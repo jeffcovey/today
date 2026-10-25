@@ -1025,7 +1025,7 @@ html[data-theme="dark"] .editor-toolbar {
 .toggle-btn {
   background: transparent;
   border: none;
-  color: white;
+  color: var(--today-brand-text);
   cursor: pointer;
   padding: 0.25rem;
   margin-left: auto;

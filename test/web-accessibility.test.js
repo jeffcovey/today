@@ -525,7 +525,8 @@ describe('a palette from the vault', () => {
       const tile = '.list-group-item.bg-primary';
       const colors = {
         tile: await view.$eval(tile, el => getComputedStyle(el).color),
-        header: await view.$eval('#aiAssistantHeader', el => getComputedStyle(el).color)
+        header: await view.$eval('#aiAssistantHeader', el => getComputedStyle(el).color),
+        chevron: await view.$eval('#aiAssistantHeader .toggle-btn #toggleIcon', el => getComputedStyle(el).color)
       };
       await view.hover(tile);
       colors.hoveredTile = await view.$eval(tile, el => getComputedStyle(el).color);
@@ -547,7 +548,7 @@ describe('a palette from the vault', () => {
         return color;
       });
       expect(colors).toEqual({
-        tile: ink, hoveredTile: ink, header: ink,
+        tile: ink, hoveredTile: ink, header: ink, chevron: ink,
         activeFile: ink, activeFileText: [ink], badge: ink
       });
     } finally {
