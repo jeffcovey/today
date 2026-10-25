@@ -569,6 +569,97 @@ describe('a palette from the vault', () => {
     }
   });
 
+  // The floating AI toggle and the user's own chat bubble were filled with
+  // Bootstrap 4's #007bff and inked in a literal white, so no palette could
+  // reach them and they were not even the blue the rest of the page wore.
+  // Both are brand fills now. The pair is checked rather than a colour: the
+  // fill is whatever the palette says, the ink is the palette's brand ink and
+  // not a hardcoded white, and the two still clear 4.5:1 the way text on a
+  // filled surface has to.
+  const PALETTE_BRAND = {
+    today: { light: { bg: 'rgb(59, 113, 202)', ink: 'rgb(255, 255, 255)' },
+      dark: { bg: 'rgb(59, 113, 202)', ink: 'rgb(255, 255, 255)' } },
+    cocoa: { light: { bg: 'rgb(122, 66, 16)', ink: 'rgb(255, 255, 255)' },
+      dark: { bg: 'rgb(161, 85, 26)', ink: 'rgb(255, 255, 255)' } },
+    'light-brand': { light: { bg: 'rgb(255, 244, 204)', ink: 'rgb(36, 24, 0)' },
+      dark: { bg: 'rgb(232, 240, 255)', ink: 'rgb(16, 32, 64)' } }
+  };
+
+  const channel = (value) => {
+    const c = value / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+
+  const contrast = (first, second) => {
+    const luminance = (colour) => {
+      const [r, g, b] = colour.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number);
+      return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+    };
+    const [a, b] = [luminance(first), luminance(second)].sort((x, y) => y - x);
+    return (a + 0.05) / (b + 0.05);
+  };
+
+  const brandFills = (view) => view.evaluate(() => {
+    // The toggle only shows once the assistant is collapsed, and a user
+    // bubble only exists once somebody has said something, so both are put
+    // into the state the stylesheet paints them in.
+    document.body.classList.add('ai-collapsed');
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble user';
+    bubble.textContent = 'What is on today?';
+    document.querySelector('.chat-messages').appendChild(bubble);
+    const probe = document.createElement('span');
+    document.body.appendChild(probe);
+    const token = (name) => {
+      probe.style.color = `var(${name})`;
+      return getComputedStyle(probe).color;
+    };
+    const paint = (el) => {
+      const style = getComputedStyle(el);
+      return { bg: style.backgroundColor, ink: style.color };
+    };
+    const colours = {
+      toggle: paint(document.querySelector('.floating-toggle-btn')),
+      bubble: paint(bubble),
+      token: { bg: token('--today-brand-bg'), ink: token('--today-brand-text') },
+      // Proof the toggle is a surface a reader would meet, not one the
+      // stylesheet keeps hidden: it is on screen in the state measured.
+      toggleShown: getComputedStyle(document.querySelector('.floating-toggle-btn')).display
+    };
+    probe.remove();
+    bubble.remove();
+    document.body.classList.remove('ai-collapsed');
+    return colours;
+  });
+
+  test.each(THEMES.flatMap(theme =>
+    ['today', 'cocoa', 'light-brand'].map(palette => [theme, palette])
+  ))('%s theme, %s palette: the floating toggle and the user bubble wear the brand pair', async (theme, palette) => {
+    const view = await browser.newPage();
+    try {
+      await usePalette(palette, server.baseUrl);
+      await view.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
+      await useTheme(view, theme, server.baseUrl);
+      await view.goto(`${server.baseUrl}/notes/kitchen-sink.md`, { waitUntil: 'networkidle0' });
+
+      const colours = await brandFills(view);
+      const expected = PALETTE_BRAND[palette][theme];
+      // Spelled out rather than compared only to the token, so the built-in
+      // case records the one-time move this made: these two were
+      // rgb(0, 123, 255), which is neither the brand fill nor a colour any
+      // palette could move, and white on it measured 3.98:1 — under the 4.5:1
+      // that text on a filled surface needs.
+      expect(colours.toggle).toEqual(expected);
+      expect(colours.bubble).toEqual(expected);
+      expect(colours.token).toEqual(expected);
+      expect(colours.toggleShown).toBe('flex');
+      expect(contrast(expected.ink, expected.bg)).toBeGreaterThanOrEqual(4.5);
+    } finally {
+      await view.close();
+      await usePalette('today', server.baseUrl);
+    }
+  });
+
   test.each(THEMES.flatMap(theme =>
     ['today', 'cocoa'].map(palette => [theme, palette])
   ))('%s theme, %s palette: task-source ink follows the link token, not the brand fill', async (theme, palette) => {
