@@ -274,20 +274,27 @@ describe('pomodoro banner', () => {
     ]);
   }
 
-  // The banner, whichever of its three states is showing.
+  // The banner while it is running, or the pill it shrinks to while it is not.
   function bannerText(page) {
     return page.$eval(
       '[data-pomodoro-start], [data-pomodoro-awaiting], [onclick*="pomodoro/start"]',
-      el => el.closest('[role="alert"]').textContent.replace(/\s+/g, ' ').trim()
+      el => el.closest('[role="alert"], .activity-pill').textContent.replace(/\s+/g, ' ').trim()
     );
+  }
+
+  // Idle, the schedule is configuration rather than status, so it is in the
+  // pill's tooltip instead of being spelled out across the strip.
+  function idleSchedule(page) {
+    return page.$eval('[onclick*="pomodoro/start"]',
+      el => el.closest('.activity-pill').getAttribute('title'));
   }
 
   test('starts, pauses, resumes, skips and stops from the page', async () => {
     const page = await openPage();
     try {
-      // Idle: the configured schedule is on show.
+      // Idle: a pill, with the configured schedule on its tooltip.
       expect(await bannerText(page)).toContain('Pomodoro');
-      expect(await bannerText(page)).toContain('2 × 25 min');
+      expect(await idleSchedule(page)).toContain('2 × 25 min');
 
       await press(page, 'start');
       expect(await bannerText(page)).toContain('Work period 1 of 2');
