@@ -86,6 +86,7 @@ import { containsDynamicContent, markDynamic } from './dynamic-content.js';
 import { DeferredBlockRegistry, deferredBlockPlaceholder, DEFERRED_BLOCK_ENDPOINT } from './deferred-blocks.js';
 import { interpolateTemplate } from './template-interpolation.js';
 import { getVaultScriptMoment } from './vault-script-moment.js';
+import { readTasks, withLazyTasks } from './dataview-tasks.js';
 import { isPostponable, postponeTaskLine } from './task-postpone.js';
 import { injectRoleReplyForms, saveRoleReply, ROLE_REPLY_ENDPOINT } from '../plugins/roles/web-reply.js';
 import { roleBlocksToCards } from '../plugins/roles/web-cards.js';
@@ -3035,21 +3036,22 @@ class DataviewAPI {
 
   // Query pages by folder or tag (now synchronous since files are pre-loaded)
   pages(source) {
-    const allFiles = this.allFiles;
+    let files = this.allFiles;
 
     // Handle folder queries like "projects" or '"projects"'
     const folderMatch = source.match(/^["']?([^"']+)["']?$/);
     if (folderMatch) {
       const folder = folderMatch[1];
-      const filtered = allFiles.filter(file => {
+      files = files.filter(file => {
         return file.folder === folder || file.path.startsWith(folder + '/');
       });
-
-      return new DataviewArray(...filtered);
     }
 
-    // Default: return all files
-    return new DataviewArray(...allFiles);
+    return DataviewArray.from(files, file => this._withTasks(file));
+  }
+
+  _withTasks(record) {
+    return withLazyTasks(record, path.join(this.vaultPath, record.path), tasks => DataviewArray.from(tasks));
   }
 
   // Parse date string and return a date with duration methods
@@ -3137,30 +3139,7 @@ class DataviewAPI {
     const relPath = this.currentFilePath.replace(this.vaultPath + '/', '').replace(/^\//, '');
     const page = this.allFiles.find(f => f.path === relPath);
 
-    // Parse tasks from the current file
-    let tasks = [];
-    try {
-      const content = fsSync.readFileSync(this.currentFilePath, 'utf-8');
-      // Match tasks including those inside blockquotes (> prefix)
-      const taskRegex = /^(?:\s*>)*\s*- \[([x\s-])\]\s*(.+)$/gim;
-      let match;
-      while ((match = taskRegex.exec(content)) !== null) {
-        const isCompleted = match[1].toLowerCase() === 'x';
-        const isCancelled = match[1] === '-';
-        tasks.push({
-          text: match[2].trim(),
-          completed: isCompleted,
-          fullyCompleted: isCompleted,
-          cancelled: isCancelled,
-          status: isCompleted ? 'done' : (isCancelled ? 'cancelled' : 'open')
-        });
-      }
-    } catch (e) {
-      debug('[DataviewAPI.current] Error reading file:', this.currentFilePath, e.message);
-    }
-
-    // Create a DataviewArray for tasks with .where() method
-    const taskArray = new DataviewArray(...tasks);
+    const taskArray = DataviewArray.from(readTasks(this.currentFilePath));
 
     const fileObj = {
       path: relPath,
@@ -3190,7 +3169,7 @@ class DataviewAPI {
     );
 
     if (page) {
-      return { ...page, ...page.frontmatter, file: page.file };
+      return { ...page, ...page.frontmatter, file: this._withTasks(page).file };
     }
     return null;
   }
