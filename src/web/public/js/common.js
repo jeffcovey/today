@@ -114,6 +114,70 @@ function cycleThemeMode() {
   setThemeMode(getNextThemeMode(getThemeMode()));
 }
 
+// Palettes
+//
+// A palette is a set of --today-* values; the server serves the chosen one at
+// /theme.css. Unlike the mode, it can't be applied here before the round trip:
+// the colours live in a stylesheet only the server can write. So the select
+// waits for the save, then reloads the one stylesheet rather than the page.
+
+function reloadThemeStylesheet() {
+  const link = document.querySelector('link[href^="/theme.css"]');
+  if (!link) return;
+  // A fresh query string is the only way to make the browser re-ask; the
+  // response itself is no-cache, so this costs one request.
+  link.href = `/theme.css?changed=${Date.now()}`;
+}
+
+function setThemePalette(name) {
+  const select = document.getElementById('paletteSelect');
+  const previous = select ? select.dataset.selected : null;
+  if (typeof fetch !== 'function') return Promise.resolve();
+  return fetch('/api/theme', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name })
+  }).then((response) => {
+    if (!response.ok) throw new Error(`Could not save palette: ${response.status}`);
+    if (select) select.dataset.selected = name;
+    reloadThemeStylesheet();
+  }).catch(() => {
+    // The palette is whatever the server still has, so put the control back
+    // rather than leaving it showing a choice that did not take.
+    if (select && previous) select.value = previous;
+  });
+}
+
+/**
+ * Fill the palette row from the vault. It stays hidden unless there is more
+ * than the built-in palette, so a vault with no themes sees no empty control.
+ */
+function initializePalettes() {
+  const row = document.getElementById('paletteRow');
+  const select = document.getElementById('paletteSelect');
+  if (!row || !select || typeof fetch !== 'function') return;
+  fetch('/api/themes')
+    .then((response) => (response.ok ? response.json() : null))
+    .then((data) => {
+      if (!data || !Array.isArray(data.themes) || data.themes.length < 2) return;
+      select.textContent = '';
+      for (const theme of data.themes) {
+        const option = document.createElement('option');
+        option.value = theme.id;
+        // textContent, not innerHTML: these names come from vault files.
+        option.textContent = theme.name;
+        select.appendChild(option);
+      }
+      select.value = data.selected;
+      select.dataset.selected = data.selected;
+      row.hidden = false;
+    })
+    .catch(() => {
+      // Offline or logged out: the row stays hidden and the page keeps the
+      // palette the server already served.
+    });
+}
+
 function initializeTheme() {
   const mode = getThemeMode();
   const effectiveTheme = getEffectiveTheme(mode);
@@ -581,6 +645,7 @@ function initializeLoadingSpinner() {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
   initializeTheme();
+  initializePalettes();
   initializeTextSize();
   initializeAIAssistant();
   restoreCollapseStates();
