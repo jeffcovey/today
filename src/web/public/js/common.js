@@ -542,6 +542,214 @@ function updatePomodoroCountdown() {
 }
 
 // Collapse/expand functionality for sections
+// ── The calm tab ────────────────────────────────────────────────────────────
+// Unsplash photographs, grouped by the light in them so the picture matches
+// the hour, and rotating by date so a given hour is not the same view every
+// day. These are direct CDN links: Unsplash retired source.unsplash.com, and
+// its licence allows hotlinking without a key.
+
+const MOMENT_PHOTOS = {
+  dawn: [
+    '1506905925346-21bda4d32df4',
+    '1426604966848-d7adac402bff',
+    '1439853949127-fa647821eba0'
+  ],
+  day: [
+    '1441974231531-c6227db76b6e',
+    '1501854140801-50d01698950b',
+    '1518837695005-2083093ee35b',
+    '1433086966358-54859d0ed716',
+    '1447752875215-b2761acb3c5d',
+    '1465146344425-f00d5f5c8f07',
+    '1486870591958-9b9d0d1dda99',
+    '1458668383970-8ddd3927deed',
+    '1419133203517-f3b3ed0ba2bb'
+  ],
+  dusk: [
+    '1470071459604-3b5ec3a7fe05',
+    '1472214103451-9374bd1c798e',
+    '1475924156734-496f6cac6ec1',
+    '1495616811223-4d98c6e9c869',
+    '1472120435266-53107fd0c44a'
+  ],
+  night: [
+    '1419242902214-272b3f66ee7a',
+    '1507400492013-162706c8c05e',
+    '1531306728370-e2ebd9d7bb99'
+  ]
+};
+
+const MOMENT_QUOTES = [
+  ['The best way out is always through.', 'Robert Frost'],
+  ['Nothing is less productive than to make more efficient what should not be done at all.', 'Peter Drucker'],
+  ['It does not matter how slowly you go as long as you do not stop.', 'Confucius'],
+  ['Simplicity is the ultimate sophistication.', 'Leonardo da Vinci'],
+  ['You can do anything, but not everything.', 'David Allen'],
+  ['Well begun is half done.', 'Aristotle'],
+  ['How we spend our days is, of course, how we spend our lives.', 'Annie Dillard'],
+  ['Tension is who you think you should be. Relaxation is who you are.', 'Chinese proverb'],
+  ['Begin anywhere.', 'John Cage'],
+  ['Do not wait to strike till the iron is hot; but make it hot by striking.', 'William Butler Yeats']
+];
+
+// Which light the photograph should be in. Dawn and dusk are deliberately
+// narrow: they are the hours when a daylight picture would look wrong.
+function momentBucket(hour) {
+  if (hour < 5 || hour >= 21) return 'night';
+  if (hour < 8) return 'dawn';
+  if (hour < 18) return 'day';
+  return 'dusk';
+}
+
+function momentGreeting(hour) {
+  if (hour < 5) return 'Good night';
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+// A stable number for the day, so the photograph and the quote hold still
+// across page loads and move only when the date or the hour does.
+function momentDayIndex(now) {
+  return Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+}
+
+function momentPhotoUrl(now) {
+  const set = MOMENT_PHOTOS[momentBucket(now.getHours())];
+  return 'https://images.unsplash.com/photo-'
+    + set[momentDayIndex(now) % set.length]
+    + '?auto=format&fit=crop&w=2000&q=80';
+}
+
+function paintMomentClock() {
+  const clock = document.getElementById('momentClock');
+  const greeting = document.getElementById('momentGreeting');
+  if (!clock || !greeting) return;
+
+  const now = new Date();
+  clock.textContent = (now.getHours() % 12 || 12) + ':' + String(now.getMinutes()).padStart(2, '0');
+
+  const panel = document.getElementById('momentPanel');
+  const name = panel ? panel.dataset.name : '';
+  greeting.textContent = momentGreeting(now.getHours()) + (name ? ', ' + name : '') + '.';
+}
+
+function paintMomentPhoto() {
+  const holder = document.getElementById('momentPhoto');
+  if (!holder) return;
+  const url = momentPhotoUrl(new Date());
+  if (holder.dataset.url === url) return;
+
+  // Loaded out of view first, so the panel never shows a half-painted photo
+  // and never flashes an empty box if the network is slow or absent.
+  const image = new Image();
+  image.onload = () => {
+    holder.style.backgroundImage = 'url("' + url + '")';
+    holder.dataset.url = url;
+    holder.classList.add('is-loaded');
+  };
+  image.src = url;
+}
+
+function paintMomentQuote() {
+  const target = document.getElementById('momentQuote');
+  if (!target) return;
+  const quote = MOMENT_QUOTES[momentDayIndex(new Date()) % MOMENT_QUOTES.length];
+  target.textContent = '“' + quote[0] + '” — ' + quote[1];
+}
+
+async function initializeMoment() {
+  const panel = document.getElementById('momentPanel');
+  if (!panel) return;
+
+  paintMomentClock();
+  paintMomentPhoto();
+  paintMomentQuote();
+
+  // Often enough that the clock is never visibly behind, and so the picture
+  // changes when the hour crosses into a different light.
+  setInterval(() => {
+    paintMomentClock();
+    paintMomentPhoto();
+  }, 20000);
+
+  const input = document.getElementById('momentGoal');
+  const saved = document.getElementById('momentGoalSaved');
+  const form = document.getElementById('momentGoalForm');
+  if (!input || !form) return;
+
+  try {
+    const response = await fetch('/api/daily-goal');
+    const data = await response.json();
+    if (data.success && typeof data.goal === 'string') input.value = data.goal;
+  } catch (error) {
+    // Leave it empty. The goal is a nicety, not something to interrupt over.
+  }
+
+  let saveTimer = null;
+  const save = async () => {
+    try {
+      const response = await fetch('/api/daily-goal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goal: input.value })
+      });
+      saved.textContent = response.ok ? 'Saved' : 'Not saved';
+    } catch (error) {
+      saved.textContent = 'Not saved';
+    }
+    setTimeout(() => { saved.textContent = ''; }, 2000);
+  };
+
+  input.addEventListener('input', () => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(save, 800);
+  });
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    clearTimeout(saveTimer);
+    input.blur();
+    save();
+  });
+}
+
+// ── The home page's tabbed card ─────────────────────────────────────────────
+// Driven here rather than through MDB's tab plugin, which arrives from a CDN:
+// the vault listing lives inside a tab panel, and the page's main content
+// should not be one failed script away from being unreachable.
+
+function selectHomeTab(name) {
+  document.querySelectorAll('[data-home-tab]').forEach(tab => {
+    const selected = tab.dataset.homeTab === name;
+    tab.classList.toggle('active', selected);
+    tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+    // Roving tabindex: the tablist is one stop, and the arrows move within it.
+    tab.tabIndex = selected ? 0 : -1;
+  });
+  document.querySelectorAll('[data-home-panel]').forEach(panel => {
+    panel.hidden = panel.dataset.homePanel !== name;
+  });
+}
+
+function moveHomeTab(event) {
+  const keys = { ArrowLeft: -1, ArrowRight: 1, Home: 'first', End: 'last' };
+  const step = keys[event.key];
+  if (step === undefined) return;
+
+  const tabs = Array.from(document.querySelectorAll('[data-home-tab]'));
+  if (!tabs.length) return;
+  const current = tabs.findIndex(tab => tab.getAttribute('aria-selected') === 'true');
+
+  let next;
+  if (step === 'first') next = 0;
+  else if (step === 'last') next = tabs.length - 1;
+  else next = (current + step + tabs.length) % tabs.length;
+
+  event.preventDefault();
+  selectHomeTab(tabs[next].dataset.homeTab);
+  tabs[next].focus();
+}
+
 function toggleCollapse(sectionId) {
   const section = document.getElementById(sectionId);
   if (!section) return;
@@ -646,6 +854,7 @@ function initializeLoadingSpinner() {
 document.addEventListener('DOMContentLoaded', () => {
   initializeTheme();
   initializePalettes();
+  initializeMoment();
   initializeTextSize();
   initializeAIAssistant();
   restoreCollapseStates();

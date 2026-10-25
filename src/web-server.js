@@ -125,12 +125,21 @@ const __dirname = dirname(__filename);
 // even though express.static still sends a long max-age. Falls back to a
 // boot timestamp if git is unavailable (eg. detached source dir).
 const STATIC_VERSION = (() => {
+  const git = (args) => execSync(`git ${args}`, {
+    cwd: path.join(__dirname, '..'),
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim();
   try {
-    return execSync('git rev-parse --short HEAD', {
-      cwd: path.join(__dirname, '..'),
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim() || Date.now().toString(36);
+    const head = git('rev-parse --short HEAD');
+    // A dirty tree means someone is editing this checkout in place, and the
+    // sha alone would pin every browser to whatever was last committed — the
+    // stylesheet changes and nobody sees it. Stamp those with the boot time,
+    // so a restart is enough. A clean tree still gets the plain sha, so a
+    // deployed version is stable and shared across visitors.
+    const dirty = git('status --porcelain --untracked-files=no');
+    if (dirty) return `${head || 'dev'}-${Date.now().toString(36)}`;
+    return head || Date.now().toString(36);
   } catch {
     return Date.now().toString(36);
   }
@@ -507,6 +516,46 @@ app.get('/api/themes', authMiddleware, async (req, res) => {
   }
 });
 
+// ── The day's one goal ──────────────────────────────────────────────────────
+// Kept in .data rather than the vault: it is a scratch intention for today,
+// not a note worth a file and a sync. It resets by date, so asking for it on
+// a new day returns an empty string rather than yesterday's answer.
+const DAILY_GOAL_PATH = path.join(__dirname, '..', '.data', 'daily-goal.json');
+
+async function readDailyGoal() {
+  try {
+    const stored = JSON.parse(await fs.readFile(DAILY_GOAL_PATH, 'utf-8'));
+    const today = getTodayDate(getConfiguredTimezone());
+    return stored && stored.date === today && typeof stored.goal === 'string'
+      ? { date: today, goal: stored.goal }
+      : { date: today, goal: '' };
+  } catch {
+    return { date: getTodayDate(getConfiguredTimezone()), goal: '' };
+  }
+}
+
+app.get('/api/daily-goal', authMiddleware, async (req, res) => {
+  res.json({ success: true, ...(await readDailyGoal()) });
+});
+
+app.post('/api/daily-goal', authMiddleware, express.json(), async (req, res) => {
+  const goal = typeof req.body?.goal === 'string' ? req.body.goal.slice(0, 200) : null;
+  if (goal === null) {
+    return res.status(400).json({ success: false, message: 'goal must be a string' });
+  }
+  const date = getTodayDate(getConfiguredTimezone());
+  try {
+    await fs.mkdir(path.dirname(DAILY_GOAL_PATH), { recursive: true });
+    const tempPath = `${DAILY_GOAL_PATH}.${process.pid}.${crypto.randomUUID()}.tmp`;
+    await fs.writeFile(tempPath, `${JSON.stringify({ date, goal }, null, 2)}\n`, 'utf-8');
+    await fs.rename(tempPath, DAILY_GOAL_PATH);
+    res.json({ success: true, date, goal });
+  } catch (error) {
+    console.error('Error saving the daily goal:', error);
+    res.status(500).json({ success: false, message: 'Failed to save the goal' });
+  }
+});
+
 app.post('/api/theme', authMiddleware, express.json(), async (req, res) => {
   const { mode, name } = req.body || {};
   // Either may be sent on its own: the menu has a control for each.
@@ -639,12 +688,12 @@ function getFloatingToggleBtn() {
 function getTimerWidget(timer) {
   if (timer) {
     return `
-        <div class="alert alert-info d-flex align-items-center mb-3" role="alert" data-timer-start="${timer.startTimeISO}">
+        <div class="alert alert-info d-flex align-items-center mb-2 py-2 px-3" role="alert" data-timer-start="${timer.startTimeISO}">
           <i class="fas fa-clock me-2"></i>
           <div class="flex-grow-1">
             <strong>${timer.description}</strong>
             <br>
-            <small>Started at ${timer.startTime} • Duration: <span class="timer-duration">${timer.duration}</span></small>
+            <small class="activity-tracker-meta">Started ${timer.startTime} · <span class="timer-duration">${timer.duration}</span></small>
           </div>
           <a href="#" id="stopTimerBtn" onclick="
             const btn = this;
@@ -666,8 +715,8 @@ function getTimerWidget(timer) {
         </div>`;
   } else {
     return `
-        <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
-          <i class="fas fa-clock me-2"></i>
+        <div class="activity-tracker mb-2">
+          <i class="fas fa-clock activity-tracker-icon" aria-hidden="true"></i>
           <div class="input-group flex-grow-1">
             <input type="text" class="form-control" id="timerDescription" placeholder="What are you working on? (include #topic/tags)" onkeypress="if(event.key==='Enter'){event.preventDefault();document.getElementById('startTimerBtn').click();}">
             <button class="btn btn-primary" id="startTimerBtn" onclick="
@@ -1192,7 +1241,7 @@ async function getTaskTimerWidget() {
       const nextText = nextItem ? processMarkdownLinks(nextItem.displayText) : null;
 
       return `
-        <div class="alert alert-info mb-3 py-2 px-3" role="alert"
+        <div class="alert alert-info mb-2 py-2 px-3" role="alert"
           data-timer-start="${taskTimerState.startTime}" data-timer-total-seconds="${restSeconds}" data-timer-phase="rest">
           <div><strong>Rest</strong> — <span class="task-timer-countdown">${initMin}:${String(initSec).padStart(2, '0')}</span></div>
           ${nextText ? `<div class="mt-1"><small>Up next: <strong>${nextText}</strong></small></div>` : ''}
@@ -1212,7 +1261,7 @@ async function getTaskTimerWidget() {
     const pausedAttr = isPaused ? ' data-timer-paused="true"' : '';
 
     return `
-      <div class="alert ${alertClass} mb-3" role="alert"
+      <div class="alert ${alertClass} mb-2" role="alert"
         data-timer-start="${taskTimerState.startTime}" data-timer-total-seconds="${workSeconds}" data-timer-phase="work"${pausedAttr}>
         <div class="d-flex align-items-start">
           <i class="${iconClass} me-2 mt-1"></i>
@@ -1262,47 +1311,33 @@ async function getTaskTimerWidget() {
     const items = await getTodayTaskTimerItems();
     if (!items || items.length === 0) {
       return `
-      <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
-        <i class="fas fa-tasks me-2"></i>
-        <div class="flex-grow-1">
-          No tasks, habits, or project reviews due today.
-        </div>
+      <div class="activity-pill activity-pill-quiet">
+        <i class="fas fa-tasks" aria-hidden="true"></i>
+        <span>Task Timer</span>
+        <span class="activity-pill-count activity-pill-count-zero">0</span>
       </div>`;
     }
     return `
-      <div class="alert alert-primary d-flex align-items-center mb-3" role="alert">
-        <i class="fas fa-tasks me-2"></i>
-        <div class="flex-grow-1">
-          <div class="row g-2 align-items-center">
-            <div class="col">
-              <strong>Task Timer</strong> — ${items.length} items ready
-            </div>
-            <div class="col-auto">
-              <div class="input-group input-group-sm">
-                <input type="number" class="form-control" id="taskTimerMinutes" aria-label="Minutes per task" value="${taskTimerState.duration}" min="1" max="60" style="width: 60px;">
-                <span class="input-group-text">min</span>
-              </div>
-            </div>
-            <div class="col-auto">
-              <button class="btn btn-sm btn-primary" onclick="
-                const btn = this;
-                const icon = btn.querySelector('i');
-                const text = btn.querySelector('.btn-text');
-                const minutesInput = document.getElementById('taskTimerMinutes');
-                const duration = parseInt(minutesInput.value) || 2;
-                btn.disabled = true;
-                icon.className = 'fas fa-spinner fa-spin';
-                text.textContent = ' Starting...';
-                fetch('/api/task-timer/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({duration})}).then(function() { location.reload(); }).catch(function() {
-                  btn.disabled = false;
-                  icon.className = 'fas fa-play';
-                  text.textContent = ' Start';
-                });">
-                <i class="fas fa-play"></i><span class="btn-text"> Start</span>
-              </button>
-            </div>
-          </div>
-        </div>
+      <div class="activity-pill">
+        <i class="fas fa-tasks" aria-hidden="true"></i>
+        <span>Task Timer</span>
+        <span class="activity-pill-count">${items.length}</span>
+        <input type="number" class="activity-pill-number" id="taskTimerMinutes" aria-label="Minutes per task"
+          title="Minutes per task" value="${taskTimerState.duration}" min="1" max="60">
+        <span class="activity-pill-unit">min</span>
+        <button class="activity-pill-go" title="Start task timer" aria-label="Start task timer" onclick="
+          const btn = this;
+          const icon = btn.querySelector('i');
+          const minutesInput = document.getElementById('taskTimerMinutes');
+          const duration = parseInt(minutesInput.value) || 2;
+          btn.disabled = true;
+          icon.className = 'fas fa-spinner fa-spin';
+          fetch('/api/task-timer/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({duration})}).then(function() { location.reload(); }).catch(function() {
+            btn.disabled = false;
+            icon.className = 'fas fa-play';
+          });">
+          <i class="fas fa-play"></i>
+        </button>
       </div>`;
   }
 }
@@ -1427,20 +1462,18 @@ function getPomodoroWidget() {
   }
 
   if (!pomodoroState.isRunning) {
+    // The schedule is configuration, not status, so it moves to the tooltip:
+    // what you need at a glance is that Pomodoro is here and not running.
+    const schedule = `${config.workPeriods} \u00d7 ${config.workMinutes} min, `
+      + `${config.shortRestMinutes} min breaks, ${config.longRestMinutes} min long break`;
     return `
-      <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
-        <i class="fas fa-stopwatch me-2"></i>
-        <div class="flex-grow-1">
-          <div class="row g-2 align-items-center">
-            <div class="col">
-              <strong>Pomodoro</strong> — ${config.workPeriods} × ${config.workMinutes} min,
-              ${config.shortRestMinutes} min breaks, ${config.longRestMinutes} min long break
-            </div>
-            <div class="col-auto">
-              ${pomodoroButton('start', 'fa-play', 'Start', 'btn-primary')}
-            </div>
-          </div>
-        </div>
+      <div class="activity-pill" title="${schedule}">
+        <i class="fas fa-stopwatch" aria-hidden="true"></i>
+        <span>Pomodoro</span>
+        <button class="activity-pill-go" title="Start pomodoro" aria-label="Start pomodoro — ${schedule}" onclick="
+          fetch('/api/pomodoro/start', {method: 'POST'}).then(function() { location.reload(); });">
+          <i class="fas fa-play"></i>
+        </button>
       </div>`;
   }
 
@@ -1449,7 +1482,7 @@ function getPomodoroWidget() {
   if (pomodoroState.awaitingStart) {
     const finished = intervalDescription(pomodoroState.finishedPhase, pomodoroState.finishedPeriodIndex, config);
     return `
-      <div class="alert alert-info mb-3 py-2 px-3" role="alert" data-pomodoro-awaiting="true">
+      <div class="alert alert-info mb-2 py-2 px-3" role="alert" data-pomodoro-awaiting="true">
         <div><i class="fas fa-bell me-2"></i><strong>${finished} complete</strong></div>
         <div class="mt-1"><small>Up next: <strong>${upcoming}</strong> — ${phaseMinutes(pomodoroState.phase, config)} min</small></div>
         <div class="mt-1 d-flex gap-1">
@@ -1473,7 +1506,7 @@ function getPomodoroWidget() {
   const afterLabel = intervalDescription(after.phase, after.periodIndex, config);
 
   return `
-    <div class="alert ${alertClass} mb-3 py-2 px-3" role="alert"
+    <div class="alert ${alertClass} mb-2 py-2 px-3" role="alert"
       data-pomodoro-start="${pomodoroState.startTime}" data-pomodoro-total-seconds="${totalSeconds}"${pausedAttr}>
       <div>
         <i class="fas ${iconClass} me-2"></i>
@@ -1489,6 +1522,39 @@ function getPomodoroWidget() {
         ${pomodoroButton('stop', 'fa-stop', 'Stop', 'btn-outline-secondary')}
         ${pomodoroButton('skip', 'fa-forward', 'Skip', 'btn-outline-secondary')}
       </div>
+    </div>`;
+}
+
+// ── The activity bar ────────────────────────────────────────────────────────
+// One strip above the page instead of a stack of full-width alerts. The three
+// timers are *state*, and almost always idle, so idle is what has to be cheap:
+// each one shrinks to a pill and expands into its own banner only while it is
+// actually running. The tracker keeps a full-width row either way, because it
+// is the one thing here you type into.
+//
+// This used to be built inline at three call sites, identically, which is why
+// it lives in one function now.
+
+async function getActivityBar({ timer }) {
+  const taskTimerHtml = await getTaskTimerWidget();
+  const pomodoroHtml = getPomodoroWidget();
+
+  // Whether each one rendered a banner or a pill is decided by the same state
+  // the widget itself read, rather than by inspecting the markup it returned.
+  const taskTimerRunning = Boolean(taskTimerState.isRunning && taskTimerState.currentItem);
+  const pomodoroRunning = Boolean(pomodoroState.isRunning);
+
+  const banners = [];
+  const pills = [];
+
+  if (taskTimerHtml) (taskTimerRunning ? banners : pills).push(taskTimerHtml);
+  if (pomodoroHtml) (pomodoroRunning ? banners : pills).push(pomodoroHtml);
+
+  return `
+    <div class="activity-bar mb-3">
+      ${getTimerWidget(timer)}
+      ${banners.join('\n')}
+      ${pills.length ? `<div class="activity-pills">${pills.join('\n')}</div>` : ''}
     </div>`;
 }
 
@@ -1638,6 +1704,80 @@ function getPlanHierarchyLevel(filename) {
   }
 }
 
+// ── The calm tab ────────────────────────────────────────────────────────────
+// A still photograph, the time, a greeting and one question, after
+// momentumdash.com. Everything on it that depends on the clock — the time
+// itself, the greeting, which photograph, which quote — is filled in by the
+// page, because this markup is cached to disk and would otherwise be stuck
+// saying "Good morning" all evening. Only the name is baked in, since that
+// does not change between renders.
+function renderMomentPanel(displayName) {
+  return `
+            <div class="moment" id="momentPanel" data-name="${escapeHtmlEntities(displayName || '')}">
+              <div class="moment-photo" id="momentPhoto" aria-hidden="true"></div>
+              <div class="moment-scrim" aria-hidden="true"></div>
+              <div class="moment-inner">
+                <p class="moment-clock" id="momentClock"></p>
+                <p class="moment-greeting" id="momentGreeting"></p>
+                <form class="moment-goal" id="momentGoalForm" autocomplete="off">
+                  <label class="moment-goal-label" for="momentGoal">What is your main goal for today?</label>
+                  <input class="moment-goal-input" type="text" id="momentGoal" maxlength="200"
+                    aria-describedby="momentGoalSaved">
+                  <span class="moment-goal-saved" id="momentGoalSaved" role="status"></span>
+                </form>
+                <p class="moment-quote" id="momentQuote"></p>
+              </div>
+            </div>`;
+}
+
+// ── The home page's one card ────────────────────────────────────────────────
+// Vault, Now, Plans and Recent Pages used to be four stacked cards, three of
+// them collapsed, so reaching the vault listing meant scrolling past three
+// headers that were shut. They are one card with tabs now, Vault first,
+// because the listing is what the page is for.
+//
+// The tabs are driven by the page's own script rather than by MDB's tab
+// plugin: that arrives from a CDN, and a card whose only content is behind a
+// tab should not depend on a third-party script to open.
+function renderHomeTabCard(tabs, links = null) {
+  const nav = tabs.map((tab, index) => `
+            <li class="nav-item" role="presentation">
+              <button type="button" role="tab" id="homeTab-${tab.id}" data-home-tab="${tab.id}"
+                class="nav-link${index === 0 ? ' active' : ''}"
+                aria-controls="homePanel-${tab.id}" aria-selected="${index === 0 ? 'true' : 'false'}"
+                tabindex="${index === 0 ? '0' : '-1'}" onclick="selectHomeTab('${tab.id}')">
+                <i class="fas ${tab.icon} me-2" aria-hidden="true"></i>${tab.label}
+              </button>
+            </li>`).join('');
+
+  // Deliberately a second list, outside the tablist. These leave the page
+  // rather than swapping a panel, and a link inside role="tablist" would tell
+  // a screen reader it is a tab and then not behave like one.
+  const linkNav = (links || []).map(link => `
+            <li class="nav-item">
+              <a class="nav-link home-tab-link" href="${link.href}"${link.detail ? ` title="${link.detail}"` : ''}>
+                <i class="fas ${link.icon} me-2" aria-hidden="true"></i>${link.label}
+                ${link.count === undefined || link.count === null ? '' : `<span class="home-tab-count">${link.count}</span>`}
+              </a>
+            </li>`).join('');
+
+  const panels = tabs.map((tab, index) => `
+          <div class="home-tab-panel" role="tabpanel" id="homePanel-${tab.id}"
+            data-home-panel="${tab.id}" aria-labelledby="homeTab-${tab.id}"${index === 0 ? '' : ' hidden'}>
+            ${tab.body}
+          </div>`).join('');
+
+  return `
+        <div class="card shadow-sm mb-3">
+          <div class="card-header home-tabbar">
+            <ul class="nav home-tabs" role="tablist" onkeydown="moveHomeTab(event)">${nav}
+            </ul>${linkNav ? `
+            <ul class="nav home-tabs home-tab-links">${linkNav}
+            </ul>` : ''}
+          </div>${panels}
+        </div>`;
+}
+
 // Directory listing
 async function renderDirectory(dirPath, urlPath) {
   let items = await fs.readdir(dirPath, { withFileTypes: true });
@@ -1668,6 +1808,9 @@ async function renderDirectory(dirPath, urlPath) {
   // Build breadcrumb items
   const breadcrumbParts = urlPath ? urlPath.split('/').filter(Boolean) : [];
   let breadcrumbHtml = '<li class="breadcrumb-item"><a href="/" aria-label="Home"><i class="fas fa-home" aria-hidden="true"></i></a></li>';
+  // On the home page the breadcrumb is a single crumb linking to the page you
+  // are already on, so the whole nav goes rather than rendering as an empty bar.
+  const showBreadcrumb = breadcrumbParts.length > 0;
   let currentPath = '';
   breadcrumbParts.forEach((part, index) => {
     currentPath += '/' + part;
@@ -1679,6 +1822,14 @@ async function renderDirectory(dirPath, urlPath) {
   });
 
   let contentHtml = '';
+  // The home page's two shortcuts sit on the card's tab row, after the tabs.
+  // They are links rather than tabs: they leave the page instead of swapping
+  // a panel, which is why they are kept out of the tablist below.
+  let homeLinks = null;
+  // The home page's one card: Vault plus whichever of Now/Plans/Recents the
+  // configured plugins give us. Vault is added last, so it can carry the
+  // directory listing that is built further down, and shown first.
+  let homeTabs = null;
 
   // Special homepage content
   if (!urlPath) {
@@ -1732,65 +1883,36 @@ async function renderDirectory(dirPath, urlPath) {
     const plansEnabled = isPluginConfigured('markdown-plans');
     const nowUpdatesEnabled = isPluginConfigured('now-updates');
 
-    // Build Today's Plan/Diary and Today's Tasks cards side-by-side on larger screens
-    contentHtml += `<div class="row">`;
+    homeTabs = [];
 
-    // Add Today's Plan/Diary button based on enabled plugins
+    // Today's diary/plan and today's tasks are two links with a count; they
+    // were two saturated full-width tiles, which made the loudest thing on the
+    // page a fact that is almost always true.
+    homeLinks = [];
     if (diaryEnabled) {
-      contentHtml += `
-              <div class="col-12 col-lg-6 mb-3">
-                <div class="card shadow-sm h-100">
-                  <a href="/diary/${todayISO}.md" class="list-group-item list-group-item-action bg-primary text-white h-100">
-                    <div class="d-flex align-items-center ps-2 py-2">
-                      <i class="fas fa-book me-2"></i>
-                      <div>
-                        <strong>Today's Diary</strong>
-                        <br>
-                        <small>${todayDisplay}</small>
-                      </div>
-                    </div>
-                  </a>
-                </div>
-              </div>`;
+      homeLinks.push({
+        href: `/diary/${todayISO}.md`,
+        icon: 'fa-book',
+        label: 'Diary',
+        detail: todayDisplay
+      });
     } else if (plansEnabled) {
-      contentHtml += `
-              <div class="col-12 col-lg-6 mb-3">
-                <div class="card shadow-sm h-100">
-                  <a href="/plans/${todayPlanFile}" class="list-group-item list-group-item-action bg-primary text-white h-100">
-                    <div class="d-flex align-items-center ps-2 py-2">
-                      <i class="fas fa-calendar-day me-2"></i>
-                      <div>
-                        <strong>Today's Plan</strong>
-                        <br>
-                        <small>${todayDisplay}</small>
-                      </div>
-                    </div>
-                  </a>
-                </div>
-              </div>`;
+      homeLinks.push({
+        href: `/plans/${todayPlanFile}`,
+        icon: 'fa-calendar-day',
+        label: 'Plan',
+        detail: todayDisplay
+      });
     }
-
-    // Add Today's Tasks button
-    contentHtml += `
-              <div class="col-12 ${diaryEnabled || plansEnabled ? 'col-lg-6' : ''} mb-3">
-                <div class="card shadow-sm h-100">
-                  <a href="/tasks/today.md" class="list-group-item list-group-item-action ${taskCount > 0 ? 'bg-warning text-dark' : 'bg-secondary text-white'} h-100">
-                    <div class="d-flex align-items-center justify-content-between ps-2 py-2">
-                      <div class="d-flex align-items-center">
-                        <i class="fas fa-tasks me-2"></i>
-                        <div>
-                          <strong>Today's Tasks</strong>
-                          <br>
-                          <small>${taskCount > 0 ? `${taskCount} task${taskCount !== 1 ? 's' : ''} scheduled/due today` : 'No tasks scheduled for today'}</small>
-                        </div>
-                      </div>
-                      ${taskCount > 0 ? `<span class="badge bg-light text-dark fs-6">${taskCount}</span>` : ''}
-                    </div>
-                  </a>
-                </div>
-              </div>`;
-
-    contentHtml += `</div>`;
+    homeLinks.push({
+      href: '/tasks/today.md',
+      icon: 'fa-tasks',
+      label: 'Tasks',
+      detail: taskCount > 0
+        ? `${taskCount} task${taskCount !== 1 ? 's' : ''} scheduled/due today`
+        : 'No tasks scheduled for today',
+      count: taskCount
+    });
 
     if (nowUpdatesEnabled) {
       const nowPath = path.join(VAULT_PATH, 'now.md');
@@ -1806,105 +1928,92 @@ async function renderDirectory(dirPath, urlPath) {
         }
       }
 
-      contentHtml += `
-            <div class="card shadow-sm mb-3">
-              <div class="card-header" style="cursor: pointer;" onclick="toggleCollapse('nowSection')">
-                <div class="d-flex justify-content-between align-items-center">
-                  <span><i class="fas fa-bolt me-2"></i> Now</span>
-                  <i class="fas fa-chevron-down" id="nowChevron"></i>
-                </div>
-              </div>
-              <div class="collapse" id="nowSection">
+      homeTabs.push({
+        id: 'now',
+        label: 'Now',
+        icon: 'fa-bolt',
+        body: `
                 <div class="card-body">
                   ${nowEntryHtml}
                   <a href="/now.md" class="btn btn-sm btn-outline-primary mt-2">View full now.md</a>
-                </div>
-              </div>
-            </div>`;
+                </div>`
+      });
     }
 
     // Add Plans section (collapsed) - only if markdown-plans plugin is enabled
     if (plansEnabled) {
       const plansDir = path.join(dirPath, 'plans');
+      const dayPlanExists = await fs.access(path.join(plansDir, todayPlanFile)).then(() => true).catch(() => false);
       const weekPlanExists = await fs.access(path.join(plansDir, weekPlanFile)).then(() => true).catch(() => false);
       const monthPlanExists = await fs.access(path.join(plansDir, monthPlanFile)).then(() => true).catch(() => false);
       const quarterPlanExists = await fs.access(path.join(plansDir, quarterPlanFile)).then(() => true).catch(() => false);
       const yearPlanExists = await fs.access(path.join(plansDir, yearPlanFile)).then(() => true).catch(() => false);
 
-      contentHtml += `
-            <div class="card shadow-sm mb-3">
-              <div class="card-header" style="cursor: pointer;" onclick="toggleCollapse('plansSection')">
-                <div class="d-flex justify-content-between align-items-center">
-                  <span><i class="fas fa-calendar-alt me-2"></i> Plans</span>
-                  <i class="fas fa-chevron-down" id="plansChevron"></i>
-                </div>
-              </div>
-              <div class="collapse" id="plansSection">
-                <div class="list-group list-group-flush">`;
+      let plansBody = '<div class="list-group list-group-flush">';
 
+      // Today's own plan heads the list: the tab runs day, week, month,
+      // quarter, year, so it reads outward from now.
+      if (dayPlanExists) {
+        plansBody += `
+                  <a href="/plans/${todayPlanFile}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-calendar-day text-primary me-3"></i>
+                    Today — ${todayDisplay}
+                  </a>`;
+      }
       if (weekPlanExists) {
-        contentHtml += `
+        plansBody += `
                   <a href="/plans/${weekPlanFile}" class="list-group-item list-group-item-action">
                     <i class="fas fa-calendar-week text-info me-3"></i>
                     Week ${week}
                   </a>`;
       }
       if (monthPlanExists) {
-        contentHtml += `
+        plansBody += `
                   <a href="/plans/${monthPlanFile}" class="list-group-item list-group-item-action">
                     <i class="fas fa-calendar text-success me-3"></i>
                     ${today.toLocaleDateString('en-US', { month: 'long' })} ${year}
                   </a>`;
       }
       if (quarterPlanExists) {
-        contentHtml += `
+        plansBody += `
                   <a href="/plans/${quarterPlanFile}" class="list-group-item list-group-item-action">
                     <i class="fas fa-business-time text-warning me-3"></i>
                     Quarter ${quarter.slice(1)} - ${year}
                   </a>`;
       }
       if (yearPlanExists) {
-        contentHtml += `
+        plansBody += `
                   <a href="/plans/${yearPlanFile}" class="list-group-item list-group-item-action">
                     <i class="fas fa-calendar-check text-danger me-3"></i>
                     Year ${year}
                   </a>`;
       }
 
-      contentHtml += `
-                </div>
-              </div>
-            </div>`;
+      plansBody += '</div>';
+
+      homeTabs.push({ id: 'plans', label: 'Plans', icon: 'fa-calendar-alt', body: plansBody });
     }
     
-    // Add Recents section (collapsed) - placeholder for now
-    contentHtml += `
-            <div class="card shadow-sm mb-3">
-              <div class="card-header" style="cursor: pointer;" onclick="toggleCollapse('recentsSection')">
-                <div class="d-flex justify-content-between align-items-center">
-                  <span><i class="fas fa-history me-2"></i> Recent Pages</span>
-                  <i class="fas fa-chevron-down" id="recentsChevron"></i>
-                </div>
-              </div>
-              <div class="collapse" id="recentsSection">
+    // Recents is still a placeholder; the list is filled in by the page.
+    homeTabs.push({
+      id: 'recents',
+      label: 'Recent Pages',
+      icon: 'fa-history',
+      body: `
                 <div class="list-group list-group-flush" id="recentsList">
                   <div class="list-group-item text-muted">
                     <small>Recent pages will appear here</small>
                   </div>
-                </div>
-              </div>
-            </div>`;
+                </div>`
+    });
   }
   
-  contentHtml += `
-            <div class="card shadow-sm h-100">
-              <div class="list-group list-group-flush">
-  `;
+  let listingHtml = '';
   
   // Add parent directory link if not at root
   if (urlPath) {
     const parentPath = path.dirname(urlPath);
-    contentHtml += `
+    listingHtml += `
       <a href="/${parentPath === '.' ? '' : parentPath}" class="list-group-item list-group-item-action">
         <i class="fas fa-level-up-alt text-muted me-3"></i>
         <span class="text-muted">..</span>
@@ -1915,7 +2024,7 @@ async function renderDirectory(dirPath, urlPath) {
   for (const item of items) {
     if (item.isDirectory()) {
       const itemPath = urlPath ? `${urlPath}/${item.name}` : item.name;
-      contentHtml += `
+      listingHtml += `
         <a href="/${itemPath}" class="list-group-item list-group-item-action">
           <i class="fas fa-folder text-warning me-3"></i>
           <strong>${item.name}/</strong>
@@ -1997,13 +2106,42 @@ async function renderDirectory(dirPath, urlPath) {
           </div>`;
       }
 
-      contentHtml += `
+      listingHtml += `
         <a href="/${itemPath}" class="list-group-item list-group-item-action" style="${indentStyle}">
           ${displayContent}
         </a>`;
     }
   }
   
+
+  // The listing is the Vault tab's body on the home page, and the whole card
+  // everywhere else, so it is built on its own and placed afterwards. It used
+  // to leave its <div>s unclosed and let the column element close them.
+  if (homeTabs) {
+    homeTabs.unshift({
+      id: 'vault',
+      label: 'Vault',
+      icon: 'fa-folder-open',
+      body: `<div class="list-group list-group-flush">${listingHtml}</div>`
+    });
+    // The calm tab goes in front of Vault and opens first.
+    homeTabs.unshift({
+      id: 'moment',
+      label: 'Today',
+      icon: 'fa-sun',
+      body: renderMomentPanel(
+        getConfig('profile.display_name')
+          || String(getConfig('profile.name') || '').trim().split(/\s+/)[0]
+      )
+    });
+    contentHtml += renderHomeTabCard(homeTabs, homeLinks);
+  } else {
+    contentHtml += `
+            <div class="card shadow-sm h-100">
+              <div class="list-group list-group-flush">${listingHtml}</div>
+            </div>`;
+  }
+
   // Build page using directory template
   const dirTemplate = await loadTemplate('directory');
   const dirInlineScript = `<script>
@@ -2272,7 +2410,9 @@ Contents:
   const html = renderTemplate(dirTemplate, {
     title: `Vault: ${urlPath || '/'}`,
     navbar: getNavbar(),
-    breadcrumb: breadcrumbHtml,
+    breadcrumbNav: showBreadcrumb
+      ? `<nav aria-label="breadcrumb"><ol class="breadcrumb">${breadcrumbHtml}</ol></nav>`
+      : '',
     content: contentHtml,
     sidebar: getAIAssistantPanel('Ask questions about this directory and its contents'),
     floatingToggle: getFloatingToggleBtn(),
@@ -2280,16 +2420,7 @@ Contents:
   });
 
   // Inject timer widgets
-  const widgetsHtml = `
-    <div class="row g-3 mb-3">
-      <div class="col-12 col-lg-6">
-        ${getTimerWidget(currentTimer)}
-      </div>
-      <div class="col-12 col-lg-6">
-        ${await getTaskTimerWidget()}
-        ${getPomodoroWidget()}
-      </div>
-    </div>`;
+  const widgetsHtml = await getActivityBar({ timer: currentTimer });
 
   return html.replace('<!--TIMER_WIDGETS_PLACEHOLDER-->', widgetsHtml);
 }
@@ -5571,16 +5702,7 @@ async function renderMarkdown(filePath, urlPath) {
   // Inject live timer widgets on every request (not cached)
   const currentTimer = await getCurrentTimer();
 
-  const widgetsHtml = `
-    <div class="row g-3 mb-3">
-      <div class="col-12 col-lg-6">
-        ${getTimerWidget(currentTimer)}
-      </div>
-      <div class="col-12 col-lg-6">
-        ${await getTaskTimerWidget()}
-        ${getPomodoroWidget()}
-      </div>
-    </div>`;
+  const widgetsHtml = await getActivityBar({ timer: currentTimer });
 
   return html.replace('<!--TIMER_WIDGETS_PLACEHOLDER-->', widgetsHtml);
 }
@@ -8372,16 +8494,7 @@ app.get('/*path', authMiddleware, async (req, res) => {
         // Inject live timer widgets (not cached)
         const currentTimer = await getCurrentTimer();
 
-        const widgetsHtml = `
-          <div class="row g-3 mb-3">
-            <div class="col-12 col-lg-6">
-              ${getTimerWidget(currentTimer)}
-            </div>
-            <div class="col-12 col-lg-6">
-              ${await getTaskTimerWidget()}
-              ${getPomodoroWidget()}
-            </div>
-          </div>`;
+        const widgetsHtml = await getActivityBar({ timer: currentTimer });
 
         const html = injectRoleReplyForms(
           cachedHtml.replace('<!--TIMER_WIDGETS_PLACEHOLDER-->', widgetsHtml),

@@ -1871,3 +1871,416 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
 .git-dir-files {
   border-left: 3px solid var(--today-border);
 }
+
+/* ── The activity bar ──────────────────────────────────────────────────────
+   The five boxes that used to open every page were three Bootstrap alerts and
+   two saturated tiles: five treatments for what is really two kinds of thing.
+   The timers are state and are almost always idle, so idle is a pill here and
+   only a running timer gets a banner. Colour is left to mean "this is
+   running" rather than being spent on telling the three idle controls apart.
+
+   A pill is a control, not a message, so it takes the card surface and the
+   control border — which, unlike --today-border, is a palette entry that has
+   to clear 3:1 on its own, because on a pill it is the only thing marking the
+   target. */
+
+.activity-tracker {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.activity-tracker-icon {
+  color: var(--today-muted-text);
+  flex: 0 0 auto;
+}
+
+.activity-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.activity-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.25rem;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--today-control-border);
+  border-radius: 999px;
+  background: var(--today-card-bg);
+  color: var(--today-text);
+  font-size: 0.875rem;
+  line-height: 1.2;
+  text-decoration: none;
+}
+
+a.activity-pill:hover,
+a.activity-pill:focus-visible {
+  background: var(--today-hover-bg);
+  color: var(--today-text);
+  text-decoration: none;
+}
+
+.activity-pill > i {
+  color: var(--today-muted-text);
+}
+
+.activity-pill-quiet {
+  border-style: dashed;
+  color: var(--today-muted-text);
+}
+
+.activity-pill-count {
+  display: inline-block;
+  min-width: 1.5rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--today-attn-bg);
+  color: var(--today-attn-text);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+/* Nothing due is not news, so the count stops shouting rather than disappearing
+   — the control should not change shape depending on the number in it. */
+.activity-pill-count-zero {
+  background: var(--today-muted-bg);
+  color: var(--today-muted-text);
+  font-weight: 400;
+}
+
+.activity-pill-number {
+  width: 2.75rem;
+  padding: 0.1rem 0.35rem;
+  border: 1px solid var(--today-control-border);
+  border-radius: 0.25rem;
+  background: var(--today-card-bg);
+  color: var(--today-text);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+.activity-pill-go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--today-button-bg);
+  color: #ffffff;
+  font-size: 0.75rem;
+}
+
+.activity-pill-go:hover {
+  background: var(--today-button-hover-bg);
+  color: #ffffff;
+}
+
+.activity-pill-go:disabled {
+  opacity: 0.65;
+}
+
+.activity-pill-unit {
+  color: var(--today-muted-text);
+  font-size: 0.75rem;
+}
+
+.activity-tracker-meta {
+  font-size: 0.8125rem;
+}
+
+/* ── The home page's tabbed card ───────────────────────────────────────────
+   Vault, Now, Plans and Recent Pages were four stacked cards, three of them
+   shut, so the listing the page exists for sat below three closed headers.
+   One card, Vault first and open.
+
+   The shape follows the profile tabs on oldergay.men: folder tabs on a
+   tinted strip, each its own bordered surface, the selected one filled and
+   pulled down a pixel so it joins the panel it opens. Below 768px they
+   become compact chips instead — that swap is what keeps six of them from
+   eating a third of a phone screen. */
+
+.home-tabbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.25rem 0.4rem;
+  padding: 0.6rem 0.75rem 0;
+  background: var(--today-surface-2);
+  border-bottom: 1px solid var(--today-border);
+}
+
+.home-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.4rem;
+  margin: 0;
+  padding: 0;
+  border-bottom: 0;
+}
+
+.home-tabs .nav-link {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 0.5rem 0.9rem;
+  /* --today-control-border, not --today-border: an unselected tab is
+     --today-card-bg on a --today-surface-2 strip, 1.07:1 apart, so the
+     outline is the only thing marking the target and has to clear 3:1 on
+     its own (WCAG 2.2 1.4.11). */
+  border: 1px solid var(--today-control-border);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--today-card-bg);
+  color: var(--today-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.home-tabs .nav-link:hover {
+  background: var(--today-hover-bg);
+  color: var(--today-text);
+}
+
+/* The filled state is the same contract the login button uses — white ink on
+   --today-button-bg — rather than a new pairing needing its own contrast
+   check. The negative margin eats the strip's border so the tab and its
+   panel read as one surface. */
+.home-tabs .nav-link.active,
+.home-tabs .nav-link.active:hover {
+  margin-bottom: -1px;
+  padding-bottom: calc(0.5rem + 1px);
+  border-color: var(--today-button-bg);
+  background: var(--today-button-bg);
+  color: #ffffff;
+}
+
+.home-tabs .nav-link:focus-visible {
+  outline: 2px solid var(--today-accent);
+  outline-offset: 2px;
+}
+
+.home-tabs .nav-link i {
+  font-size: 0.95rem;
+  opacity: 0.8;
+}
+
+.home-tabs .nav-link.active i {
+  opacity: 1;
+}
+
+/* Diary and Tasks share the row but navigate away instead of swapping a
+   panel, so they never take the filled state. */
+.home-tab-links {
+  margin: 0;
+}
+
+.home-tab-count {
+  display: inline-block;
+  min-width: 1.4rem;
+  margin-left: 0.35rem;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--today-attn-bg);
+  color: var(--today-attn-text);
+  font-weight: 600;
+  font-size: 0.7rem;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.home-tab-panel > .list-group-flush {
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+}
+
+/* Chips on a phone. Six folder tabs wrap to three lines at 390px; the same
+   six as chips fit in two, and each is still a 32px-tall target. */
+@media (max-width: 768px) {
+  .home-tabbar {
+    gap: 6px;
+    /* Extra under the chips: they are free-standing pills here rather than
+       folder tabs joined to the panel, so the list below needs daylight. */
+    padding: 0.5rem 0.5rem 0.75rem;
+    border-bottom: 0;
+  }
+
+  .home-tabs {
+    gap: 6px;
+  }
+
+  .home-tabs .nav-link {
+    padding: 6px 12px;
+    border: 1px solid var(--today-control-border);
+    border-radius: 16px;
+    font-size: 0.78rem;
+  }
+
+  .home-tabs .nav-link.active,
+  .home-tabs .nav-link.active:hover {
+    margin-bottom: 0;
+    padding-bottom: 6px;
+    border-color: var(--today-button-bg);
+  }
+
+  .home-tabs .nav-link i {
+    margin-right: 4px !important;
+    font-size: 0.85rem;
+  }
+
+  .home-tab-count {
+    margin-left: 4px;
+    font-size: 0.65rem;
+    padding: 1px 5px;
+  }
+}
+
+/* ── The calm tab ──────────────────────────────────────────────────────────
+   A still photograph with the time, a greeting and one question on it, after
+   momentumdash.com. It is the one place in the interface that is not trying
+   to show you anything, so it deliberately ignores the palette: the picture
+   supplies the colour and the type is white on a scrim over it. */
+
+.moment {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26rem;
+  overflow: hidden;
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+  /* Showing before the photograph arrives, and standing in for it entirely
+     if the network is away. */
+  background: #2b3440;
+}
+
+.moment-photo {
+  position: absolute;
+  inset: 0;
+  background-position: center;
+  background-size: cover;
+  opacity: 0;
+  transition: opacity 900ms ease;
+}
+
+.moment-photo.is-loaded {
+  opacity: 1;
+}
+
+/* Photographs are unpredictable, so the type never sits straight on one: this
+   is what keeps white legible over a pale sky. */
+.moment-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.45),
+    rgba(0, 0, 0, 0.25) 40%,
+    rgba(0, 0, 0, 0.55)
+  );
+}
+
+.moment-inner {
+  position: relative;
+  width: 100%;
+  max-width: 34rem;
+  padding: 2.5rem 1.5rem;
+  color: #ffffff;
+  text-align: center;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.moment-clock {
+  margin: 0;
+  font-size: clamp(3.5rem, 12vw, 6rem);
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.moment-greeting {
+  margin: 0.5rem 0 0;
+  font-size: clamp(1.25rem, 4vw, 1.9rem);
+  font-weight: 400;
+}
+
+.moment-goal {
+  margin-top: 2.5rem;
+}
+
+.moment-goal-label {
+  display: block;
+  margin-bottom: 0.75rem;
+  font-size: clamp(1rem, 3vw, 1.2rem);
+  font-weight: 400;
+}
+
+/* A rule to write on rather than a box: the point is that it does not look
+   like a form. */
+.moment-goal-input {
+  width: 100%;
+  padding: 0.25rem 0.25rem 0.4rem;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.85);
+  background: none;
+  color: #ffffff;
+  font-size: 1.05rem;
+  text-align: center;
+}
+
+.moment-goal-input:focus {
+  outline: none;
+  border-bottom-color: #ffffff;
+  border-bottom-width: 2px;
+  padding-bottom: calc(0.4rem - 1px);
+}
+
+.moment-goal-saved {
+  display: block;
+  min-height: 1.2em;
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+.moment-quote {
+  margin: 2.5rem 0 0;
+  font-size: 0.9rem;
+  font-style: italic;
+  opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+  .moment {
+    min-height: 22rem;
+  }
+
+  .moment-inner {
+    padding: 2rem 1.25rem;
+  }
+
+  .moment-goal {
+    margin-top: 1.75rem;
+  }
+
+  .moment-quote {
+    margin-top: 1.75rem;
+  }
+}
+
+/* The photograph is decoration; someone who has asked for less movement
+   should not get a cross-fade. */
+@media (prefers-reduced-motion: reduce) {
+  .moment-photo {
+    transition: none;
+  }
+}
