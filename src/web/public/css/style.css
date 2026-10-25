@@ -980,10 +980,15 @@ html[data-theme="dark"] .editor-toolbar {
 }
 
 .floating-toggle-btn:hover {
-  /* A shade down from the fill, so the hover follows the palette instead of
-     landing back on a fixed blue. */
-  background: color-mix(in srgb, var(--today-brand-bg) 85%, #000);
   transform: translateY(-50%) scale(1.1);
+}
+
+@supports (background: color-mix(in srgb, #fff 85%, #000)) {
+  .floating-toggle-btn:hover {
+    /* A shade down from the fill, so the hover follows the palette instead of
+       landing back on a fixed blue. */
+    background: color-mix(in srgb, var(--today-brand-bg) 85%, #000);
+  }
 }
 
 /* Mobile styles */
