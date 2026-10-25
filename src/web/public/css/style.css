@@ -56,6 +56,21 @@ html[data-theme="dark"] {
   --today-attn-edge: #f59e0b;
   --today-ok-text: #86efac;
   --today-ok-bg: #173a27;
+  /* MDB's own dark palette is neutral grey (#424242 surfaces) where Today's
+     is slate, which is why its cards, dropdowns and modals used to be
+     corrected by hand further down this file. Pointing the tokens those
+     components read at Today's lets them come out in Today's colours on
+     their own. Only those tokens are set: MDB's --mdb-border-color is
+     deliberately translucent white, so it shades to whatever it sits on, and
+     replacing it with a solid slate would ring blue controls in grey. The
+     `-rgb` triple is spelled out because MDB composes translucent surfaces
+     as rgba(var(--mdb-…-rgb), a), which a var() colour cannot feed. */
+  --mdb-surface-bg: var(--today-card-bg);
+  --mdb-surface-color: var(--today-text);
+  --mdb-surface-color-rgb: 243, 244, 246;
+  --mdb-body-color: var(--today-text);
+  --mdb-body-color-rgb: 243, 244, 246;
+  --mdb-card-border-color: var(--today-border);
 }
 
 /* Default to iOS 'Large'; the head bootstrap applies Dynamic Type on iOS. */
@@ -1344,10 +1359,7 @@ nav[aria-label="breadcrumb"] {
   }
 }
 
-html[data-theme="dark"] .card,
-html[data-theme="dark"] .list-group-item,
-html[data-theme="dark"] .modal-content,
-html[data-theme="dark"] .dropdown-menu {
+html[data-theme="dark"] .list-group-item {
   background-color: var(--today-card-bg);
   color: var(--today-text);
   border-color: var(--today-border);
