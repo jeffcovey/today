@@ -13,6 +13,15 @@
   --today-surface-2: #f1f3f5;
   --today-link: #2b5fb4;
   --today-accent: #1266f1;
+  /* The brand fill and the ink on it: the navbar, the day tiles, and the
+     rest of what MDB paints from its primary colour. This is a pair of its
+     own rather than a second duty for --today-accent, which is a link and
+     focus-ring colour held to 3:1 as a boundary; a large filled surface has
+     to hold its text at 4.5:1, and the two are not the same requirement.
+     The defaults are MDB's own primary and its white ink, so the built-in
+     palette renders exactly as it did before the bridge below existed. */
+  --today-brand-bg: #3b71ca;
+  --today-brand-text: #ffffff;
   /* Controls and filled buttons carry their own contrast duties, so they are
      palette entries in their own right rather than shades of the two above.
      --today-border separates surfaces that already differ, but on an input
@@ -34,6 +43,15 @@
   --mdb-link-color: var(--today-link);
   --mdb-link-color-rgb: 43, 95, 180;
   --mdb-secondary-color: var(--today-muted-text);
+  /* The same bridge for the brand fill. MDB 7.1.0 never reads --mdb-primary
+     itself — Today's own rules do, here and in web-server.js — and what MDB
+     reads is the triple, which it composes as rgba(var(--mdb-primary-rgb), a)
+     for .bg-primary (the navbar, the day tiles), .text-primary and
+     .border-primary. So the triple is spelled out here and re-emitted by a
+     vault theme (see src/web/themes.js). Both lines hold MDB's own primary,
+     #3b71ca, so the built-in palette is unmoved. */
+  --mdb-primary: var(--today-brand-bg);
+  --mdb-primary-rgb: 59, 113, 202;
   /* MDB paints its own surfaces (cards, dropdowns, modals) from this rather
      than from --today-card-bg, so a palette that moves the card colour would
      otherwise leave them behind. MDB's light default is #fff, the same colour
@@ -64,6 +82,10 @@ html[data-theme="dark"] {
   --today-surface-2: #273244;
   --today-link: #93c5fd;
   --today-accent: #60a5fa;
+  /* MDB has no dark override for its primary, so the brand pair holds the
+     same stock values in both modes and the built-in palette is unmoved. */
+  --today-brand-bg: #3b71ca;
+  --today-brand-text: #ffffff;
   --today-control-border: #6b7280;
   --today-button-bg: #2563eb;
   --today-button-hover-bg: #1d4ed8;
@@ -74,6 +96,8 @@ html[data-theme="dark"] {
   --mdb-link-color: var(--today-link);
   --mdb-link-color-rgb: 147, 197, 253;
   --mdb-secondary-color: var(--today-muted-text);
+  --mdb-primary: var(--today-brand-bg);
+  --mdb-primary-rgb: 59, 113, 202;
   --today-you-bg: #1e3a5f;
   --today-you-border: #2f5688;
   --today-attn-text: #fcd34d;
@@ -96,6 +120,19 @@ html[data-theme="dark"] {
   --mdb-body-color: var(--today-text);
   --mdb-body-color-rgb: 243, 244, 246;
   --mdb-card-border-color: var(--today-border);
+}
+
+/* Brand fills own their ink, including over dark-mode list-item colours. */
+.bg-primary:not(.badge) {
+  color: var(--today-brand-text) !important;
+}
+
+.badge.bg-primary {
+  --mdb-badge-color: var(--today-brand-text);
+}
+
+.today-text-link {
+  color: var(--today-link);
 }
 
 /* Default to iOS 'Large'; the head bootstrap applies Dynamic Type on iOS. */
@@ -192,9 +229,10 @@ html {
 }
 
 .theme-mode-group .btn.active {
-  background: var(--mdb-primary, #3b71ca);
-  border-color: var(--mdb-primary, #3b71ca);
-  color: #fff;
+  /* No fallback: --mdb-primary is defined in both :root blocks above. */
+  background: var(--mdb-primary);
+  border-color: var(--mdb-primary);
+  color: var(--today-brand-text);
 }
 
 .text-size-control .btn:disabled {
@@ -987,7 +1025,7 @@ html[data-theme="dark"] .editor-toolbar {
 .toggle-btn {
   background: transparent;
   border: none;
-  color: white;
+  color: var(--today-brand-text);
   cursor: pointer;
   padding: 0.25rem;
   margin-left: auto;
@@ -1197,6 +1235,7 @@ html[data-theme="dark"] .editor-toolbar {
 .navbar .navbar-brand {
   display: inline-flex;
   align-items: center;
+  color: var(--today-brand-text);
   min-height: 44px;
   margin: 0 8px 0 0;
   padding: 0 4px;
@@ -1208,6 +1247,9 @@ html[data-theme="dark"] .editor-toolbar {
   font-size: 22px;
 }
 
+/* The navbar is painted from the brand fill, so its ink is the brand's.
+   The hover wash stays a translucent white: it lightens whatever it sits
+   on rather than naming a colour of its own. */
 .navbar .nav-link,
 .navbar .navbar-icon-btn {
   display: inline-flex;
@@ -1218,7 +1260,7 @@ html[data-theme="dark"] .editor-toolbar {
   padding: 0 6px;
   font-size: 18px;
   line-height: 1;
-  color: #fff;
+  color: var(--today-brand-text);
   background: none;
   border: 0;
   border-radius: 6px;
@@ -1227,13 +1269,13 @@ html[data-theme="dark"] .editor-toolbar {
 .navbar .nav-link:hover,
 .navbar .navbar-icon-btn:hover,
 .navbar .navbar-icon-btn[aria-expanded="true"] {
-  color: #fff;
+  color: var(--today-brand-text);
   background: rgba(255, 255, 255, 0.16);
 }
 
 .navbar .navbar-icon-btn:focus-visible,
 .navbar .nav-link:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--today-brand-text);
   outline-offset: 2px;
 }
 
@@ -1269,7 +1311,7 @@ html[data-theme="dark"] .editor-toolbar {
 }
 
 .navbar-search-cancel {
-  color: #fff;
+  color: var(--today-brand-text);
   font-size: 16px;
   padding: 0 4px;
   text-decoration: none;
@@ -1277,7 +1319,7 @@ html[data-theme="dark"] .editor-toolbar {
 
 .navbar-search-cancel:hover,
 .navbar-search-cancel:focus {
-  color: #fff;
+  color: var(--today-brand-text);
   text-decoration: underline;
 }
 

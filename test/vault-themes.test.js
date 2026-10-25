@@ -8,6 +8,7 @@
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 import {
   parseColor,
@@ -38,6 +39,20 @@ async function writeTheme(name, contents) {
   await fs.mkdir(themesDir, { recursive: true });
   await fs.writeFile(path.join(themesDir, name), contents, 'utf-8');
 }
+
+test('source never uses the brand fill as text-primary foreground ink', async () => {
+  const srcDir = fileURLToPath(new URL('../src/', import.meta.url));
+  const consumers = [];
+  for (const file of await fs.readdir(srcDir, { recursive: true })) {
+    if (!/\.(js|css|html)$/.test(file)) continue;
+    const source = await fs.readFile(path.join(srcDir, file), 'utf8');
+    const withoutComments = source
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '');
+    if (/\btext-primary\b/.test(withoutComments)) consumers.push(file);
+  }
+  expect(consumers).toEqual([]);
+});
 
 describe('reading a colour', () => {
   test.each([
@@ -134,6 +149,33 @@ describe('rendering the stylesheet', () => {
     expect(css).toContain('--mdb-link-color-rgb: 138, 75, 20;');
     expect(css).toContain('--mdb-surface-color-rgb: 242, 234, 222;');
     expect(css).toContain('--mdb-body-color-rgb: 242, 234, 222;');
+  });
+
+  // MDB composes .bg-primary — the navbar, the day tiles, the badges — as
+  // rgba(var(--mdb-primary-rgb), var(--mdb-bg-opacity)), so the brand fill
+  // needs its triple spelled out too, or a palette stops at the navbar.
+  test('the brand fill moves MDB\'s primary, in both modes', () => {
+    const { theme } = buildTheme('cocoa', {
+      name: 'Cocoa',
+      light: { 'brand-bg': '#7a4210', 'brand-text': '#ffffff' },
+      // MDB ships no dark override for its primary, so the dark block has to
+      // carry the triple itself rather than inherit the light one.
+      dark: { 'brand-bg': '#a1551a' }
+    });
+    const css = renderThemeCss(theme);
+    expect(css).toContain('--today-brand-bg: rgb(122, 66, 16);');
+    expect(css).toContain('--today-brand-text: rgb(255, 255, 255);');
+    expect(css).toContain('--mdb-primary-rgb: 122, 66, 16;');
+    expect(css).toContain('--mdb-primary-rgb: 161, 85, 26;');
+  });
+
+  // The ink is only ever read through a var(), so it has no triple of its
+  // own: a theme that sets it alone has not moved MDB's primary.
+  test('the brand ink alone does not move MDB\'s primary', () => {
+    const { theme } = buildTheme('cocoa', { light: { 'brand-text': '#ffffff' } });
+    const css = renderThemeCss(theme);
+    expect(css).toContain('--today-brand-text: rgb(255, 255, 255);');
+    expect(css).not.toContain('--mdb-primary-rgb');
   });
 
   test('alpha survives', () => {

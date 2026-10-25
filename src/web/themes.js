@@ -42,6 +42,8 @@ export const THEME_TOKENS = [
   'surface-2',
   'link',
   'accent',
+  'brand-bg',
+  'brand-text',
   'button-bg',
   'button-hover-bg',
   'code-text',
@@ -69,13 +71,22 @@ const ID_PATTERN = /^[a-z0-9][a-z0-9_-]*$/i;
  * MDB reads a few of its own properties that style.css cannot express as
  * `var(--today-…)`, because MDB composes them as `rgba(var(--…-rgb), a)` and
  * a var() colour cannot feed that. They are derived here instead, from the
- * theme's own values, so a theme that moves the link or text colour moves
- * MDB's with it. The rest of the bridge is plain `var()` in style.css.
+ * theme's own values, so a theme that moves the link, brand or text colour
+ * moves MDB's with it. The rest of the bridge is plain `var()` in style.css.
+ *
+ * `brand-bg` is in both modes because MDB ships no dark override for its
+ * primary: `.bg-primary` — the navbar, the day tiles — is
+ * `rgba(var(--mdb-primary-rgb), var(--mdb-bg-opacity))` in either one, so
+ * without this line a vault palette would leave the navbar MDB's blue.
  */
 const RGB_BRIDGES = {
-  light: { link: ['--mdb-link-color-rgb'] },
+  light: {
+    link: ['--mdb-link-color-rgb'],
+    'brand-bg': ['--mdb-primary-rgb']
+  },
   dark: {
     link: ['--mdb-link-color-rgb'],
+    'brand-bg': ['--mdb-primary-rgb'],
     text: ['--mdb-surface-color-rgb', '--mdb-body-color-rgb']
   }
 };

@@ -597,7 +597,7 @@ function getAIAssistantPanel(placeholderText = 'Ask me anything...') {
   return `
     <div class="ai-assistant-wrapper" id="aiAssistantWrapper">
     <div class="card shadow-sm">
-      <div class="card-header bg-primary text-white d-flex align-items-center" id="aiAssistantHeader">
+      <div class="card-header bg-primary d-flex align-items-center" id="aiAssistantHeader">
         <i class="fas fa-robot me-2"></i>
         <span>AI Assistant</span>
         <button class="toggle-btn desktop-only ms-auto" onclick="toggleAIAssistant()" title="Collapse">
@@ -1740,7 +1740,7 @@ async function renderDirectory(dirPath, urlPath) {
       contentHtml += `
               <div class="col-12 col-lg-6 mb-3">
                 <div class="card shadow-sm h-100">
-                  <a href="/diary/${todayISO}.md" class="list-group-item list-group-item-action bg-primary text-white h-100">
+                  <a href="/diary/${todayISO}.md" class="list-group-item list-group-item-action bg-primary h-100">
                     <div class="d-flex align-items-center ps-2 py-2">
                       <i class="fas fa-book me-2"></i>
                       <div>
@@ -1756,7 +1756,7 @@ async function renderDirectory(dirPath, urlPath) {
       contentHtml += `
               <div class="col-12 col-lg-6 mb-3">
                 <div class="card shadow-sm h-100">
-                  <a href="/plans/${todayPlanFile}" class="list-group-item list-group-item-action bg-primary text-white h-100">
+                  <a href="/plans/${todayPlanFile}" class="list-group-item list-group-item-action bg-primary h-100">
                     <div class="d-flex align-items-center ps-2 py-2">
                       <i class="fas fa-calendar-day me-2"></i>
                       <div>
@@ -1959,7 +1959,7 @@ async function renderDirectory(dirPath, urlPath) {
               icon = 'fa-calendar-week text-info';
               break;
             case 'day':
-              icon = 'fa-calendar-day text-primary';
+              icon = 'fa-calendar-day today-text-link';
               break;
           }
         }
@@ -2390,7 +2390,7 @@ async function renderEditor(filePath, urlPath) {
           const saveStatus = document.getElementById('save-status');
 
           saveStatus.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
-          saveStatus.className = 'text-primary small me-3';
+          saveStatus.className = 'today-text-link small me-3';
 
           try {
             const response = await fetch('/save/${urlPath}', {
@@ -5888,8 +5888,8 @@ app.get('/_git', authMiddleware, async (req, res) => {
   ${pageStyle}
   <link rel="stylesheet" href="/static/vendor/diff2html/diff2html.min.css?v=${STATIC_VERSION}" />
   <style>
-    .file-item.active { background-color: var(--mdb-primary); color: #fff !important; }
-    .file-item.active span { color: #fff !important; }
+    .file-item.active { background-color: var(--mdb-primary); color: var(--today-brand-text) !important; }
+    .file-item.active span { color: var(--today-brand-text) !important; }
     .diff-container { min-height: 200px; }
     .commit-list { max-height: 300px; overflow-y: auto; }
     .d2h-wrapper { font-size: 0.82rem; }
@@ -8228,7 +8228,7 @@ app.get('/task/*taskId', authMiddleware, async (req, res) => {
         <div class="mb-4">
           <h6 class="text-muted mb-2">Source</h6>
           <div><i class="fas fa-plug me-2"></i>${esc(task.source)}</div>
-          ${editFileRelPath ? `<div class="mt-1"><a href="/${esc(editFileRelPath)}" class="text-primary"><i class="fas fa-file-alt me-1"></i>${esc(editFilePath)}</a></div>` : ''}
+          ${editFileRelPath ? `<div class="mt-1"><a href="/${esc(editFileRelPath)}"><i class="fas fa-file-alt me-1"></i>${esc(editFilePath)}</a></div>` : ''}
         </div>
         <div class="d-flex gap-2 flex-wrap">
           ${editFileRelPath ? `<a href="/${esc(editFileRelPath)}" class="btn btn-primary"><i class="fas fa-edit me-2"></i>Edit File</a>` : ''}
