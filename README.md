@@ -219,6 +219,7 @@ bg = "#f6f1ea"
 card-bg = "#fffdf9"
 text = "#2b2119"
 link = "#8a4b14"
+brand-bg = "#7a4210"
 button-bg = "#7a4210"
 
 [dark]
@@ -226,6 +227,7 @@ bg = "#1b1510"
 card-bg = "#272019"
 text = "#f2eade"
 link = "#e0a96d"
+brand-bg = "#a1551a"
 button-bg = "#a1551a"
 ```
 
@@ -244,10 +246,12 @@ Two things to watch:
 
 - **Contrast is yours to get right.** Today's own palette is tuned to WCAG 2.2
   AA and the test suite holds it there, but nothing can check a file in your
-  vault. Text wants 4.5:1 against what's behind it; `control-border` and
-  `button-bg` are separate keys from `border` and `accent` precisely because
-  they carry that duty — an input outline needs 3:1 against the surface
-  behind it, and a button needs 4.5:1 against the white text on it.
+  vault. Text wants 4.5:1 against what's behind it; `control-border`,
+  `button-bg` and `brand-bg` are separate keys from `border` and `accent`
+  precisely because they carry that duty — an input outline needs 3:1 against
+  the surface behind it, while a button and the navbar need 4.5:1 against the
+  text on them. `brand-bg` is the navbar and the day tiles, and `brand-text`
+  is the ink on them, so those two have to clear 4.5:1 against each other.
 - **Code blocks keep their polarity.** Syntax highlighting comes from
   highlight.js, which picks its own colours per mode, so `code-block-bg`
   should stay light under `[light]` and dark under `[dark]` whatever the rest

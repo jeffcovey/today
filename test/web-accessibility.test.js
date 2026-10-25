@@ -26,6 +26,7 @@ import {
 } from './helpers/a11y-harness.js';
 import fs from 'fs';
 import path from 'path';
+import Database from 'better-sqlite3';
 
 jest.setTimeout(240_000);
 
@@ -356,7 +357,8 @@ describe('a palette from the vault', () => {
     const { themes, selected } = await response.json();
     expect(themes).toEqual([
       { id: 'today', name: 'Today' },
-      { id: 'cocoa', name: 'Cocoa' }
+      { id: 'cocoa', name: 'Cocoa' },
+      { id: 'light-brand', name: 'Light brand' }
     ]);
     expect(selected).toBe('today');
   });
@@ -369,9 +371,12 @@ describe('a palette from the vault', () => {
     expect(css).toContain(':root {');
     expect(css).toContain('html[data-theme="dark"] {');
     expect(css).toContain('--today-bg: rgb(246, 241, 234);');
-    // The bridge MDB reads for links, which style.css cannot express as a
-    // var() because MDB composes it as rgba(var(--…-rgb), a).
+    // The bridges MDB reads for links and for the brand fill, which
+    // style.css cannot express as a var() because MDB composes them as
+    // rgba(var(--…-rgb), a).
     expect(css).toContain('--mdb-link-color-rgb: 138, 75, 20;');
+    expect(css).toContain('--mdb-primary-rgb: 122, 66, 16;');
+    expect(css).toContain('--mdb-primary-rgb: 161, 85, 26;');
     // Only custom properties, one per line, and no way out of the block.
     for (const line of css.split('\n')) {
       const body = line.trim();
@@ -425,7 +430,8 @@ describe('a palette from the vault', () => {
       expect(await page.$$eval('#paletteSelect option', options =>
         options.map(option => [option.value, option.textContent]))).toEqual([
         ['today', 'Today'],
-        ['cocoa', 'Cocoa']
+        ['cocoa', 'Cocoa'],
+        ['light-brand', 'Light brand']
       ]);
 
       const before = await page.evaluate(() =>
@@ -448,6 +454,154 @@ describe('a palette from the vault', () => {
       }
     } finally {
       await page.close();
+    }
+  });
+
+  // The navbar is the thing a palette most visibly has to reach, and it is
+  // MDB's .bg-primary: rgba(var(--mdb-primary-rgb), var(--mdb-bg-opacity)).
+  // That composition is why the triple is emitted as digits rather than as a
+  // var() — a var() colour cannot feed an rgba(). Both halves are checked
+  // here: the fill at full opacity, and a tint of it, which is the case that
+  // would silently come out transparent if the triple were ever a var().
+  const BRAND_FILL = { light: 'rgb(122, 66, 16)', dark: 'rgb(161, 85, 26)' };
+
+  test.each(THEMES)('%s theme: the vault\'s brand fill reaches the navbar', async (theme) => {
+    const view = await browser.newPage();
+    try {
+      await view.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
+      await useTheme(view, theme, server.baseUrl);
+
+      const brandColours = () => view.evaluate(() => {
+        // Nothing Today renders carries bg-opacity today, so the tint is
+        // built here rather than hunted for: it is the construction the
+        // literal triple exists for.
+        const tint = document.createElement('div');
+        tint.className = 'bg-primary bg-opacity-10';
+        document.body.appendChild(tint);
+        const colours = {
+          navbar: getComputedStyle(document.querySelector('.navbar.bg-primary')).backgroundColor,
+          tint: getComputedStyle(tint).backgroundColor
+        };
+        tint.remove();
+        return colours;
+      });
+
+      await usePalette('today', server.baseUrl);
+      await view.goto(`${server.baseUrl}/notes/kitchen-sink.md`, { waitUntil: 'networkidle0' });
+      // The built-in palette holds MDB's own primary, so bridging it moved
+      // nothing: this is the colour the navbar had before the bridge existed.
+      expect(await brandColours()).toEqual({
+        navbar: 'rgb(59, 113, 202)',
+        tint: 'rgba(59, 113, 202, 0.1)'
+      });
+
+      await usePalette('cocoa', server.baseUrl);
+      await view.reload({ waitUntil: 'networkidle0' });
+      const fill = BRAND_FILL[theme];
+      expect(await brandColours()).toEqual({
+        navbar: fill,
+        tint: fill.replace('rgb(', 'rgba(').replace(')', ', 0.1)')
+      });
+    } finally {
+      await view.close();
+    }
+  });
+
+  test.each(THEMES.flatMap(theme =>
+    ['markdown-diary', 'markdown-plans'].map(plugin => [theme, plugin])
+  ))('%s theme, %s: non-white brand ink reaches filled surfaces', async (theme, plugin) => {
+    const brandServer = await startServer({
+      configLines: [`[plugins.${plugin}.default]`, 'enabled = true']
+    });
+    const { baseUrl } = brandServer;
+    const view = await browser.newPage();
+    const ink = theme === 'light' ? 'rgb(36, 24, 0)' : 'rgb(16, 32, 64)';
+    try {
+      await usePalette('light-brand', baseUrl);
+      await view.setExtraHTTPHeaders({ Authorization: 'Bearer ' + PASSWORD });
+      await useTheme(view, theme, baseUrl);
+      await view.goto(baseUrl, { waitUntil: 'networkidle0' });
+
+      const tile = '.list-group-item.bg-primary';
+      const colors = {
+        tile: await view.$eval(tile, el => getComputedStyle(el).color),
+        header: await view.$eval('#aiAssistantHeader', el => getComputedStyle(el).color),
+        chevron: await view.$eval('#aiAssistantHeader .toggle-btn #toggleIcon', el => getComputedStyle(el).color)
+      };
+      await view.hover(tile);
+      colors.hoveredTile = await view.$eval(tile, el => getComputedStyle(el).color);
+
+      await view.goto(`${baseUrl}/_git`, { waitUntil: 'networkidle0' });
+      await openDiff(view, 'code/example.js');
+      colors.activeFile = await view.$eval('.file-item.active', el => new Promise(resolve => {
+        let previous;
+        const sample = () => {
+          const color = getComputedStyle(el).color;
+          if (color === previous) {
+            resolve(color);
+          } else {
+            previous = color;
+            requestAnimationFrame(sample);
+          }
+        };
+        requestAnimationFrame(sample);
+      }));
+      colors.activeFileText = await view.$$eval('.file-item.active span', els =>
+        els.map(el => getComputedStyle(el).color));
+
+      // Exercise MDB's badge colour variable, not just inherited surface ink.
+      colors.badge = await view.evaluate(() => {
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-primary';
+        badge.textContent = 'Open';
+        document.body.appendChild(badge);
+        const color = getComputedStyle(badge).color;
+        badge.remove();
+        return color;
+      });
+      expect(colors).toEqual({
+        tile: ink, hoveredTile: ink, header: ink, chevron: ink,
+        activeFile: ink, activeFileText: [ink], badge: ink
+      });
+    } finally {
+      await view.close();
+      await brandServer.stop();
+    }
+  });
+
+  test.each(THEMES.flatMap(theme =>
+    ['today', 'cocoa'].map(palette => [theme, palette])
+  ))('%s theme, %s palette: task-source ink follows the link token, not the brand fill', async (theme, palette) => {
+    const db = new Database(path.join(path.dirname(server.vaultDir), '.data', 'today.db'));
+    const taskId = 'brand-source-link-test';
+    const view = await browser.newPage();
+    try {
+      db.prepare('INSERT INTO tasks (id, source, title, status, metadata) VALUES (?, ?, ?, ?, ?)').run(
+        taskId, 'test/source', 'Task with a source file', 'open',
+        JSON.stringify({ file_path: 'vault/notes/kitchen-sink.md' })
+      );
+      await usePalette(palette, server.baseUrl);
+      await view.setExtraHTTPHeaders({ Authorization: 'Bearer ' + PASSWORD });
+      await useTheme(view, theme, server.baseUrl);
+      await view.goto(`${server.baseUrl}/task/${taskId}`, { waitUntil: 'networkidle0' });
+      expect(await view.$('.text-primary')).toBeNull();
+
+      const colors = await view.$eval('a[href="/notes/kitchen-sink.md"]', el => {
+        const probe = document.createElement('span');
+        el.appendChild(probe);
+        probe.style.color = 'var(--today-link)';
+        const link = getComputedStyle(probe).color;
+        probe.style.color = 'var(--today-brand-bg)';
+        const brand = getComputedStyle(probe).color;
+        probe.remove();
+        return { actual: getComputedStyle(el).color, link, brand };
+      });
+      expect(colors.actual).toBe(colors.link);
+      expect(colors.actual).not.toBe(colors.brand);
+    } finally {
+      db.prepare('DELETE FROM tasks WHERE id = ?').run(taskId);
+      db.close();
+      await view.close();
     }
   });
 

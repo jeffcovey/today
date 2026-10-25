@@ -1,0 +1,9 @@
+name = "Light brand"
+
+[light]
+brand-bg = "#fff4cc"
+brand-text = "#241800"
+
+[dark]
+brand-bg = "#e8f0ff"
+brand-text = "#102040"
