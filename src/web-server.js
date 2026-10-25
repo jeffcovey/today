@@ -64,7 +64,9 @@ import {
   buildMessages,
 } from './ai-chat/index.js';
 import { getNavbar, getThemeBootstrapScript, getDisplayMenuHtml, getSearchToggleHtml, getSearchFormHtml, getSearchRowHtml, THEME_COOKIE_NAME } from './web/navbar.js';
-import { getStoredThemeMode, setStoredThemeMode, isThemeMode, THEME_MODES } from './web-preferences.js';
+import { getStoredThemeMode, setStoredThemeMode, isThemeMode, THEME_MODES,
+  getStoredThemeName, setStoredThemeName, isThemeName, readWebPreferences } from './web-preferences.js';
+import { listThemes, getThemeStylesheet, BUILT_IN_THEME_ID } from './web/themes.js';
 import { createSaveHandler } from './save-route.js';
 import { listPlanSummaries, savePlanSummary, savePlanPriorities, PLAN_TYPE_ORDER } from './plan-summaries.js';
 import { getPlanStatusBadge, PLAN_STATUS_BADGES } from './plan-summary-status.js';
@@ -253,7 +255,8 @@ const fileStatsCache = new Map();
 const CACHE_MAX_SIZE = 100; // Maximum number of cached files
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour TTL for cache entries
 // Bump when rendered HTML or the head bootstrap changes.
-const HTML_CACHE_RENDER_VERSION = 1;
+// 2: the head gained the <link> to /theme.css.
+const HTML_CACHE_RENDER_VERSION = 2;
 
 // Disk-based HTML cache (persists across server restarts)
 const DISK_CACHE_DIR = path.join(__dirname, '..', '.data', 'html-cache');
@@ -446,35 +449,97 @@ app.get("/auth/logout", (req,res) => req.session.destroy(() => res.redirect("/au
 const authMiddleware = sessionAuth;
 app.use('/static', express.static(path.join(__dirname, 'web', 'public'), { maxAge: '1d' }));
 
+// The chosen palette, as a stylesheet. Public, like /static, because the
+// login page wears it too.
+//
+// The URL carries no ?v= cache-buster on purpose: rendered pages are cached
+// to disk, so a versioned URL baked into the markup would freeze whichever
+// palette was current when the page was rendered -- the same reason the theme
+// mode travels as a cookie rather than as an attribute in the markup. Instead
+// it revalidates on every load and answers 304 with no body unless the
+// palette has actually changed.
+app.get('/theme.css', async (req, res) => {
+  res.type('text/css');
+  res.set('Cache-Control', 'no-cache');
+  let css = '';
+  try {
+    ({ css } = await getThemeStylesheet(getAbsoluteVaultPath(), await getStoredThemeName()));
+  } catch (error) {
+    // A palette we can't read is not worth failing a page load over; the
+    // built-in one is always underneath.
+    debug('Could not render theme stylesheet:', error.message);
+  }
+  const etag = `W/"${crypto.createHash('sha1').update(css).digest('base64')}"`;
+  res.set('ETag', etag);
+  if (req.headers['if-none-match'] === etag) return res.status(304).end();
+  res.send(css);
+});
+
 // Read and change the shared theme. The browser applies the change itself and
 // tells the server, so one device's choice reaches the others on their next
 // page load.
 app.get('/api/theme', authMiddleware, async (req, res) => {
   try {
-    res.json({ success: true, mode: await getStoredThemeMode() });
+    const { themeMode, themeName } = await readWebPreferences();
+    res.json({ success: true, mode: themeMode, name: themeName });
   } catch (error) {
     console.error('Error reading theme preference:', error);
     res.status(500).json({ success: false, message: 'Failed to read theme' });
   }
 });
 
+// The palettes on offer: the built-in one plus whatever the vault holds. The
+// display menu asks for this rather than having it rendered into the page,
+// because pages are cached to disk and the list would go stale there.
+app.get('/api/themes', authMiddleware, async (req, res) => {
+  try {
+    const { themeName } = await readWebPreferences();
+    const themes = await listThemes(getAbsoluteVaultPath());
+    res.json({
+      success: true,
+      themes,
+      selected: themes.some((theme) => theme.id === themeName) ? themeName : BUILT_IN_THEME_ID
+    });
+  } catch (error) {
+    console.error('Error listing themes:', error);
+    res.status(500).json({ success: false, message: 'Failed to list themes' });
+  }
+});
+
 app.post('/api/theme', authMiddleware, express.json(), async (req, res) => {
-  const { mode } = req.body || {};
-  if (!isThemeMode(mode)) {
+  const { mode, name } = req.body || {};
+  // Either may be sent on its own: the menu has a control for each.
+  if (mode !== undefined && !isThemeMode(mode)) {
     return res.status(400).json({
       success: false,
       message: `Theme must be one of: ${THEME_MODES.join(', ')}`
     });
   }
+  if (name !== undefined && !isThemeName(name)) {
+    return res.status(400).json({ success: false, message: 'Unknown palette' });
+  }
+  if (mode === undefined && name === undefined) {
+    return res.status(400).json({ success: false, message: 'Nothing to change' });
+  }
   try {
-    await setStoredThemeMode(mode);
-    res.cookie(THEME_COOKIE_NAME, mode, {
-      path: '/',
-      sameSite: 'lax',
-      httpOnly: false,
-      maxAge: THEME_COOKIE_MAX_AGE
-    });
-    res.json({ success: true, mode });
+    if (name !== undefined) {
+      const themes = await listThemes(getAbsoluteVaultPath());
+      if (!themes.some((theme) => theme.id === name)) {
+        return res.status(400).json({ success: false, message: `No such palette: ${name}` });
+      }
+      await setStoredThemeName(name);
+    }
+    if (mode !== undefined) {
+      await setStoredThemeMode(mode);
+      res.cookie(THEME_COOKIE_NAME, mode, {
+        path: '/',
+        sameSite: 'lax',
+        httpOnly: false,
+        maxAge: THEME_COOKIE_MAX_AGE
+      });
+    }
+    const { themeMode, themeName } = await readWebPreferences();
+    res.json({ success: true, mode: themeMode, name: themeName });
   } catch (error) {
     console.error('Error saving theme preference:', error);
     res.status(500).json({ success: false, message: 'Failed to save theme' });
@@ -496,6 +561,8 @@ ${getThemeBootstrapScript()}
 <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css" rel="stylesheet"/>
 <!-- Custom styles -->
 <link href="/static/css/style.css?v=${STATIC_VERSION}" rel="stylesheet"/>
+<!-- The chosen palette, last so it wins -->
+<link href="/theme.css" rel="stylesheet"/>
 `;
 
 // Common scripts for all pages

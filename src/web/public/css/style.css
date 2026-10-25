@@ -26,9 +26,22 @@
   --today-code-bg: rgba(18, 102, 241, 0.1);
   --today-code-block-bg: #f6f8fa;
   --today-code-block-text: #1f2328;
-  --mdb-link-color: #2b5fb4;
+  /* MDB reads its own properties for links and secondary text. Pointing
+     them at Today's means one palette drives both. The `-rgb` triple has to
+     be spelled out: MDB composes it as rgba(var(--mdb-link-color-rgb), a),
+     which a var() colour cannot feed, so a vault theme that moves the link
+     colour re-emits this line (see src/web/themes.js). */
+  --mdb-link-color: var(--today-link);
   --mdb-link-color-rgb: 43, 95, 180;
-  --mdb-secondary-color: #5c636a;
+  --mdb-secondary-color: var(--today-muted-text);
+  /* MDB paints its own surfaces (cards, dropdowns, modals) from this rather
+     than from --today-card-bg, so a palette that moves the card colour would
+     otherwise leave them behind. MDB's light default is #fff, the same colour
+     this token already holds, so the built-in palette renders unchanged.
+     MDB's --mdb-surface-color and --mdb-card-border-color are left alone here:
+     their light defaults are not Today's values, so bridging them would move
+     the built-in palette too, and that wants its own look. */
+  --mdb-surface-bg: var(--today-card-bg);
   --today-you-bg: #e7f0fe;
   --today-you-border: #b9d1fb;
   --today-attn-text: #92400e;
@@ -58,9 +71,9 @@ html[data-theme="dark"] {
   --today-code-bg: #273a5c;
   --today-code-block-bg: #0d1117;
   --today-code-block-text: #e6edf3;
-  --mdb-link-color: #93c5fd;
+  --mdb-link-color: var(--today-link);
   --mdb-link-color-rgb: 147, 197, 253;
-  --mdb-secondary-color: #9ca3af;
+  --mdb-secondary-color: var(--today-muted-text);
   --today-you-bg: #1e3a5f;
   --today-you-border: #2f5688;
   --today-attn-text: #fcd34d;
@@ -144,6 +157,12 @@ html {
   font-size: 0.85rem;
   color: var(--today-muted-text);
   text-align: right;
+}
+
+.display-menu-select {
+  width: auto;
+  max-width: 11rem;
+  font-size: 0.85rem;
 }
 
 .display-menu-foot {
