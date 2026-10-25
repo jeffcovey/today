@@ -1114,9 +1114,8 @@ function advanceTaskTimerPhases() {
     taskTimerState.phase = 'work';
     taskTimerSyncedItems = null;
     triggerTaskTimerSync();
-
-    // Recurse in case new work phase also expired (user was away a long time)
-    advanceTaskTimerPhases();
+    // Start the next item fresh rather than burning through the queue during
+    // a long absence; nobody was there to work on those items.
   }
 }
 

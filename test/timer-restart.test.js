@@ -182,6 +182,16 @@ describe('time that passed while the server was down', () => {
     expectAboutSeconds(taskCountdown(after), WORK_MINUTES * 60);
     expect(taskTimerStart(after)).not.toBe(taskTimerStart(before));
   });
+
+  test('starts item 2 fresh after a long outage instead of burning through the queue', async () => {
+    const { before, after } = await restartAfter(3.5 * 60 * MINUTE, startTaskTimer);
+
+    expect(before).toContain('Item 1 of');
+    expect(after).toContain('Item 2 of');
+    expect(attribute(after, 'data-timer-phase')).toBe('work');
+    expect(taskTimerRunning(after)).toBe(true);
+    expectAboutSeconds(taskCountdown(after), WORK_MINUTES * 60);
+  });
 });
 
 describe('state that is too old to resume', () => {
