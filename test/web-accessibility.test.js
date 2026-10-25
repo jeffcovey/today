@@ -26,6 +26,7 @@ import {
 } from './helpers/a11y-harness.js';
 import fs from 'fs';
 import path from 'path';
+import Database from 'better-sqlite3';
 
 jest.setTimeout(240_000);
 
@@ -552,6 +553,42 @@ describe('a palette from the vault', () => {
     } finally {
       await view.close();
       await brandServer.stop();
+    }
+  });
+
+  test.each(THEMES.flatMap(theme =>
+    ['today', 'cocoa'].map(palette => [theme, palette])
+  ))('%s theme, %s palette: task-source ink follows the link token, not the brand fill', async (theme, palette) => {
+    const db = new Database(path.join(path.dirname(server.vaultDir), '.data', 'today.db'));
+    const taskId = 'brand-source-link-test';
+    const view = await browser.newPage();
+    try {
+      db.prepare('INSERT INTO tasks (id, source, title, status, metadata) VALUES (?, ?, ?, ?, ?)').run(
+        taskId, 'test/source', 'Task with a source file', 'open',
+        JSON.stringify({ file_path: 'vault/notes/kitchen-sink.md' })
+      );
+      await usePalette(palette, server.baseUrl);
+      await view.setExtraHTTPHeaders({ Authorization: 'Bearer ' + PASSWORD });
+      await useTheme(view, theme, server.baseUrl);
+      await view.goto(`${server.baseUrl}/task/${taskId}`, { waitUntil: 'networkidle0' });
+      expect(await view.$('.text-primary')).toBeNull();
+
+      const colors = await view.$eval('a[href="/notes/kitchen-sink.md"]', el => {
+        const probe = document.createElement('span');
+        el.appendChild(probe);
+        probe.style.color = 'var(--today-link)';
+        const link = getComputedStyle(probe).color;
+        probe.style.color = 'var(--today-brand-bg)';
+        const brand = getComputedStyle(probe).color;
+        probe.remove();
+        return { actual: getComputedStyle(el).color, link, brand };
+      });
+      expect(colors.actual).toBe(colors.link);
+      expect(colors.actual).not.toBe(colors.brand);
+    } finally {
+      db.prepare('DELETE FROM tasks WHERE id = ?').run(taskId);
+      db.close();
+      await view.close();
     }
   });
 

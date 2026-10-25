@@ -131,6 +131,10 @@ html[data-theme="dark"] {
   --mdb-badge-color: var(--today-brand-text);
 }
 
+.today-text-link {
+  color: var(--today-link);
+}
+
 /* Default to iOS 'Large'; the head bootstrap applies Dynamic Type on iOS. */
 html {
   font-size: 17px;

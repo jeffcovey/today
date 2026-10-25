@@ -1959,7 +1959,7 @@ async function renderDirectory(dirPath, urlPath) {
               icon = 'fa-calendar-week text-info';
               break;
             case 'day':
-              icon = 'fa-calendar-day text-primary';
+              icon = 'fa-calendar-day today-text-link';
               break;
           }
         }
@@ -2390,7 +2390,7 @@ async function renderEditor(filePath, urlPath) {
           const saveStatus = document.getElementById('save-status');
 
           saveStatus.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
-          saveStatus.className = 'text-primary small me-3';
+          saveStatus.className = 'today-text-link small me-3';
 
           try {
             const response = await fetch('/save/${urlPath}', {
@@ -8228,7 +8228,7 @@ app.get('/task/*taskId', authMiddleware, async (req, res) => {
         <div class="mb-4">
           <h6 class="text-muted mb-2">Source</h6>
           <div><i class="fas fa-plug me-2"></i>${esc(task.source)}</div>
-          ${editFileRelPath ? `<div class="mt-1"><a href="/${esc(editFileRelPath)}" class="text-primary"><i class="fas fa-file-alt me-1"></i>${esc(editFilePath)}</a></div>` : ''}
+          ${editFileRelPath ? `<div class="mt-1"><a href="/${esc(editFileRelPath)}"><i class="fas fa-file-alt me-1"></i>${esc(editFilePath)}</a></div>` : ''}
         </div>
         <div class="d-flex gap-2 flex-wrap">
           ${editFileRelPath ? `<a href="/${esc(editFileRelPath)}" class="btn btn-primary"><i class="fas fa-edit me-2"></i>Edit File</a>` : ''}
