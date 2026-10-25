@@ -356,7 +356,8 @@ describe('a palette from the vault', () => {
     const { themes, selected } = await response.json();
     expect(themes).toEqual([
       { id: 'today', name: 'Today' },
-      { id: 'cocoa', name: 'Cocoa' }
+      { id: 'cocoa', name: 'Cocoa' },
+      { id: 'light-brand', name: 'Light brand' }
     ]);
     expect(selected).toBe('today');
   });
@@ -428,7 +429,8 @@ describe('a palette from the vault', () => {
       expect(await page.$$eval('#paletteSelect option', options =>
         options.map(option => [option.value, option.textContent]))).toEqual([
         ['today', 'Today'],
-        ['cocoa', 'Cocoa']
+        ['cocoa', 'Cocoa'],
+        ['light-brand', 'Light brand']
       ]);
 
       const before = await page.evaluate(() =>
@@ -501,6 +503,55 @@ describe('a palette from the vault', () => {
       });
     } finally {
       await view.close();
+    }
+  });
+
+  test.each(THEMES.flatMap(theme =>
+    ['markdown-diary', 'markdown-plans'].map(plugin => [theme, plugin])
+  ))('%s theme, %s: non-white brand ink reaches filled surfaces', async (theme, plugin) => {
+    const brandServer = await startServer({
+      configLines: [`[plugins.${plugin}.default]`, 'enabled = true']
+    });
+    const { baseUrl } = brandServer;
+    const view = await browser.newPage();
+    const ink = theme === 'light' ? 'rgb(36, 24, 0)' : 'rgb(16, 32, 64)';
+    try {
+      await usePalette('light-brand', baseUrl);
+      await view.setExtraHTTPHeaders({ Authorization: 'Bearer ' + PASSWORD });
+      await useTheme(view, theme, baseUrl);
+      await view.goto(baseUrl, { waitUntil: 'networkidle0' });
+
+      const tile = '.list-group-item.bg-primary';
+      const colors = {
+        tile: await view.$eval(tile, el => getComputedStyle(el).color),
+        header: await view.$eval('#aiAssistantHeader', el => getComputedStyle(el).color)
+      };
+      await view.hover(tile);
+      colors.hoveredTile = await view.$eval(tile, el => getComputedStyle(el).color);
+
+      await view.goto(`${baseUrl}/_git`, { waitUntil: 'networkidle0' });
+      await openDiff(view, 'code/example.js');
+      colors.activeFile = await view.$eval('.file-item.active', el => getComputedStyle(el).color);
+      colors.activeFileText = await view.$$eval('.file-item.active span', els =>
+        els.map(el => getComputedStyle(el).color));
+
+      // Exercise MDB's badge colour variable, not just inherited surface ink.
+      colors.badge = await view.evaluate(() => {
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-primary';
+        badge.textContent = 'Open';
+        document.body.appendChild(badge);
+        const color = getComputedStyle(badge).color;
+        badge.remove();
+        return color;
+      });
+      expect(colors).toEqual({
+        tile: ink, hoveredTile: ink, header: ink,
+        activeFile: ink, activeFileText: [ink], badge: ink
+      });
+    } finally {
+      await view.close();
+      await brandServer.stop();
     }
   });
 

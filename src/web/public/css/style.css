@@ -122,6 +122,15 @@ html[data-theme="dark"] {
   --mdb-card-border-color: var(--today-border);
 }
 
+/* Brand fills own their ink, including over dark-mode list-item colours. */
+.bg-primary:not(.badge) {
+  color: var(--today-brand-text) !important;
+}
+
+.badge.bg-primary {
+  --mdb-badge-color: var(--today-brand-text);
+}
+
 /* Default to iOS 'Large'; the head bootstrap applies Dynamic Type on iOS. */
 html {
   font-size: 17px;

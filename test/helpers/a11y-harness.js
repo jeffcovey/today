@@ -93,7 +93,7 @@ function freePort() {
  * Start the web server on a free port against a temporary copy of the
  * fixture vault. Returns { baseUrl, stop }.
  */
-export async function startServer({ vaultSource = FIXTURE_VAULT, timeoutMs = 60_000 } = {}) {
+export async function startServer({ vaultSource = FIXTURE_VAULT, timeoutMs = 60_000, configLines = [] } = {}) {
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'today-a11y-'));
   const vaultDir = path.join(workDir, 'vault');
   fs.cpSync(vaultSource, vaultDir, { recursive: true });
@@ -132,7 +132,8 @@ export async function startServer({ vaultSource = FIXTURE_VAULT, timeoutMs = 60_
     'work_minutes = 25',
     'short_rest_minutes = 5',
     'long_rest_minutes = 15',
-    ''
+    '',
+    ...configLines
   ].join('\n'));
 
   // The server reads .data/today.db relative to its working directory and
