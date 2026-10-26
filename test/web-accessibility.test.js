@@ -268,13 +268,19 @@ describe('pomodoro banner', () => {
   }
 
   async function press(page, action) {
+    // A running timer is collapsed to one line; its controls live behind the
+    // card's disclosure, so open it before reaching for them.
+    await page.evaluate(() => {
+      const card = document.querySelector('.timer-card[data-timer-key="pomodoro"]');
+      if (card) card.open = true;
+    });
     await Promise.all([
       page.waitForNavigation({ waitUntil: 'networkidle0' }),
       page.click(control(action))
     ]);
   }
 
-  // The banner, whichever of its three states is showing.
+  // The banner while it is running, or the pill it shrinks to while it is not.
   function bannerText(page) {
     return page.$eval(
       '[data-pomodoro-start], [data-pomodoro-awaiting], [onclick*="pomodoro/start"]',
@@ -282,12 +288,21 @@ describe('pomodoro banner', () => {
     );
   }
 
+  // Idle, the schedule is configuration rather than status, so it is in the
+  // pill's tooltip instead of being spelled out across the strip.
+  // The schedule used to be a tooltip on the idle pill, which touch could not
+  // reach; it is text in the card's detail now.
+  function idleSchedule(page) {
+    return page.$eval('[onclick*="pomodoro/start"]',
+      el => el.closest('.timer-card').textContent.replace(/\s+/g, ' ').trim());
+  }
+
   test('starts, pauses, resumes, skips and stops from the page', async () => {
     const page = await openPage();
     try {
-      // Idle: the configured schedule is on show.
+      // Idle: the same card shape as when running, schedule in its detail.
       expect(await bannerText(page)).toContain('Pomodoro');
-      expect(await bannerText(page)).toContain('2 × 25 min');
+      expect(await idleSchedule(page)).toContain('2 × 25 min');
 
       await press(page, 'start');
       expect(await bannerText(page)).toContain('Work period 1 of 2');
@@ -463,6 +478,12 @@ describe('a palette from the vault', () => {
   // var() — a var() colour cannot feed an rgba(). Both halves are checked
   // here: the fill at full opacity, and a tint of it, which is the case that
   // would silently come out transparent if the triple were ever a var().
+  // The navbar is the thing a palette most visibly has to reach, and it is
+  // MDB's .bg-primary: rgba(var(--mdb-primary-rgb), var(--mdb-bg-opacity)).
+  // That composition is why the triple is emitted as digits rather than as a
+  // var() — a var() colour cannot feed an rgba(). Both halves are checked
+  // here: the fill at full opacity, and a tint of it, which is the case that
+  // would silently come out transparent if the triple were ever a var().
   const BRAND_FILL = { light: 'rgb(122, 66, 16)', dark: 'rgb(161, 85, 26)' };
 
   test.each(THEMES)('%s theme: the vault\'s brand fill reaches the navbar', async (theme) => {
@@ -507,11 +528,15 @@ describe('a palette from the vault', () => {
     }
   });
 
-  test.each(THEMES.flatMap(theme =>
-    ['markdown-diary', 'markdown-plans'].map(plugin => [theme, plugin])
-  ))('%s theme, %s: non-white brand ink reaches filled surfaces', async (theme, plugin) => {
+  // This covered the two day tiles as well, under both markdown-diary and
+  // markdown-plans, which is what the plugin parametrisation was for. The
+  // home page's tiles are tabs now and nothing Today renders is a
+  // .list-group-item.bg-primary any more, so the tile assertions and the
+  // second plugin case have gone with them. The surfaces left are the ones
+  // that still exist.
+  test.each(THEMES)('%s theme: non-white brand ink reaches filled surfaces', async (theme) => {
     const brandServer = await startServer({
-      configLines: [`[plugins.${plugin}.default]`, 'enabled = true']
+      configLines: ['[plugins.markdown-diary.default]', 'enabled = true']
     });
     const { baseUrl } = brandServer;
     const view = await browser.newPage();
@@ -522,14 +547,10 @@ describe('a palette from the vault', () => {
       await useTheme(view, theme, baseUrl);
       await view.goto(baseUrl, { waitUntil: 'networkidle0' });
 
-      const tile = '.list-group-item.bg-primary';
       const colors = {
-        tile: await view.$eval(tile, el => getComputedStyle(el).color),
         header: await view.$eval('#aiAssistantHeader', el => getComputedStyle(el).color),
         chevron: await view.$eval('#aiAssistantHeader .toggle-btn #toggleIcon', el => getComputedStyle(el).color)
       };
-      await view.hover(tile);
-      colors.hoveredTile = await view.$eval(tile, el => getComputedStyle(el).color);
 
       await view.goto(`${baseUrl}/_git`, { waitUntil: 'networkidle0' });
       await openDiff(view, 'code/example.js');
@@ -560,7 +581,7 @@ describe('a palette from the vault', () => {
         return color;
       });
       expect(colors).toEqual({
-        tile: ink, hoveredTile: ink, header: ink, chevron: ink,
+        header: ink, chevron: ink,
         activeFile: ink, activeFileText: [ink], badge: ink
       });
     } finally {

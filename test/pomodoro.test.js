@@ -473,18 +473,40 @@ describe('opt-in and placement', () => {
     expect(routeBody(webServerSource, '/api/pomodoro/start')).toContain('getPomodoroConfig().enabled');
   });
 
+  // Both widgets used to be pasted into three page builders, and these two
+  // tests counted the copies. They are built in one place now, so the thing to
+  // check is that the one place is used everywhere and puts them in order.
+  function activityBarBody() {
+    const start = webServerSource.indexOf('async function getActivityBar(');
+    expect(start).toBeGreaterThan(-1);
+    const end = webServerSource.indexOf('\n}', start);
+    expect(end).toBeGreaterThan(start);
+    return webServerSource.slice(start, end);
+  }
+
   test('it appears on every page that carries the task timer', () => {
-    const taskTimer = webServerSource.match(/\$\{await getTaskTimerWidget\(\)\}/g) || [];
-    const pomodoro = webServerSource.match(/\$\{getPomodoroWidget\(\)\}/g) || [];
-    expect(taskTimer).toHaveLength(3);
-    expect(pomodoro).toHaveLength(taskTimer.length);
+    const bars = webServerSource.match(/await getActivityBar\(/g) || [];
+    expect(bars).toHaveLength(3);
+
+    const body = activityBarBody();
+    expect(body).toContain('await getTaskTimerWidget()');
+    expect(body).toContain('getPomodoroWidget()');
   });
 
-  test('each banner sits directly under the task timer, not above it', () => {
-    const pairs = webServerSource.match(
-      /\$\{await getTaskTimerWidget\(\)\}\s*\n\s*\$\{getPomodoroWidget\(\)\}/g
-    ) || [];
-    expect(pairs).toHaveLength(3);
+  test('the pomodoro card comes after the task timer in the row', () => {
+    const body = activityBarBody();
+    expect(body.indexOf('getPomodoroWidget()'))
+      .toBeGreaterThan(body.indexOf('await getTaskTimerWidget()'));
+    // And the order survives placement: the row lists them in that order, so
+    // the task timer is always the left-hand one of the two. Read as a list
+    // rather than matched as a fixed string, because another card joining the
+    // row is a change of layout, not a change of this order.
+    const row = body.match(/const rowed = \[([^\]]*)\]/);
+    expect(row).not.toBeNull();
+    const members = row[1].split(',').map((member) => member.trim());
+    expect(members).toContain('taskTimerHtml');
+    expect(members.indexOf('pomodoroHtml'))
+      .toBeGreaterThan(members.indexOf('taskTimerHtml'));
   });
 });
 
