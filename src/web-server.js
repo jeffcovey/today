@@ -729,7 +729,7 @@ function getTimerWidget(timer) {
       title: timer.description,
       clock: `<span class="timer-duration">${timer.duration}</span>`,
       detail: `
-            <a href="#" id="stopTimerBtn" onclick="
+            <a href="#" id="stopTimerBtn" data-timer-action="stop" onclick="
             const btn = this;
             const icon = btn.querySelector('i');
             const text = btn.querySelector('.btn-text');
@@ -757,7 +757,7 @@ function getTimerWidget(timer) {
       detail: `
         <div class="input-group">
           <input type="text" class="form-control" id="timerDescription" placeholder="What are you working on? (include #topic/tags)" onkeypress="if(event.key==='Enter'){event.preventDefault();document.getElementById('startTimerBtn').click();}">
-            <button class="btn btn-primary" id="startTimerBtn" onclick="
+            <button class="btn btn-primary" id="startTimerBtn" data-timer-action="start" onclick="
               const btn = this;
               const icon = btn.querySelector('i');
               const text = btn.querySelector('.btn-text');
@@ -1325,7 +1325,7 @@ async function getTaskTimerWidget() {
             <a href="#" onclick="event.preventDefault(); fetch('/api/task-timer/skip', {method: 'POST'}).then(function(r) { return r.json(); }).then(function(data) {
               if (data.message === 'All tasks completed!') alert('All tasks completed!'); location.reload();
             }).catch(function() { alert('Failed to skip'); });">Skip Rest</a>
-            <a href="#" onclick="event.preventDefault(); fetch('/api/task-timer/stop', {method: 'POST'}).then(function() { location.reload(); });">Stop</a>
+            <a href="#" data-timer-action="stop" onclick="event.preventDefault(); fetch('/api/task-timer/stop', {method: 'POST'}).then(function() { location.reload(); });">Stop</a>
           </small>`
       });
     }
@@ -1364,7 +1364,7 @@ async function getTaskTimerWidget() {
             <div><small>(${phaseLabel}) · Item ${position} of ${total}</small></div>
             <div class="mt-1 d-flex gap-1">
               ${isPaused ?
-                `<button class="btn btn-sm btn-outline-dark" onclick="
+                `<button class="btn btn-sm btn-outline-dark" data-timer-action="resume" onclick="
                   fetch('/api/task-timer/resume', {method: 'POST'}).then(function() { location.reload(); });">
                   <i class="fas fa-play"></i> Resume
                 </button>` :
@@ -1373,7 +1373,7 @@ async function getTaskTimerWidget() {
                   <i class="fas fa-pause"></i> Pause
                 </button>`
               }
-              <button class="btn btn-sm btn-outline-secondary" onclick="
+              <button class="btn btn-sm btn-outline-secondary" data-timer-action="stop" onclick="
                 fetch('/api/task-timer/stop', {method: 'POST'}).then(function() { location.reload(); });">
                 <i class="fas fa-stop"></i> Stop
               </button>
@@ -1414,7 +1414,8 @@ async function getTaskTimerWidget() {
           <input type="number" class="timer-minutes" id="taskTimerMinutes" aria-label="Minutes per task"
           title="Minutes per task" value="${taskTimerState.duration}" min="1" max="60">
         <span class="timer-unit">min</span>
-        <button class="timer-go" title="Start task timer" aria-label="Start task timer" onclick="
+        <button class="timer-go" title="Start task timer" aria-label="Start task timer"
+          data-timer-action="start" onclick="
           const btn = this;
           const icon = btn.querySelector('i');
           const minutesInput = document.getElementById('taskTimerMinutes');
@@ -1537,7 +1538,7 @@ function sendPomodoroNudge() {
 }
 
 function pomodoroButton(action, icon, label, style) {
-  return `<button class="btn btn-sm ${style}" onclick="
+  return `<button class="btn btn-sm ${style}" data-timer-action="${action}" onclick="
     fetch('/api/pomodoro/${action}', {method: 'POST'}).then(function() { location.reload(); });">
     <i class="fas ${icon}"></i> ${label}
   </button>`;
@@ -1599,7 +1600,8 @@ function getPomodoroWidget() {
       title: 'Pomodoro',
       detail: `
         <div class="d-flex align-items-center gap-2">
-          <button class="timer-go" title="Start pomodoro" aria-label="Start pomodoro — ${schedule}" onclick="
+          <button class="timer-go" title="Start pomodoro" aria-label="Start pomodoro — ${schedule}"
+          data-timer-action="start" onclick="
           fetch('/api/pomodoro/start', {method: 'POST'}).then(function() { location.reload(); });">
           <i class="fas fa-play"></i>
         </button>

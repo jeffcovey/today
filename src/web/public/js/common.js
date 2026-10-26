@@ -736,6 +736,12 @@ function initializeMoment() {
 // them being one line.
 const TIMER_CARD_MEMORY_MS = 10000;
 
+// A card is opened to do one thing. Once the timer is running, or once it has
+// been stopped, that thing is done and the card goes back to being one line.
+// Pause and skip are not on this list: those are adjustments made with the
+// card in hand, and the next press is likely to be in it too.
+const COLLAPSING_ACTIONS = new Set(['start', 'next', 'resume', 'stop']);
+
 function initializeTimerCards() {
   for (const card of document.querySelectorAll('.timer-card[data-timer-key]')) {
     const key = 'timer-card:' + card.dataset.timerKey;
@@ -759,7 +765,12 @@ function initializeTimerCards() {
     card.addEventListener('toggle', remember);
     // The expiry should measure time since the action, not since opening.
     card.addEventListener('click', event => {
-      if (event.target.closest('.timer-detail button, .timer-detail a')) remember();
+      const control = event.target.closest('.timer-detail button, .timer-detail a');
+      if (!control) return;
+      // Collapse first, then remember: the memory records the card as the
+      // control left it, so the reload the control causes comes back closed.
+      if (COLLAPSING_ACTIONS.has(control.dataset.timerAction)) card.open = false;
+      remember();
     });
   }
 }
