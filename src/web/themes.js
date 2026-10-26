@@ -17,7 +17,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { parse as parseToml } from 'smol-toml';
-import { APP_DIRNAME, resolveAppPath } from '../vault-app-files.js';
+import { APP_DIRNAME, appPathCandidates } from '../vault-app-files.js';
 
 /** The id of the palette that ships with Today; not a file, and never shadowed. */
 export const BUILT_IN_THEME_ID = 'today';
@@ -295,7 +295,7 @@ export function renderThemeCss(theme) {
 let cache = null;
 
 function signatureOf(entries) {
-  return entries.map(({ file, stat }) => `${file}:${stat.mtimeMs}:${stat.size}`).join('|');
+  return entries.map(({ filePath, stat }) => `${filePath}:${stat.mtimeMs}:${stat.size}`).join('|');
 }
 
 /**
@@ -304,39 +304,44 @@ function signatureOf(entries) {
  * file to what is wrong with it so the server can say so.
  */
 export async function readVaultThemes(vaultPath, appDirectory = APP_DIRNAME) {
-  const directory = resolveAppPath(vaultPath, THEMES_DIRNAME, appDirectory);
-
-  let files;
-  try {
-    files = (await fs.readdir(directory))
-      .filter((file) => file.toLowerCase().endsWith('.toml'))
-      .sort();
-  } catch {
-    cache = null;
-    return { themes: new Map(), problems: new Map() };
+  const directories = appPathCandidates(vaultPath, THEMES_DIRNAME, appDirectory);
+  const filesByName = new Map();
+  for (const directory of directories) {
+    let files;
+    try {
+      files = (await fs.readdir(directory))
+        .filter((file) => file.toLowerCase().endsWith('.toml'))
+        .sort();
+    } catch {
+      continue;
+    }
+    for (const file of files) {
+      if (!filesByName.has(file)) filesByName.set(file, path.join(directory, file));
+    }
   }
 
   const entries = [];
-  for (const file of files) {
+  for (const [file, filePath] of filesByName) {
     try {
-      entries.push({ file, stat: await fs.stat(path.join(directory, file)) });
+      entries.push({ file, filePath, stat: await fs.stat(filePath) });
     } catch {
       // Vanished between the listing and the stat; it simply isn't there.
     }
   }
 
+  const directoryKey = JSON.stringify(directories);
   const signature = signatureOf(entries);
-  if (cache && cache.directory === directory && cache.signature === signature) {
+  if (cache && cache.directory === directoryKey && cache.signature === signature) {
     return cache.value;
   }
 
   const themes = new Map();
   const problems = new Map();
-  for (const { file } of entries) {
+  for (const { file, filePath } of entries) {
     const id = file.slice(0, -'.toml'.length);
     let parsed;
     try {
-      parsed = parseToml(await fs.readFile(path.join(directory, file), 'utf-8'));
+      parsed = parseToml(await fs.readFile(filePath, 'utf-8'));
     } catch (error) {
       problems.set(file, [`is not valid TOML: ${error.message}`]);
       continue;
@@ -347,7 +352,7 @@ export async function readVaultThemes(vaultPath, appDirectory = APP_DIRNAME) {
   }
 
   const value = { themes, problems };
-  cache = { directory, signature, value };
+  cache = { directory: directoryKey, signature, value };
   return value;
 }
 

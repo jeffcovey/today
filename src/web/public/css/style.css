@@ -2376,14 +2376,10 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
 .moment {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 26rem;
-  /* Room at the top for the row of links, which is placed against the corner
-     and so takes no space of its own. Without it the centred block rides up
-     under the links on a narrow screen, where the clock is widest relative to
-     the panel. */
-  padding-top: 3.5rem;
   overflow: hidden;
   border-bottom-left-radius: inherit;
   border-bottom-right-radius: inherit;
@@ -2422,6 +2418,7 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
   position: relative;
   width: 100%;
   max-width: 34rem;
+  margin: auto;
   padding: 2.5rem 1.5rem;
   color: #ffffff;
   text-align: center;
@@ -2488,14 +2485,13 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
 }
 
 /* The user's own links, from the vault's links.md, across the top of the
-   panel. Placed against the corner rather than inside .moment-inner, which is
-   centred: these are the one thing on the calm tab that is not about today.
-   They wrap, since how many there are is up to whoever wrote the file. */
+   panel. They wrap, since how many there are is up to whoever wrote the file;
+   staying in flow keeps them from covering the centred block. */
 .moment-bookmarks {
-  position: absolute;
-  top: 0;
-  left: 0;
-  max-width: 100%;
+  box-sizing: border-box;
+  align-self: stretch;
+  flex: none;
+  order: -1;
   padding: 1.1rem 1.5rem;
   color: #ffffff;
   font-size: clamp(0.85rem, 2.4vw, 1rem);
@@ -2503,6 +2499,10 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
   line-height: 1.6;
   text-align: left;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.moment-bookmarks:empty {
+  display: none;
 }
 
 .moment-quote {
@@ -2515,7 +2515,6 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
 @media (max-width: 768px) {
   .moment {
     min-height: 22rem;
-    padding-top: 3rem;
   }
 
   .moment-inner {

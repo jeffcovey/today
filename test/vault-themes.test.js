@@ -245,6 +245,17 @@ describe('reading the vault', () => {
     expect(themes.get('cocoa').name).toBe('New');
   });
 
+  test('mixed layouts keep root themes unless the app directory has that filename', async () => {
+    await writeTheme('cocoa.toml', 'name = "Root Cocoa"\n\n[light]\nbg = "#000000"\n');
+    await writeTheme('plum.toml', 'name = "Plum"\n\n[light]\nbg = "#990099"\n');
+    await writeTheme('cocoa.toml', 'name = "App Cocoa"\n\n[light]\nbg = "#ffffff"\n', 'today/themes');
+
+    const { themes } = await readVaultThemes(vaultDir);
+
+    expect(themes.get('cocoa').name).toBe('App Cocoa');
+    expect(themes.get('plum').name).toBe('Plum');
+  });
+
   test('an edit is picked up without a restart', async () => {
     await writeTheme('cocoa.toml', 'name = "Cocoa"\n\n[light]\nbg = "#f6f1ea"\n');
     expect((await getThemeStylesheet(vaultDir, 'cocoa')).css).toContain('rgb(246, 241, 234)');

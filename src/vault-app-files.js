@@ -141,10 +141,12 @@ const LINK_LINE = /^\s*[-*]\s+\[([^\]]+)\]\(([^)\s]+)(?:\s+(?:"[^"]*"|'[^']*'|\(
  * within the vault, which is the common case and carries no scheme risk.
  */
 export function isSafeLinkTarget(target) {
-  const scheme = String(target).match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/);
+  const value = String(target);
+  if (/[\u0000-\u001f\u007f-\u009f\\]/.test(value)) return false;
+  const scheme = value.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/);
   if (scheme) return ['http', 'https', 'mailto'].includes(scheme[1].toLowerCase());
   // Protocol-relative: no scheme to check, but it still leaves the site.
-  return !String(target).startsWith('//');
+  return !value.startsWith('//');
 }
 
 export function parseVaultLinks(content) {

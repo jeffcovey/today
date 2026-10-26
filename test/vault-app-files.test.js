@@ -165,6 +165,9 @@ describe('what a links file may say', () => {
     expect(isSafeLinkTarget('data:text/html,<script>')).toBe(false);
     expect(isSafeLinkTarget('vbscript:msgbox')).toBe(false);
     expect(isSafeLinkTarget('//evil.example.com')).toBe(false);
+    expect(isSafeLinkTarget('\u0001javascript:alert(1)')).toBe(false);
+    expect(isSafeLinkTarget('\\evil.example.com/path')).toBe(false);
+    expect(isSafeLinkTarget('\\\\evil.example.com/path')).toBe(false);
 
     expect(isSafeLinkTarget('https://example.com')).toBe(true);
     expect(isSafeLinkTarget('http://example.com')).toBe(true);
@@ -175,7 +178,9 @@ describe('what a links file may say', () => {
     // which would make this assertion pass for the wrong reason.
     expect(parseVaultLinks([
       '- [Fine](https://example.com)',
-      '- [Not fine](javascript:alert)'
+      '- [Not fine](javascript:alert)',
+      '- [Hidden control](\u0001javascript:alert)',
+      '- [Backslash host](\\\\evil.example.com/path)'
     ].join('\n'))).toEqual([{ label: 'Fine', href: 'https://example.com' }]);
   });
 
