@@ -1641,8 +1641,11 @@ html[data-theme="dark"] .alert-primary {
   border-color: var(--today-err-edge);
 }
 
-html[data-theme="dark"] .alert strong,
-html[data-theme="dark"] .alert a:not(.btn) {
+.alert a:not(.btn) {
+  color: inherit;
+}
+
+html[data-theme="dark"] .alert strong {
   color: inherit;
 }
 
