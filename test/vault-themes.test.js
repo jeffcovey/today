@@ -151,7 +151,7 @@ describe('rendering the stylesheet', () => {
     expect(css).toContain('--mdb-body-color-rgb: 242, 234, 222;');
   });
 
-  // MDB composes .bg-primary — the navbar, the day tiles, the badges — as
+  // MDB composes .bg-primary — the navbar, the badges, the AI header — as
   // rgba(var(--mdb-primary-rgb), var(--mdb-bg-opacity)), so the brand fill
   // needs its triple spelled out too, or a palette stops at the navbar.
   test('the brand fill moves MDB\'s primary, in both modes', () => {
