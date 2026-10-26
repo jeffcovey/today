@@ -49,6 +49,11 @@ __pycache__/
 .claude/
 *.code-workspace
 
+# Claude Code's project instructions. Local to each deployment: it names
+# paths, service names and deploy habits that are not the repository's
+# business, and this repo is public.
+CLAUDE.md
+
 # =============================================================================
 # Git Worktrees
 # =============================================================================
