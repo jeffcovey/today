@@ -295,19 +295,23 @@ html {
 }
 
 .toc-links a:hover {
-  color: #007bff;
+  color: var(--today-link);
   background: var(--today-card-bg);
   text-decoration: underline;
 }
 
 /* Table of Contents styles */
 details summary.h5 {
-  color: #007bff;
+  color: var(--today-link);
   font-weight: 500;
 }
 
+/* The hover is an underline rather than a second colour: --today-link is the
+   only blue a palette has to hold at 4.5:1 as text, and --today-accent is a
+   3:1 boundary colour, so shifting to it on hover would be a contrast step
+   down on a palette that took that permission. */
 details summary.h5:hover {
-  color: #0056b3;
+  text-decoration: underline;
 }
 
 /* Styles for collapse components */
@@ -643,7 +647,7 @@ details.role-reply .form-text {
 }
 
 /* Obsidian-style callout variations */
-details.callout-note { border-left: 4px solid #007bff; }
+details.callout-note { border-left: 4px solid var(--today-link); }
 details.callout-tip { border-left: 4px solid #28a745; }
 details.callout-warning { border-left: 4px solid #ffc107; }
 details.callout-danger { border-left: 4px solid #dc3545; }
@@ -964,8 +968,8 @@ html[data-theme="dark"] .editor-toolbar {
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background: #007bff;
-  color: white;
+  background: var(--today-brand-bg);
+  color: var(--today-brand-text);
   border: none;
   cursor: pointer;
   align-items: center;
@@ -976,8 +980,15 @@ html[data-theme="dark"] .editor-toolbar {
 }
 
 .floating-toggle-btn:hover {
-  background: #0056b3;
   transform: translateY(-50%) scale(1.1);
+}
+
+@supports (background: color-mix(in srgb, #fff 85%, #000)) {
+  .floating-toggle-btn:hover {
+    /* A shade down from the fill, so the hover follows the palette instead of
+       landing back on a fixed blue. */
+    background: color-mix(in srgb, var(--today-brand-bg) 85%, #000);
+  }
 }
 
 /* Mobile styles */
@@ -1061,8 +1072,8 @@ html[data-theme="dark"] .editor-toolbar {
 
 .chat-bubble.user {
   margin-left: auto;
-  background: #007bff !important;
-  color: white !important;
+  background: var(--today-brand-bg) !important;
+  color: var(--today-brand-text) !important;
 }
 
 .chat-bubble .card,
