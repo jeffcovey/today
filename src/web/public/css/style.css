@@ -2038,9 +2038,10 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
    luminance, and a saturated hue against a pale wash differs mostly in
    chromaticity, so it reads perfectly well while measuring badly.
 
-   If color-mix is unavailable the background declaration is simply dropped
-   and the card keeps --today-card-bg from the rule above, which is why the
-   plain value comes first. */
+   The literal @supports check below keeps --today-card-bg when color-mix is
+   unavailable. Without it, a declaration containing var() would become
+   invalid at computed-value time and reset the background to transparent
+   rather than falling back to the plain value. */
 .family-card {
   --family: var(--today-family-site);
   background: var(--today-card-bg);
@@ -2050,12 +2051,14 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
   border-radius: 0.5rem;
 }
 
-.family-card {
-  background: color-mix(in srgb, var(--family) 14%, var(--today-card-bg));
-}
+@supports (background: color-mix(in srgb, #fff 85%, #000)) {
+  .family-card {
+    background: color-mix(in srgb, var(--family) 14%, var(--today-card-bg));
+  }
 
-html[data-theme="dark"] .family-card {
-  background: color-mix(in srgb, var(--family) 12%, var(--today-card-bg));
+  html[data-theme="dark"] .family-card {
+    background: color-mix(in srgb, var(--family) 12%, var(--today-card-bg));
+  }
 }
 
 .family-work { --family: var(--today-family-work); }

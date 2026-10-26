@@ -69,10 +69,11 @@ describe('family and status stay separate', () => {
     // sits -- a one-line rule puts it after the brace, not at line start,
     // which is what an earlier version of this test missed. The leading
     // boundary is what keeps `background-color` and `border-color` out.
+    // Catch both --today-family-* tokens and the cards' --family alias.
     const declaration = /(?:^|[\s;{])(?:-webkit-text-fill-)?color\s*:\s*([^;}]*)/g;
     const inkUses = [];
     for (const match of withoutComments.matchAll(declaration)) {
-      if (match[1].includes('--today-family-')) inkUses.push(match[0].trim());
+      if (/--(?:today-family-|family\b)/.test(match[1])) inkUses.push(match[0].trim());
     }
     expect(inkUses).toEqual([]);
   });
