@@ -343,7 +343,9 @@ describe('timer banner', () => {
     try {
       await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
       await page.goto(`${server.baseUrl}/notes/kitchen-sink.md`, { waitUntil: 'networkidle0' });
-      expect(await page.$eval('.alert-info[data-timer-start]', el => el.textContent)).toContain('Write the accessibility tests');
+      // family-time, not alert-info: the tracker wears the colour of the
+      // content it is about, not a status colour.
+      expect(await page.$eval('.family-time[data-timer-start]', el => el.textContent)).toContain('Write the accessibility tests');
     } finally {
       await page.close();
     }

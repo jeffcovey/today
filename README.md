@@ -272,11 +272,36 @@ Two things to watch:
   should stay light under `[light]` and dark under `[dark]` whatever the rest
   of the palette does.
 
+The keys come in two sets, and the difference between them matters more than
+any individual colour.
+
 **Status** — `ok-*`, `attn-*`, `info-*`, `err-*` — says how something *went*.
 Green worked, amber needs a look, red is wrong. These carry meaning on their
 own, so they are the same everywhere they appear regardless of what they sit
 inside, and each is a trio: the `-bg` tint, the `-text` ink that has to clear
 4.5:1 on it, and the `-edge` for a border or stripe.
+
+**Family** — `family-work`, `family-day`, `family-time`, `family-world`,
+`family-self`, `family-site` — says what a thing *is*. A task is `work`
+wherever it turns up; the pomodoro is `site`, Today's own instrument. Six of
+them, collapsed from Today's eleven plugin types, because eleven hues cannot
+be told apart. Which type landed in which family is arbitrary-but-consistent,
+and that is all a family colour has to be: its only job is that the same kind
+of thing looks the same way twice.
+
+Keeping them apart is the point. A family colour is used as a stripe and as a
+wash mixed into the card beneath it, never as ink — the text on a family wash
+stays `text`, in both modes. So **a family colour has no contrast floor**,
+which is why a palette can put a fully saturated hue there and have it come
+out legible. Status colours do carry ink, and they move for status reasons: if
+the two sets shared a key, darkening the error red to fix its contrast would
+silently restyle every card of whatever family happened to share it.
+
+The practical rule when you are picking a colour: **ask whether it is carrying
+text before reaching for the accessible tone.** Contrast measures luminance,
+and a saturated hue against a pale wash differs mostly in chromaticity, so a
+bright stripe can measure badly and still read perfectly. Substituting a
+"legible" tone there usually just makes it muddy.
 
 `test/fixtures/a11y-vault/themes/cocoa.toml` is a complete, contrast-checked
 example.
