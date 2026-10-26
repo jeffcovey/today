@@ -2044,6 +2044,15 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
   font-weight: 600;
 }
 
+/* Truncation is for the one-line collapsed card; once opened, the title wraps
+   so a long description can be read in full. */
+.timer-card[open] .timer-title {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+
 /* Tabular figures, or the row twitches every second as the digits change.
    Not dimmed: at 0.85 the countdown came out at 3.73:1 on the pomodoro's
    tint, and the remaining time is the whole point of the collapsed row. */

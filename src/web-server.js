@@ -1649,7 +1649,7 @@ function getPomodoroWidget() {
     attrs: ` data-pomodoro-start="${pomodoroState.startTime}" data-pomodoro-total-seconds="${totalSeconds}"${pausedAttr}`,
     emoji: EMOJI_POMODORO,
     extraClass: 'timer-card-tight',
-    clock: `<span class="pomodoro-countdown">${initMin}:${String(initSec).padStart(2, '0')}</span>${isPaused ? ' \u23F8' : ''}`,
+    clock: `<span class="visually-hidden">Pomodoro, ${phaseLabel(pomodoroState.phase)}${isPaused ? ', paused' : ''}: </span><span class="pomodoro-countdown">${initMin}:${String(initSec).padStart(2, '0')}</span>${isPaused ? ' \u23F8' : ''}`,
     detail: `
       <div><small>${phaseLabel(pomodoroState.phase)}${isPaused ? ' (Paused)' : ''} · ${upcoming} · then ${afterLabel}</small></div>
       <div class="mt-1 d-flex gap-1">

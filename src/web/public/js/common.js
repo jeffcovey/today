@@ -607,7 +607,10 @@ function momentGreeting(hour) {
 // A stable number for the day, so the photograph and the quote hold still
 // across page loads and move only when the date or the hour does.
 function momentDayIndex(now) {
-  return Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+  // UTC timestamps built from the local calendar fields, so a 23- or 25-hour
+  // day across a DST change still counts as exactly one day.
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.floor((today - Date.UTC(now.getFullYear(), 0, 0)) / 86400000);
 }
 
 // The photograph turns over when the day does or when the light does, so this
@@ -746,12 +749,17 @@ function initializeTimerCards() {
     } catch (error) {
       // Private window, or storage is blocked. The card starts collapsed.
     }
-    card.addEventListener('toggle', () => {
+    const remember = () => {
       try {
         sessionStorage.setItem(key, JSON.stringify({ open: card.open, at: Date.now() }));
       } catch (error) {
         // It still opens and closes; it just will not survive the reload.
       }
+    };
+    card.addEventListener('toggle', remember);
+    // The expiry should measure time since the action, not since opening.
+    card.addEventListener('click', event => {
+      if (event.target.closest('.timer-detail button, .timer-detail a')) remember();
     });
   }
 }
