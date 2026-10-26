@@ -101,6 +101,8 @@ html[data-theme="dark"] {
      same stock values in both modes and the built-in palette is unmoved. */
   --today-brand-bg: #3b71ca;
   --today-brand-text: #ffffff;
+  /* Reset aliases in each mode, just like their base tokens: otherwise a
+     light palette override on :root survives when the dark key is omitted. */
   --today-header-bg: var(--today-brand-bg);
   --today-header-text: var(--today-brand-text);
   --today-control-border: #6b7280;
@@ -1367,7 +1369,7 @@ html[data-theme="dark"] .editor-toolbar {
 }
 
 .navbar-search-cancel {
-  color: var(--today-brand-text);
+  color: var(--today-header-text);
   font-size: 16px;
   padding: 0 4px;
   text-decoration: none;
@@ -1375,7 +1377,7 @@ html[data-theme="dark"] .editor-toolbar {
 
 .navbar-search-cancel:hover,
 .navbar-search-cancel:focus {
-  color: var(--today-brand-text);
+  color: var(--today-header-text);
   text-decoration: underline;
 }
 

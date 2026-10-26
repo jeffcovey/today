@@ -71,6 +71,29 @@ describe('web view layout', () => {
 describe('navbar header surface', () => {
   const css = fs.readFileSync(new URL('../src/web/public/css/style.css', import.meta.url), 'utf8');
 
+  test.each(THEMES)('%s theme: mobile search Cancel uses header ink in every state', async (theme) => {
+    const page = await browser.newPage();
+    try {
+      await page.setViewport(VIEWPORTS.phone);
+      await page.setContent(`<style>${css}</style>
+        <nav class="navbar" style="--today-header-bg: #fff7ec; --today-header-text: #212529; --today-brand-text: #fff">
+          <div class="navbar-search-row">
+            <form><input><button class="btn btn-link navbar-search-cancel" type="button">Cancel</button></form>
+          </div>
+        </nav>`);
+      await page.evaluate(theme => document.documentElement.dataset.theme = theme, theme);
+      const ink = () => page.$eval('.navbar-search-cancel', el => getComputedStyle(el).color);
+      expect(await ink()).toBe('rgb(33, 37, 41)');
+      await page.hover('.navbar-search-cancel');
+      expect(await ink()).toBe('rgb(33, 37, 41)');
+      await page.mouse.move(0, 0);
+      await page.focus('.navbar-search-cancel');
+      expect(await ink()).toBe('rgb(33, 37, 41)');
+    } finally {
+      await page.close();
+    }
+  });
+
   test.each([true, false])('hover wash with color-mix support enabled: %s', async (supported) => {
     const page = await browser.newPage();
     try {
