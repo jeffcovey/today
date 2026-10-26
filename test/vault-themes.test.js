@@ -199,9 +199,11 @@ describe('rendering the stylesheet', () => {
     expect(css).toContain('--mdb-body-color-rgb: 242, 234, 222;');
   });
 
-  // MDB composes .bg-primary — the navbar, the badges, the AI header — as
+  // MDB composes .bg-primary — the badges, the AI header — as
   // rgba(var(--mdb-primary-rgb), var(--mdb-bg-opacity)), so the brand fill
-  // needs its triple spelled out too, or a palette stops at the navbar.
+  // needs its triple spelled out too, or a palette stops short of them. The
+  // navbar used to be the headline case here; it has its own token now, which
+  // still defaults to this fill.
   test('the brand fill moves MDB\'s primary, in both modes', () => {
     const { theme } = buildTheme('cocoa', {
       name: 'Cocoa',
@@ -223,6 +225,24 @@ describe('rendering the stylesheet', () => {
     const { theme } = buildTheme('cocoa', { light: { 'brand-text': '#ffffff' } });
     const css = renderThemeCss(theme);
     expect(css).toContain('--today-brand-text: rgb(255, 255, 255);');
+    expect(css).not.toContain('--mdb-primary-rgb');
+  });
+
+  test('a header colour is emitted only when the theme asks for one', () => {
+    // The header defaults to the brand fill in style.css, so a palette that
+    // names only the brand must not emit a header token -- emitting one would
+    // pin the header and quietly break that default for every other palette.
+    const brandOnly = buildTheme('cocoa', { light: { 'brand-bg': '#7a4210' } }).theme;
+    expect(renderThemeCss(brandOnly)).not.toContain('--today-header-bg');
+
+    const withHeader = buildTheme('cream', {
+      light: { 'header-bg': '#fff7ec', 'header-text': '#212529' }
+    }).theme;
+    const css = renderThemeCss(withHeader);
+    expect(css).toContain('--today-header-bg: rgb(255, 247, 236);');
+    expect(css).toContain('--today-header-text: rgb(33, 37, 41);');
+    // And it is its own token: naming the header must not move MDB's primary,
+    // which is what the badges and border-primary are drawn from.
     expect(css).not.toContain('--mdb-primary-rgb');
   });
 

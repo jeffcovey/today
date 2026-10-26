@@ -44,6 +44,8 @@ export const THEME_TOKENS = [
   'accent',
   'brand-bg',
   'brand-text',
+  'header-bg',
+  'header-text',
   'button-bg',
   'button-hover-bg',
   'code-text',
@@ -91,9 +93,10 @@ const ID_PATTERN = /^[a-z0-9][a-z0-9_-]*$/i;
  * moves MDB's with it. The rest of the bridge is plain `var()` in style.css.
  *
  * `brand-bg` is in both modes because MDB ships no dark override for its
- * primary: `.bg-primary` — the navbar, the day tiles — is
+ * primary: `.bg-primary` — the AI card header, the badges — is
  * `rgba(var(--mdb-primary-rgb), var(--mdb-bg-opacity))` in either one, so
- * without this line a vault palette would leave the navbar MDB's blue.
+ * without this line a vault palette would leave them MDB's blue. The navbar
+ * is no longer among them; it paints itself from `--today-header-bg`.
  */
 const RGB_BRIDGES = {
   light: {
