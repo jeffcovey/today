@@ -32,7 +32,7 @@ import { getDatabase } from './database-service.js';
 import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
 import { convertEmojisToIcons } from './emoji-mappings.js';
 import { getMarkdownFileCache } from './markdown-file-cache.js';
-import { getAbsoluteVaultPath, getConfig, getPublicBaseUrl, getVaultPath } from './config.js';
+import { getAbsoluteVaultPath, getAppDirectory, getConfig, getPublicBaseUrl, getVaultPath } from './config.js';
 import { formatDate, formatDisplayDate, getDayName, getTodayDate } from './date-utils.js';
 import { isPluginConfigured, getPluginSources } from './plugin-loader.js';
 import { createAiCommitMessageHandler } from './git-ai-commit-message-route.js';
@@ -69,6 +69,7 @@ import { getNavbar, getThemeBootstrapScript, getDisplayMenuHtml, getSearchToggle
 import { getStoredThemeMode, setStoredThemeMode, isThemeMode, THEME_MODES,
   getStoredThemeName, setStoredThemeName, isThemeName, readWebPreferences } from './web-preferences.js';
 import { listThemes, getThemeStylesheet, BUILT_IN_THEME_ID } from './web/themes.js';
+import { readVaultQuotes, readVaultLinks } from './vault-app-files.js';
 import { createSaveHandler } from './save-route.js';
 import { listPlanSummaries, savePlanSummary, savePlanPriorities, PLAN_TYPE_ORDER } from './plan-summaries.js';
 import { getPlanStatusBadge, PLAN_STATUS_BADGES } from './plan-summary-status.js';
@@ -475,7 +476,7 @@ app.get('/theme.css', async (req, res) => {
   res.set('Cache-Control', 'no-cache');
   let css = '';
   try {
-    ({ css } = await getThemeStylesheet(getAbsoluteVaultPath(), await getStoredThemeName()));
+    ({ css } = await getThemeStylesheet(getAbsoluteVaultPath(), await getStoredThemeName(), getAppDirectory()));
   } catch (error) {
     // A palette we can't read is not worth failing a page load over; the
     // built-in one is always underneath.
@@ -506,7 +507,7 @@ app.get('/api/theme', authMiddleware, async (req, res) => {
 app.get('/api/themes', authMiddleware, async (req, res) => {
   try {
     const { themeName } = await readWebPreferences();
-    const themes = await listThemes(getAbsoluteVaultPath());
+    const themes = await listThemes(getAbsoluteVaultPath(), getAppDirectory());
     res.json({
       success: true,
       themes,
@@ -518,51 +519,19 @@ app.get('/api/themes', authMiddleware, async (req, res) => {
   }
 });
 
-// ── The calm panel's quotes ────────────────────────────────────────────────
-// They live in the vault, in vault/quotes.md, one per line as "Text — Author",
-// because they are the user's own words to choose rather than a list shipped
-// with the app. Read on demand and held until the file's mtime moves, so
-// editing the file shows up without a restart.
-const QUOTE_SEPARATOR = ' \u2014 ';
-let quotesCache = { mtimeMs: 0, quotes: [] };
-
-async function readVaultQuotes() {
-  const quotesPath = path.join(VAULT_PATH, 'quotes.md');
-  let stat;
-  try {
-    stat = await fs.stat(quotesPath);
-  } catch {
-    // No file is a legitimate state: the panel simply shows no quote.
-    quotesCache = { mtimeMs: 0, quotes: [] };
-    return quotesCache.quotes;
-  }
-
-  if (stat.mtimeMs === quotesCache.mtimeMs) return quotesCache.quotes;
-
-  const content = await fs.readFile(quotesPath, 'utf-8');
-  const quotes = [];
-  for (const line of content.split('\n')) {
-    const item = line.match(/^\s*[-*]\s+(.*)$/);
-    if (!item) continue;
-    const text = item[1].trim();
-    if (!text) continue;
-    // Split on the last separator, so a quote may contain a dash of its own.
-    const cut = text.lastIndexOf(QUOTE_SEPARATOR);
-    quotes.push(cut === -1
-      ? { text, author: '' }
-      : { text: text.slice(0, cut).trim(), author: text.slice(cut + QUOTE_SEPARATOR.length).trim() });
-  }
-
-  quotesCache = { mtimeMs: stat.mtimeMs, quotes };
-  return quotes;
-}
+// ── The calm panel's quotes and links ──────────────────────────────────────
+// Both live in the vault, under the app directory, because they are the
+// user's own to write rather than lists shipped with the app. Both are
+// fetched by the page rather than rendered into it: this markup is cached to
+// disk, so anything baked in would outlive the next edit of the file.
+// Reading and parsing them is in src/vault-app-files.js.
 
 // One quote, chosen by the page. The index comes from the client because it is
 // the client that knows which photograph is up — the two turn over together —
 // and because this markup is cached to disk, so the server cannot bake it in.
 app.get('/api/quote', authMiddleware, async (req, res) => {
   try {
-    const quotes = await readVaultQuotes();
+    const { value: quotes } = await readVaultQuotes(VAULT_PATH, getAppDirectory());
     if (quotes.length === 0) return res.json({ success: true, count: 0 });
     const asked = Number.parseInt(req.query.index, 10);
     const index = Number.isFinite(asked)
@@ -572,6 +541,24 @@ app.get('/api/quote', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error reading the vault quotes:', error);
     res.status(500).json({ success: false, message: 'Failed to read quotes' });
+  }
+});
+
+// The links across the top of the panel. Unlike the quote this is the whole
+// file every time, so it revalidates instead: the stamp the reader hands back
+// moves only when the file does, which makes the repeat cost of a page load
+// one stat and a 304 with no body.
+app.get('/api/links', authMiddleware, async (req, res) => {
+  try {
+    const { value: links, stamp } = await readVaultLinks(VAULT_PATH, getAppDirectory());
+    res.set('Cache-Control', 'no-cache');
+    const etag = `W/"links:${stamp}"`;
+    res.set('ETag', etag);
+    if (req.headers['if-none-match'] === etag) return res.status(304).end();
+    res.json({ success: true, links });
+  } catch (error) {
+    console.error('Error reading the vault links:', error);
+    res.status(500).json({ success: false, message: 'Failed to read links' });
   }
 });
 
@@ -606,7 +593,7 @@ app.post('/api/theme', authMiddleware, express.json(), async (req, res) => {
   }
   try {
     if (name !== undefined) {
-      const themes = await listThemes(getAbsoluteVaultPath());
+      const themes = await listThemes(getAbsoluteVaultPath(), getAppDirectory());
       if (!themes.some((theme) => theme.id === name)) {
         return res.status(400).json({ success: false, message: `No such palette: ${name}` });
       }
@@ -1853,6 +1840,10 @@ function getPlanHierarchyLevel(filename) {
 // counts. The stages plugin is optional, so this is null when it is off and
 // the calm tab simply shows the date on its own.
 //
+// The row of links across the top is a sibling of .moment-inner rather than
+// part of it: that block is centred in the panel, and the links belong to the
+// corner. It arrives empty and the page fills it from /api/links.
+//
 // The whole week goes to the page rather than just today's name, because this
 // markup is cached to disk: a panel rendered on Sunday would still be calling
 // it Sunday on Wednesday. The day mapping is configuration, which does not
@@ -1911,6 +1902,7 @@ function renderMomentPanel(displayName, stageNames, links = []) {
                 <p class="moment-date" id="momentDate"></p>${linksHtml}
                 <p class="moment-quote" id="momentQuote"></p>
               </div>
+              <nav class="moment-bookmarks" id="momentBookmarks" aria-label="Links"></nav>
             </div>`;
 }
 

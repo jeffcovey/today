@@ -2481,6 +2481,7 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
 .moment {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 26rem;
@@ -2522,6 +2523,7 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
   position: relative;
   width: 100%;
   max-width: 34rem;
+  margin: auto;
   padding: 2.5rem 1.5rem;
   color: #ffffff;
   text-align: center;
@@ -2560,7 +2562,8 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
   font-weight: 300;
 }
 
-.moment-links a {
+.moment-links a,
+.moment-bookmarks a {
   color: #ffffff;
   text-decoration: underline;
   text-underline-offset: 4px;
@@ -2568,12 +2571,15 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
 }
 
 .moment-links a:hover,
-.moment-links a:focus-visible {
+.moment-links a:focus-visible,
+.moment-bookmarks a:hover,
+.moment-bookmarks a:focus-visible {
   color: #ffffff;
   text-decoration-thickness: 2px;
 }
 
-.moment-links a:focus-visible {
+.moment-links a:focus-visible,
+.moment-bookmarks a:focus-visible {
   outline: 2px solid #ffffff;
   outline-offset: 3px;
   border-radius: 2px;
@@ -2581,6 +2587,27 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
 
 .moment-links-sep {
   opacity: 0.7;
+}
+
+/* The user's own links, from the vault's links.md, across the top of the
+   panel. They wrap, since how many there are is up to whoever wrote the file;
+   staying in flow keeps them from covering the centred block. */
+.moment-bookmarks {
+  box-sizing: border-box;
+  align-self: stretch;
+  flex: none;
+  order: -1;
+  padding: 1.1rem 1.5rem;
+  color: #ffffff;
+  font-size: clamp(0.85rem, 2.4vw, 1rem);
+  font-weight: 300;
+  line-height: 1.6;
+  text-align: left;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.moment-bookmarks:empty {
+  display: none;
 }
 
 .moment-quote {
@@ -2597,6 +2624,10 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
 
   .moment-inner {
     padding: 2rem 1.25rem;
+  }
+
+  .moment-bookmarks {
+    padding: 0.9rem 1.25rem;
   }
 
   .moment-date {

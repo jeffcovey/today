@@ -4,6 +4,7 @@ import { writeFileAtomic } from './fs-atomic.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { parse, stringify } from 'smol-toml';
+import { APP_DIRNAME } from './vault-app-files.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -291,6 +292,20 @@ export function getVaultPath() {
 export function getAbsoluteVaultPath() {
   const projectRoot = join(__dirname, '..');
   return join(projectRoot, getVaultPath());
+}
+
+/**
+ * The directory inside the vault that holds Today's own files — the themes it
+ * offers, the calm panel's quotes and links. `today` by default; an empty
+ * string keeps them at the vault root, which is where they used to live.
+ *
+ * Only a name, not a path: these files are in the vault because they are
+ * edited like notes, so they stay inside it.
+ */
+export function getAppDirectory() {
+  const config = readConfig();
+  const configured = config.app_directory;
+  return configured === undefined ? APP_DIRNAME : String(configured);
 }
 
 /**

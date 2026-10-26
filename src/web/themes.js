@@ -3,9 +3,11 @@
  *
  * Every colour in the web view comes from a `--today-*` custom property in
  * `src/web/public/css/style.css`, so a theme is nothing but a set of values
- * for those properties. A file under `vault/themes/` supplies some or all of
- * them, for light and dark separately, and the display menu offers it
- * alongside the built-in palette.
+ * for those properties. A file under `vault/today/themes/` supplies some or
+ * all of them, for light and dark separately, and the display menu offers it
+ * alongside the built-in palette. The directory is looked for inside the
+ * vault's app directory first and at the vault root second, so a vault that
+ * predates `today/` keeps working — see `src/vault-app-files.js`.
  *
  * The values are hand-written and end up inside a CSS response, so nothing is
  * taken on trust: a value has to parse as a colour this module can convert to
@@ -15,12 +17,13 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { parse as parseToml } from 'smol-toml';
+import { APP_DIRNAME, appPathCandidates } from '../vault-app-files.js';
 
 /** The id of the palette that ships with Today; not a file, and never shadowed. */
 export const BUILT_IN_THEME_ID = 'today';
 export const BUILT_IN_THEME_NAME = 'Today';
 
-/** The directory, relative to the vault root, that themes are read from. */
+/** The directory, within the vault's app directory, that themes are read from. */
 export const THEMES_DIRNAME = 'themes';
 
 /**
@@ -304,7 +307,7 @@ export function renderThemeCss(theme) {
 let cache = null;
 
 function signatureOf(entries) {
-  return entries.map(({ file, stat }) => `${file}:${stat.mtimeMs}:${stat.size}`).join('|');
+  return entries.map(({ filePath, stat }) => `${filePath}:${stat.mtimeMs}:${stat.size}`).join('|');
 }
 
 /**
@@ -312,40 +315,45 @@ function signatureOf(entries) {
  * case, not an error. Returns `{ themes, problems }`, where `problems` maps a
  * file to what is wrong with it so the server can say so.
  */
-export async function readVaultThemes(vaultPath) {
-  const directory = path.join(vaultPath, THEMES_DIRNAME);
-
-  let files;
-  try {
-    files = (await fs.readdir(directory))
-      .filter((file) => file.toLowerCase().endsWith('.toml'))
-      .sort();
-  } catch {
-    cache = null;
-    return { themes: new Map(), problems: new Map() };
+export async function readVaultThemes(vaultPath, appDirectory = APP_DIRNAME) {
+  const directories = appPathCandidates(vaultPath, THEMES_DIRNAME, appDirectory);
+  const filesByName = new Map();
+  for (const directory of directories) {
+    let files;
+    try {
+      files = (await fs.readdir(directory))
+        .filter((file) => file.toLowerCase().endsWith('.toml'))
+        .sort();
+    } catch {
+      continue;
+    }
+    for (const file of files) {
+      if (!filesByName.has(file)) filesByName.set(file, path.join(directory, file));
+    }
   }
 
   const entries = [];
-  for (const file of files) {
+  for (const [file, filePath] of filesByName) {
     try {
-      entries.push({ file, stat: await fs.stat(path.join(directory, file)) });
+      entries.push({ file, filePath, stat: await fs.stat(filePath) });
     } catch {
       // Vanished between the listing and the stat; it simply isn't there.
     }
   }
 
+  const directoryKey = JSON.stringify(directories);
   const signature = signatureOf(entries);
-  if (cache && cache.directory === directory && cache.signature === signature) {
+  if (cache && cache.directory === directoryKey && cache.signature === signature) {
     return cache.value;
   }
 
   const themes = new Map();
   const problems = new Map();
-  for (const { file } of entries) {
+  for (const { file, filePath } of entries) {
     const id = file.slice(0, -'.toml'.length);
     let parsed;
     try {
-      parsed = parseToml(await fs.readFile(path.join(directory, file), 'utf-8'));
+      parsed = parseToml(await fs.readFile(filePath, 'utf-8'));
     } catch (error) {
       problems.set(file, [`is not valid TOML: ${error.message}`]);
       continue;
@@ -356,7 +364,7 @@ export async function readVaultThemes(vaultPath) {
   }
 
   const value = { themes, problems };
-  cache = { directory, signature, value };
+  cache = { directory: directoryKey, signature, value };
   return value;
 }
 
@@ -368,8 +376,8 @@ export function clearVaultThemesCache() {
 /**
  * The menu's list: the built-in palette first, then the vault's, by name.
  */
-export async function listThemes(vaultPath) {
-  const { themes } = await readVaultThemes(vaultPath);
+export async function listThemes(vaultPath, appDirectory) {
+  const { themes } = await readVaultThemes(vaultPath, appDirectory);
   const vaultThemes = [...themes.values()]
     .map(({ id, name }) => ({ id, name }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -381,8 +389,8 @@ export async function listThemes(vaultPath) {
  * theme that has been deleted or renamed falls back to the built-in palette,
  * which is an empty stylesheet.
  */
-export async function getThemeStylesheet(vaultPath, id) {
-  const { themes } = await readVaultThemes(vaultPath);
+export async function getThemeStylesheet(vaultPath, id, appDirectory) {
+  const { themes } = await readVaultThemes(vaultPath, appDirectory);
   const theme = (id && id !== BUILT_IN_THEME_ID ? themes.get(id) : null) || null;
   const css = renderThemeCss(theme);
   return { css, theme };

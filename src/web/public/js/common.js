@@ -683,7 +683,7 @@ function paintMomentDate() {
   target.textContent = parts.join(' \u2022 ');
 }
 
-// The quotes are the user's own, in vault/quotes.md, so they are fetched
+// The quotes are the user's own, in the vault's quotes.md, so they are fetched
 // rather than shipped. Keyed on the photograph's slot: a new quote arrives
 // with each new picture and not before.
 async function paintMomentQuote() {
@@ -697,7 +697,7 @@ async function paintMomentQuote() {
     const response = await fetch('/api/quote?index=' + slot);
     const data = await response.json();
     if (!data.success || !data.count) {
-      // No vault/quotes.md, or it is empty. Nothing to say, so say nothing.
+      // No quotes.md, or it is empty. Nothing to say, so say nothing.
       target.textContent = '';
       return;
     }
@@ -709,6 +709,40 @@ async function paintMomentQuote() {
   }
 }
 
+// The links across the top are the user's own, in the vault's links.md, so
+// they are fetched like the quote. Painted once per page load and left alone
+// by the interval below: nothing about them follows the clock, and the
+// response revalidates, so a reload costs a stat and an empty 304.
+async function paintMomentBookmarks() {
+  const target = document.getElementById('momentBookmarks');
+  if (!target || target.dataset.painted) return;
+
+  try {
+    const response = await fetch('/api/links');
+    const data = await response.json();
+    if (!data.success || !Array.isArray(data.links) || data.links.length === 0) return;
+
+    target.dataset.painted = '1';
+    data.links.forEach((link, index) => {
+      if (index > 0) {
+        const separator = document.createElement('span');
+        separator.className = 'moment-links-sep';
+        separator.setAttribute('aria-hidden', 'true');
+        separator.textContent = ' \u2022 ';
+        target.appendChild(separator);
+      }
+      // Built as nodes rather than markup: the label is whatever the file
+      // says, and it is going onto the page either way.
+      const anchor = document.createElement('a');
+      anchor.href = link.href;
+      anchor.textContent = link.label;
+      target.appendChild(anchor);
+    });
+  } catch (error) {
+    // Leave the row empty; a bookmark is not worth an error message.
+  }
+}
+
 function initializeMoment() {
   const panel = document.getElementById('momentPanel');
   if (!panel) return;
@@ -717,6 +751,7 @@ function initializeMoment() {
   paintMomentDate();
   paintMomentPhoto();
   paintMomentQuote();
+  paintMomentBookmarks();
 
   // Often enough that the clock is never visibly behind, that the picture
   // changes when the hour crosses into a different light, and that the date
