@@ -338,11 +338,15 @@ describe('pomodoro server timers', () => {
   let cfg;
   let timer;
   let sendPushover;
+  let persistTimers;
 
   beforeEach(() => {
     jest.useFakeTimers();
     cfg = config();
     sendPushover = jest.fn().mockResolvedValue({ sent: true });
+    // The real one writes .data/timer-state.json so the session survives a
+    // restart (#655); here it only has to record that it was called.
+    persistTimers = jest.fn().mockResolvedValue(undefined);
     const source = webServerSource.slice(
       webServerSource.indexOf('let pomodoroState ='),
       webServerSource.indexOf('function pomodoroButton(')
@@ -363,7 +367,8 @@ describe('pomodoro server timers', () => {
       holdInterval, intervalDescription, phaseMinutes, NUDGE_INTERVAL_MS, MAX_NUDGES,
       getPomodoroConfig: () => cfg,
       getPublicBaseUrl: () => '',
-      sendPushover
+      sendPushover,
+      persistTimers
     });
   });
 
@@ -423,6 +428,17 @@ describe('pomodoro server timers', () => {
     timer.stopPomodoro();
     expect(timer.getState()).toEqual(createPomodoroState());
     expect(jest.getTimerCount()).toBe(0);
+  });
+
+  test('saves the session when an interval ends and when it is stopped', () => {
+    timer.start();
+    persistTimers.mockClear();
+
+    jest.advanceTimersByTime(25 * 60 * 1000 + 250);
+    expect(persistTimers).toHaveBeenCalledTimes(1);   // the hold
+
+    timer.stopPomodoro();
+    expect(persistTimers).toHaveBeenCalledTimes(2);   // and the stop
   });
 });
 
