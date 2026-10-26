@@ -74,6 +74,36 @@
   --today-err-text: #842029;
   --today-err-bg: #f8d7da;
   --today-err-edge: #dc3545;
+  /* FAMILY colours. These say what a thing *is* -- a task, a diary entry, a
+     calendar event -- and never how it went. That is what the status tokens
+     above are for, and keeping the two sets apart is the point: a status
+     colour moves for status reasons, and if the two shared a token, darkening
+     the error red for contrast would silently restyle every card of whatever
+     family happened to share it.
+
+     A family colour has no contrast floor of its own. It is used as a stripe,
+     which carries no information, and as a wash mixed into the card
+     underneath; the ink on that wash stays --today-text in both modes. So no
+     family can fail contrast on its own surface, which is the failure mode
+     these replace.
+
+     Six, collapsed from Today's eleven plugin types, because eleven hues are
+     not tellable apart. There is no deep logic to which type landed where and
+     it is better not to pretend otherwise -- the job of a family colour is
+     only that the same kind of thing looks the same way twice.
+
+       work   tasks, projects, issues
+       day    diary, plans, now, stage
+       time   time logs, routines
+       world  calendar events, contacts, email
+       self   health, finance
+       site   Today's own instruments, and the default */
+  --today-family-work: #2563eb;
+  --today-family-day: #b45309;
+  --today-family-time: #7c3aed;
+  --today-family-world: #047857;
+  --today-family-self: #be123c;
+  --today-family-site: #475569;
 }
 
 html[data-theme="dark"] {
@@ -119,6 +149,14 @@ html[data-theme="dark"] {
   --today-err-text: #fee2e2;
   --today-err-bg: #7f1d1d;
   --today-err-edge: #b91c1c;
+  /* The same six, lifted for a dark ground. The wash percentage drops to 12%
+     below, because an identical mix reads much heavier against dark. */
+  --today-family-work: #60a5fa;
+  --today-family-day: #fbbf24;
+  --today-family-time: #a78bfa;
+  --today-family-world: #34d399;
+  --today-family-self: #fb7185;
+  --today-family-site: #94a3b8;
   /* MDB's own dark palette is neutral grey (#424242 surfaces) where Today's
      is slate, which is why its cards, dropdowns and modals used to be
      corrected by hand further down this file. Pointing the tokens those
@@ -1990,6 +2028,46 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
    slack because its title is the part worth reading; the pomodoro stays its
    own width, since collapsed it is only a tomato and a clock. They wrap to
    two rows rather than squeezing if a phone is narrow enough. */
+/* A FAMILY card: what it is, not how it went. Carries the family stripe and a
+   wash of the same colour mixed into the card it sits on, with body ink on
+   top in both modes.
+
+   The stripe is the family colour undiluted. That is on purpose: a stripe
+   carries no information, so WCAG's 3:1 does not apply to it, and the
+   temptation to "fix" a bright one is worth resisting -- contrast measures
+   luminance, and a saturated hue against a pale wash differs mostly in
+   chromaticity, so it reads perfectly well while measuring badly.
+
+   The literal @supports check below keeps --today-card-bg when color-mix is
+   unavailable. Without it, a declaration containing var() would become
+   invalid at computed-value time and reset the background to transparent
+   rather than falling back to the plain value. */
+.family-card {
+  --family: var(--today-family-site);
+  background: var(--today-card-bg);
+  color: var(--today-text);
+  border: 1px solid var(--today-border);
+  border-left: 4px solid var(--family);
+  border-radius: 0.5rem;
+}
+
+@supports (background: color-mix(in srgb, #fff 85%, #000)) {
+  .family-card {
+    background: color-mix(in srgb, var(--family) 14%, var(--today-card-bg));
+  }
+
+  html[data-theme="dark"] .family-card {
+    background: color-mix(in srgb, var(--family) 12%, var(--today-card-bg));
+  }
+}
+
+.family-work { --family: var(--today-family-work); }
+.family-day { --family: var(--today-family-day); }
+.family-time { --family: var(--today-family-time); }
+.family-world { --family: var(--today-family-world); }
+.family-self { --family: var(--today-family-self); }
+.family-site { --family: var(--today-family-site); }
+
 .timer-row {
   display: flex;
   flex-wrap: wrap;

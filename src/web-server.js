@@ -722,7 +722,7 @@ function getTimerWidget(timer) {
   if (timer) {
     return timerCard({
       key: 'focus',
-      classes: 'alert-info',
+      classes: 'family-time',
       extraClass: 'timer-card-grow',
       attrs: ` data-timer-start="${timer.startTimeISO}"`,
       emoji: EMOJI_FOCUS,
@@ -750,7 +750,7 @@ function getTimerWidget(timer) {
   } else {
     return timerCard({
       key: 'focus',
-      classes: 'alert-info',
+      classes: 'family-time',
       extraClass: 'timer-card-tight',
       emoji: EMOJI_FOCUS,
       title: 'Track',
@@ -1312,7 +1312,7 @@ async function getTaskTimerWidget() {
 
       return timerCard({
         key: 'tasks',
-        classes: 'alert-success',
+        classes: 'family-work',
         extraClass: 'timer-card-tight',
         attrs: ` data-timer-start="${taskTimerState.startTime}" data-timer-total-seconds="${restSeconds}" data-timer-phase="rest"`,
         emoji: EMOJI_TASKS,
@@ -1331,7 +1331,7 @@ async function getTaskTimerWidget() {
     }
 
     // One colour, always. Paused is a difference in the text, not in the card.
-    const alertClass = 'alert-success';
+    const familyClass = 'family-work';
 
     // The checklist, as on its pill: which timer this is matters more at a
     // glance than whether it is paused, which the colour, the label and the
@@ -1342,7 +1342,7 @@ async function getTaskTimerWidget() {
 
     return timerCard({
       key: 'tasks',
-      classes: alertClass,
+      classes: familyClass,
       extraClass: 'timer-card-grow',
       attrs: ` data-timer-start="${taskTimerState.startTime}" data-timer-total-seconds="${workSeconds}" data-timer-phase="work"${pausedAttr}`,
       emoji: EMOJI_TASKS,
@@ -1394,7 +1394,7 @@ async function getTaskTimerWidget() {
     if (!items || items.length === 0) {
       return timerCard({
         key: 'tasks',
-        classes: 'alert-success',
+        classes: 'family-work',
         extraClass: 'timer-card-tight',
         emoji: EMOJI_TASKS,
         title: 'Tasks',
@@ -1404,7 +1404,7 @@ async function getTaskTimerWidget() {
     }
     return timerCard({
       key: 'tasks',
-      classes: 'alert-success',
+      classes: 'family-work',
       extraClass: 'timer-card-tight',
       emoji: EMOJI_TASKS,
       title: 'Tasks',
@@ -1556,7 +1556,7 @@ function pomodoroButton(action, icon, label, style) {
 // because that is what announces a timer starting.
 function timerCard({ key, classes = '', extraClass = '', attrs = '', emoji, title = '', clock = '', detail }) {
   return `
-      <details class="timer-card alert ${classes}${extraClass ? ` ${extraClass}` : ''}" role="alert" data-timer-key="${key}"${attrs}>
+      <details class="timer-card family-card ${classes}${extraClass ? ` ${extraClass}` : ''}" role="alert" data-timer-key="${key}"${attrs}>
         <summary class="timer-summary">
           ${timerEmoji(emoji)}
           ${title ? `<span class="timer-title">${title}</span>` : ''}
@@ -1594,7 +1594,7 @@ function getPomodoroWidget() {
       + `${config.shortRestMinutes} min breaks, ${config.longRestMinutes} min long break`;
     return timerCard({
       key: 'pomodoro',
-      classes: 'alert-danger',
+      classes: 'family-site',
       extraClass: 'timer-card-tight',
       emoji: EMOJI_POMODORO,
       title: 'Pomodoro',
@@ -1616,7 +1616,7 @@ function getPomodoroWidget() {
     const finished = intervalDescription(pomodoroState.finishedPhase, pomodoroState.finishedPeriodIndex, config);
     return timerCard({
       key: 'pomodoro',
-      classes: 'alert-danger',
+      classes: 'family-site',
       extraClass: 'timer-card-tight',
       attrs: ' data-pomodoro-awaiting="true"',
       emoji: EMOJI_POMODORO,
@@ -1639,7 +1639,7 @@ function getPomodoroWidget() {
   const isWork = pomodoroState.phase === PHASE_WORK;
   // Tomato, always: the pomodoro looks like the pomodoro whether it is
   // working, resting, paused or idle. Which of those it is, is text.
-  const alertClass = 'alert-danger';
+  const familyClass = 'family-site';
 
   const pausedAttr = isPaused ? ' data-pomodoro-paused="true"' : '';
   const after = nextInterval(pomodoroState.phase, pomodoroState.periodIndex, config);
@@ -1647,7 +1647,7 @@ function getPomodoroWidget() {
 
   return timerCard({
     key: 'pomodoro',
-    classes: alertClass,
+    classes: familyClass,
     attrs: ` data-pomodoro-start="${pomodoroState.startTime}" data-pomodoro-total-seconds="${totalSeconds}"${pausedAttr}`,
     emoji: EMOJI_POMODORO,
     extraClass: 'timer-card-tight',
@@ -1669,6 +1669,13 @@ function getPomodoroWidget() {
 // timers sit on a single row and look the same whether they are running or
 // not; what changes is the text they show and what a tap reveals. Idle has to
 // be cheap, because idle is the usual case.
+//
+// Their colours are FAMILY colours, not status ones. Each takes the family of
+// the content it is about -- the tracker is time logs, the task timer is
+// tasks, the pomodoro is Today's own instrument -- which is why none of them
+// is an .alert any more. They were alert-info, alert-success and alert-danger,
+// chosen only to tell them apart, and that had the pomodoro permanently
+// wearing the colour that means something is wrong.
 //
 // This used to be built inline at three call sites, identically, which is why
 // it lives in one function now.
