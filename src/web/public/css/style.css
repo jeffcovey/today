@@ -1924,3 +1924,550 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
 .git-dir-files {
   border-left: 3px solid var(--today-border);
 }
+
+/* ── The activity bar ──────────────────────────────────────────────────────
+   The five boxes that used to open every page were three Bootstrap alerts and
+   two saturated tiles: five treatments for what is really two kinds of thing.
+   The timers are state and are almost always idle, so idle is a pill here and
+   only a running timer gets a banner. Colour is left to mean "this is
+   running" rather than being spent on telling the three idle controls apart.
+
+   A pill is a control, not a message, so it takes the card surface and the
+   control border — which, unlike --today-border, is a palette entry that has
+   to clear 3:1 on its own, because on a pill it is the only thing marking the
+   target. */
+
+.activity-tracker {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.activity-tracker-icon {
+  color: var(--today-muted-text);
+  flex: 0 0 auto;
+}
+
+
+
+
+/* ── A running timer ───────────────────────────────────────────────────────
+   Collapsed it is one row: emoji, what it is, the clock. The detail and the
+   controls are behind the disclosure, so three running timers cost three
+   lines rather than most of a phone screen. */
+
+/* The task timer and the pomodoro sit on one row. The task timer takes the
+   slack because its title is the part worth reading; the pomodoro stays its
+   own width, since collapsed it is only a tomato and a clock. They wrap to
+   two rows rather than squeezing if a phone is narrow enough. */
+.timer-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+/* Basis zero, not a content width: a growing card takes whatever is left once
+   the compact ones have theirs, which is what keeps all three on one line at
+   phone width instead of wrapping. */
+.timer-card-grow {
+  flex: 1 1 0;
+  /* A floor rather than 0: below about this the description is a couple of
+     characters and an ellipsis, which is worth less than the row it saves, so
+     the card wraps to its own line instead. All three still share one line
+     whenever they genuinely fit. */
+  min-width: 9rem;
+}
+
+/* An opened card takes the row to itself. Sharing a line is for the collapsed
+   state; a card with controls in it squeezed beside another is the layout the
+   row was meant to avoid. */
+.timer-card[open] {
+  flex: 1 1 100%;
+}
+
+/* Sized by content, but allowed to shrink: three collapsed cards came to a
+   few pixels more than a 390px phone, and giving back those pixels by
+   truncating a label is better than spending a whole row on them. */
+.timer-card-tight {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* Padding here rather than Bootstrap's px-3, so a phone can have a little
+   less of it: three collapsed cards came to three pixels more than a 390px
+   screen, and a wrapping flex row wraps before it shrinks, so those three
+   pixels cost a whole row. Also beats MDB's own alert margin. */
+.timer-card {
+  margin-bottom: 0.5rem;
+  padding: 0.25rem 1rem;
+}
+
+@media (max-width: 768px) {
+  .timer-card {
+    padding-left: 0.625rem;
+    padding-right: 0.625rem;
+  }
+}
+
+.timer-row > .timer-card {
+  margin-bottom: 0;
+}
+
+.timer-card > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  /* Both are needed: the second is what removes the triangle in Safari. */
+  list-style: none;
+}
+
+.timer-card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.timer-card > summary:focus-visible {
+  outline: 2px solid var(--today-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* The title is the only part that can give, so it is the only part that
+   truncates; min-width: 0 is what lets a flex child shrink that far. */
+.timer-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+
+/* Tabular figures, or the row twitches every second as the digits change.
+   Not dimmed: at 0.85 the countdown came out at 3.73:1 on the pomodoro's
+   tint, and the remaining time is the whole point of the collapsed row. */
+.timer-clock {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.timer-detail {
+  margin-top: 0.5rem;
+}
+
+/* The timer emoji. They bring their own colour, so no ink token applies;
+   what they need is to sit level with the text beside them. */
+.activity-emoji {
+  flex: 0 0 auto;
+  display: inline-block;
+  font-size: 0.95rem;
+  line-height: 1;
+  font-style: normal;
+}
+
+
+.timer-count {
+  display: inline-block;
+  min-width: 1.5rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--today-attn-bg);
+  color: var(--today-attn-text);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+/* Nothing due is not news, so the count stops shouting rather than disappearing
+   — the control should not change shape depending on the number in it. */
+.timer-count-zero {
+  background: var(--today-muted-bg);
+  color: var(--today-muted-text);
+  font-weight: 400;
+}
+
+.timer-minutes {
+  width: 2.75rem;
+  padding: 0.1rem 0.35rem;
+  border: 1px solid var(--today-control-border);
+  border-radius: 0.25rem;
+  background: var(--today-card-bg);
+  color: var(--today-text);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+.timer-go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--today-button-bg);
+  color: #ffffff;
+  font-size: 0.75rem;
+}
+
+.timer-go:hover {
+  background: var(--today-button-hover-bg);
+  color: #ffffff;
+}
+
+.timer-go:disabled {
+  opacity: 0.65;
+}
+
+/* No colour of its own: it sits inside a tinted card, and the muted token was
+   3.58:1 against the dark green one. The card's own ink is the only thing
+   guaranteed to contrast with the card. */
+.timer-unit {
+  font-size: 0.75rem;
+}
+
+/* The row's own spacing, rather than a margin on each piece. ms-auto on the
+   Stop button collapses to nothing once the description has eaten the slack,
+   which on a phone left the duration touching the button; a gap is a floor
+   that an auto margin cannot take away. */
+.activity-tracker-running {
+  gap: 0.5rem;
+}
+
+/* The running timer is one line: a clock, what is being worked on, how long,
+   and Stop. The description is the only part that can give, so it is the only
+   part that truncates — min-width: 0 is what lets it, since a flex child
+   otherwise refuses to shrink below its content and overflows the row
+   instead of ellipsing. */
+.activity-tracker-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.activity-tracker-meta {
+  font-size: 0.8125rem;
+}
+
+
+/* ── The home page's tabbed card ───────────────────────────────────────────
+   Vault, Now, Plans and Recent Pages were four stacked cards, three of them
+   shut, so the listing the page exists for sat below three closed headers.
+   One card, Vault first and open.
+
+   The shape follows the profile tabs on oldergay.men: folder tabs on a
+   tinted strip, each its own bordered surface, the selected one filled and
+   pulled down a pixel so it joins the panel it opens. Below 768px they
+   become compact chips instead — that swap is what keeps six of them from
+   eating a third of a phone screen. */
+
+.home-tabbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.25rem 0.4rem;
+  padding: 0.6rem 0.75rem 0;
+  background: var(--today-surface-2);
+  border-bottom: 1px solid var(--today-border);
+}
+
+.home-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.4rem;
+  margin: 0;
+  padding: 0;
+  border-bottom: 0;
+}
+
+.home-tabs .nav-link {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 0.5rem 0.9rem;
+  /* --today-control-border, not --today-border: an unselected tab is
+     --today-card-bg on a --today-surface-2 strip, 1.07:1 apart, so the
+     outline is the only thing marking the target and has to clear 3:1 on
+     its own (WCAG 2.2 1.4.11). */
+  border: 1px solid var(--today-control-border);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--today-card-bg);
+  color: var(--today-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.home-tabs .nav-link:hover {
+  background: var(--today-hover-bg);
+  color: var(--today-text);
+}
+
+/* The filled state is the same contract the login button uses — white ink on
+   --today-button-bg — rather than a new pairing needing its own contrast
+   check. The negative margin eats the strip's border so the tab and its
+   panel read as one surface. */
+.home-tabs .nav-link.active,
+.home-tabs .nav-link.active:hover {
+  margin-bottom: -1px;
+  padding-bottom: calc(0.5rem + 1px);
+  border-color: var(--today-button-bg);
+  background: var(--today-button-bg);
+  color: #ffffff;
+}
+
+.home-tabs .nav-link:focus-visible {
+  outline: 2px solid var(--today-accent);
+  outline-offset: 2px;
+}
+
+.home-tabs .nav-link i {
+  font-size: 0.95rem;
+  opacity: 0.8;
+}
+
+.home-tabs .nav-link.active i {
+  opacity: 1;
+}
+
+/* Diary and Tasks share the row but navigate away instead of swapping a
+   panel, so they never take the filled state. */
+.home-tab-links {
+  margin: 0;
+}
+
+.home-tab-count {
+  display: inline-block;
+  min-width: 1.4rem;
+  margin-left: 0.35rem;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--today-attn-bg);
+  color: var(--today-attn-text);
+  font-weight: 600;
+  font-size: 0.7rem;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.home-tab-panel > .list-group-flush {
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+}
+
+/* Chips on a phone, in one row that slides sideways. Seven folder tabs wrap
+   to three lines at 390px; as chips on a single scrolling row they cost one,
+   and each is still a 32px-tall target.
+
+   The strip is the scroll container rather than either list inside it,
+   because the tablist and the two pass-through links are separate <ul>s and
+   the point is that they read as one row. */
+@media (max-width: 768px) {
+  .home-tabbar {
+    gap: 6px;
+    /* Extra under the chips: they are free-standing pills here rather than
+       folder tabs joined to the panel, so the list below needs daylight. */
+    padding: 0.5rem 0.5rem 0.75rem;
+    border-bottom: 0;
+    flex-wrap: nowrap;
+    align-items: center;
+    overflow-x: auto;
+    /* Without this, a flick at either end of the row becomes Safari's
+       swipe-to-go-back. */
+    overscroll-behavior-x: contain;
+    /* A visible scrollbar is taller than the line of chips this saves. What
+       shows the row continues is the chip cut off at the edge. */
+    scrollbar-width: none;
+  }
+
+  .home-tabbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .home-tabs {
+    gap: 6px;
+    flex-wrap: nowrap;
+  }
+
+  /* Chips in a row that cannot wrap would otherwise be squeezed until their
+     labels clipped, rather than overflowing the row. */
+  .home-tabbar > *,
+  .home-tabs > * {
+    flex: 0 0 auto;
+  }
+
+  .home-tabs .nav-link {
+    padding: 6px 12px;
+    border: 1px solid var(--today-control-border);
+    border-radius: 16px;
+    font-size: 0.78rem;
+  }
+
+  .home-tabs .nav-link.active,
+  .home-tabs .nav-link.active:hover {
+    margin-bottom: 0;
+    padding-bottom: 6px;
+    border-color: var(--today-button-bg);
+  }
+
+  .home-tabs .nav-link i {
+    margin-right: 4px !important;
+    font-size: 0.85rem;
+  }
+
+  .home-tab-count {
+    margin-left: 4px;
+    font-size: 0.65rem;
+    padding: 1px 5px;
+  }
+}
+
+/* ── The calm tab ──────────────────────────────────────────────────────────
+   A still photograph with the time, a greeting and one question on it, after
+   momentumdash.com. It is the one place in the interface that is not trying
+   to show you anything, so it deliberately ignores the palette: the picture
+   supplies the colour and the type is white on a scrim over it. */
+
+.moment {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26rem;
+  overflow: hidden;
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+  /* Showing before the photograph arrives, and standing in for it entirely
+     if the network is away. */
+  background: #2b3440;
+}
+
+.moment-photo {
+  position: absolute;
+  inset: 0;
+  background-position: center;
+  background-size: cover;
+  opacity: 0;
+  transition: opacity 900ms ease;
+}
+
+.moment-photo.is-loaded {
+  opacity: 1;
+}
+
+/* Photographs are unpredictable, so the type never sits straight on one: this
+   is what keeps white legible over a pale sky. */
+.moment-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.45),
+    rgba(0, 0, 0, 0.25) 40%,
+    rgba(0, 0, 0, 0.55)
+  );
+}
+
+.moment-inner {
+  position: relative;
+  width: 100%;
+  max-width: 34rem;
+  padding: 2.5rem 1.5rem;
+  color: #ffffff;
+  text-align: center;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.moment-clock {
+  margin: 0;
+  font-size: clamp(3.5rem, 12vw, 6rem);
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.moment-greeting {
+  margin: 0.5rem 0 0;
+  font-size: clamp(1.25rem, 4vw, 1.9rem);
+  font-weight: 400;
+}
+
+/* The day itself, and which stage it belongs to when the stages plugin is on.
+   Lighter than the greeting: it is a fact about today, not a salutation. */
+.moment-date {
+  margin: 1.75rem 0 0;
+  font-size: clamp(0.95rem, 2.8vw, 1.15rem);
+  font-weight: 300;
+  letter-spacing: 0.02em;
+  opacity: 0.9;
+}
+
+/* Today's diary and plan, under the date. Underlined rather than merely
+   white, because on a photograph there is no other cue that they are links. */
+.moment-links {
+  margin: 0.6rem 0 0;
+  font-size: clamp(0.95rem, 2.8vw, 1.1rem);
+  font-weight: 300;
+}
+
+.moment-links a {
+  color: #ffffff;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+}
+
+.moment-links a:hover,
+.moment-links a:focus-visible {
+  color: #ffffff;
+  text-decoration-thickness: 2px;
+}
+
+.moment-links a:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.moment-links-sep {
+  opacity: 0.7;
+}
+
+.moment-quote {
+  margin: 2.5rem 0 0;
+  font-size: 0.9rem;
+  font-style: italic;
+  opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+  .moment {
+    min-height: 22rem;
+  }
+
+  .moment-inner {
+    padding: 2rem 1.25rem;
+  }
+
+  .moment-date {
+    margin-top: 1.25rem;
+  }
+
+  .moment-quote {
+    margin-top: 1.75rem;
+  }
+}
+
+/* The photograph is decoration; someone who has asked for less movement
+   should not get a cross-fade. */
+@media (prefers-reduced-motion: reduce) {
+  .moment-photo {
+    transition: none;
+  }
+}
