@@ -71,15 +71,31 @@ describe('web view layout', () => {
     const page = await browser.newPage();
     const linksPath = path.join(bookmarksServer.vaultDir, 'today', 'links.md');
     try {
+      await page.setViewport(VIEWPORTS.phone);
+      await page.setExtraHTTPHeaders({ Authorization: 'Bearer ' + PASSWORD });
+      await page.goto(bookmarksServer.baseUrl, { waitUntil: 'networkidle0' });
+
+      const emptyLayout = await page.evaluate(() => {
+        const bookmarks = document.querySelector('#momentBookmarks');
+        const panel = document.querySelector('#momentPanel').getBoundingClientRect();
+        const content = document.querySelector('.moment-inner').getBoundingClientRect();
+        return {
+          bookmarksDisplay: getComputedStyle(bookmarks).display,
+          bookmarksHeight: bookmarks.getBoundingClientRect().height,
+          panelCenterY: panel.top + panel.height / 2,
+          contentCenterY: content.top + content.height / 2
+        };
+      });
+      expect(emptyLayout.bookmarksDisplay).toBe('none');
+      expect(emptyLayout.bookmarksHeight).toBe(0);
+      expect(emptyLayout.contentCenterY).toBeCloseTo(emptyLayout.panelCenterY, 0);
+
       fs.mkdirSync(path.dirname(linksPath), { recursive: true });
       fs.writeFileSync(linksPath, Array.from(
         { length: 24 },
         (_, index) => `- [Bookmark number ${index + 1}](notes/kitchen-sink.md)`
       ).join('\n'));
-
-      await page.setViewport(VIEWPORTS.phone);
-      await page.setExtraHTTPHeaders({ Authorization: 'Bearer ' + PASSWORD });
-      await page.goto(bookmarksServer.baseUrl, { waitUntil: 'networkidle0' });
+      await page.reload({ waitUntil: 'networkidle0' });
       await page.waitForFunction(() => document.querySelectorAll('#momentBookmarks a').length === 24);
 
       const layout = await page.evaluate(() => {
