@@ -3,9 +3,11 @@
  *
  * Every colour in the web view comes from a `--today-*` custom property in
  * `src/web/public/css/style.css`, so a theme is nothing but a set of values
- * for those properties. A file under `vault/themes/` supplies some or all of
- * them, for light and dark separately, and the display menu offers it
- * alongside the built-in palette.
+ * for those properties. A file under `vault/today/themes/` supplies some or
+ * all of them, for light and dark separately, and the display menu offers it
+ * alongside the built-in palette. The directory is looked for inside the
+ * vault's app directory first and at the vault root second, so a vault that
+ * predates `today/` keeps working — see `src/vault-app-files.js`.
  *
  * The values are hand-written and end up inside a CSS response, so nothing is
  * taken on trust: a value has to parse as a colour this module can convert to
@@ -15,12 +17,13 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { parse as parseToml } from 'smol-toml';
+import { APP_DIRNAME, resolveAppPath } from '../vault-app-files.js';
 
 /** The id of the palette that ships with Today; not a file, and never shadowed. */
 export const BUILT_IN_THEME_ID = 'today';
 export const BUILT_IN_THEME_NAME = 'Today';
 
-/** The directory, relative to the vault root, that themes are read from. */
+/** The directory, within the vault's app directory, that themes are read from. */
 export const THEMES_DIRNAME = 'themes';
 
 /**
@@ -300,8 +303,8 @@ function signatureOf(entries) {
  * case, not an error. Returns `{ themes, problems }`, where `problems` maps a
  * file to what is wrong with it so the server can say so.
  */
-export async function readVaultThemes(vaultPath) {
-  const directory = path.join(vaultPath, THEMES_DIRNAME);
+export async function readVaultThemes(vaultPath, appDirectory = APP_DIRNAME) {
+  const directory = resolveAppPath(vaultPath, THEMES_DIRNAME, appDirectory);
 
   let files;
   try {
@@ -356,8 +359,8 @@ export function clearVaultThemesCache() {
 /**
  * The menu's list: the built-in palette first, then the vault's, by name.
  */
-export async function listThemes(vaultPath) {
-  const { themes } = await readVaultThemes(vaultPath);
+export async function listThemes(vaultPath, appDirectory) {
+  const { themes } = await readVaultThemes(vaultPath, appDirectory);
   const vaultThemes = [...themes.values()]
     .map(({ id, name }) => ({ id, name }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -369,8 +372,8 @@ export async function listThemes(vaultPath) {
  * theme that has been deleted or renamed falls back to the built-in palette,
  * which is an empty stylesheet.
  */
-export async function getThemeStylesheet(vaultPath, id) {
-  const { themes } = await readVaultThemes(vaultPath);
+export async function getThemeStylesheet(vaultPath, id, appDirectory) {
+  const { themes } = await readVaultThemes(vaultPath, appDirectory);
   const theme = (id && id !== BUILT_IN_THEME_ID ? themes.get(id) : null) || null;
   const css = renderThemeCss(theme);
   return { css, theme };

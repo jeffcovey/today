@@ -34,8 +34,8 @@ afterEach(async () => {
   await fs.rm(vaultDir, { recursive: true, force: true });
 });
 
-async function writeTheme(name, contents) {
-  const themesDir = path.join(vaultDir, 'themes');
+async function writeTheme(name, contents, directory = 'themes') {
+  const themesDir = path.join(vaultDir, directory);
   await fs.mkdir(themesDir, { recursive: true });
   await fs.writeFile(path.join(themesDir, name), contents, 'utf-8');
 }
@@ -218,6 +218,31 @@ describe('reading the vault', () => {
     const { themes, problems } = await readVaultThemes(vaultDir);
     expect([...themes.keys()]).toEqual(['cocoa']);
     expect(problems.get('broken.toml')[0]).toMatch(/not valid TOML/);
+  });
+
+  // Themes used to live at vault/themes/ and now live under the vault's app
+  // directory. Both have to work: every vault that existed before the
+  // directory did is in the first state, and finding neither would silently
+  // drop the user's palette back to the built-in one.
+  test('a theme under the app directory is found', async () => {
+    await writeTheme('cocoa.toml', 'name = "Cocoa"\n\n[light]\nbg = "#f6f1ea"\n', 'today/themes');
+    expect(await listThemes(vaultDir)).toEqual([
+      { id: BUILT_IN_THEME_ID, name: 'Today' },
+      { id: 'cocoa', name: 'Cocoa' }
+    ]);
+  });
+
+  test('a theme still at the vault root is found too', async () => {
+    await writeTheme('cocoa.toml', 'name = "Cocoa"\n\n[light]\nbg = "#f6f1ea"\n');
+    expect((await listThemes(vaultDir)).map(({ id }) => id)).toEqual([BUILT_IN_THEME_ID, 'cocoa']);
+  });
+
+  test('a vault holding both reads the app directory, not the old place', async () => {
+    await writeTheme('cocoa.toml', 'name = "Old"\n\n[light]\nbg = "#000000"\n');
+    await writeTheme('cocoa.toml', 'name = "New"\n\n[light]\nbg = "#ffffff"\n', 'today/themes');
+    clearVaultThemesCache();
+    const { themes } = await readVaultThemes(vaultDir);
+    expect(themes.get('cocoa').name).toBe('New');
   });
 
   test('an edit is picked up without a restart', async () => {
