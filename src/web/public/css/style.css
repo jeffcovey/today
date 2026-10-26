@@ -67,6 +67,13 @@
   --today-attn-edge: #d97706;
   --today-ok-text: #1e6b3d;
   --today-ok-bg: #e3f4ea;
+  --today-ok-edge: #1a7f4b;
+  --today-info-text: #1d5566;
+  --today-info-bg: #cff4fc;
+  --today-info-edge: #0aa2c0;
+  --today-err-text: #842029;
+  --today-err-bg: #f8d7da;
+  --today-err-edge: #dc3545;
 }
 
 html[data-theme="dark"] {
@@ -105,6 +112,13 @@ html[data-theme="dark"] {
   --today-attn-edge: #f59e0b;
   --today-ok-text: #86efac;
   --today-ok-bg: #173a27;
+  --today-ok-edge: #15803d;
+  --today-info-text: #cffafe;
+  --today-info-bg: #164e63;
+  --today-info-edge: #0e7490;
+  --today-err-text: #fee2e2;
+  --today-err-bg: #7f1d1d;
+  --today-err-edge: #b91c1c;
   /* MDB's own dark palette is neutral grey (#424242 surfaces) where Today's
      is slate, which is why its cards, dropdowns and modals used to be
      corrected by hand further down this file. Pointing the tokens those
@@ -646,19 +660,25 @@ details.role-reply .form-text {
   color: var(--today-muted-text);
 }
 
-/* Obsidian-style callout variations */
-details.callout-note { border-left: 4px solid var(--today-link); }
-details.callout-tip { border-left: 4px solid #28a745; }
-details.callout-warning { border-left: 4px solid #ffc107; }
-details.callout-danger { border-left: 4px solid #dc3545; }
-details.callout-info { border-left: 4px solid #17a2b8; }
-details.callout-success, details.callout-check, details.callout-done { border-left: 4px solid #28a745; }
-details.callout-abstract, details.callout-summary, details.callout-tldr { border-left: 4px solid #00b0ff; }
-details.callout-hint, details.callout-important { border-left: 4px solid #00bcd4; }
-details.callout-question, details.callout-help, details.callout-faq { border-left: 4px solid #ffc107; }
-details.callout-caution, details.callout-attention { border-left: 4px solid #ff9800; }
-details.callout-failure, details.callout-fail, details.callout-missing, details.callout-error, details.callout-bug { border-left: 4px solid #f44336; }
-details.callout-cite { border-left: 4px solid #9e9e9e; }
+/* Obsidian-style callout variations. A callout reports an outcome, so these
+   are status, and they resolve to the four status edges rather than to twelve
+   literal hexes. That collapses four separate blues (note, info, abstract,
+   hint) into one and two ambers (warning, question) into one -- deliberately:
+   they were never four different kinds of information, and a palette could
+   not reach any of them while they were literals. */
+details.callout-note,
+details.callout-info,
+details.callout-abstract, details.callout-summary, details.callout-tldr,
+details.callout-hint, details.callout-important { border-left: 4px solid var(--today-info-edge); }
+details.callout-tip,
+details.callout-success, details.callout-check, details.callout-done { border-left: 4px solid var(--today-ok-edge); }
+details.callout-warning,
+details.callout-question, details.callout-help, details.callout-faq,
+details.callout-caution, details.callout-attention { border-left: 4px solid var(--today-attn-edge); }
+details.callout-danger,
+details.callout-failure, details.callout-fail, details.callout-missing,
+details.callout-error, details.callout-bug { border-left: 4px solid var(--today-err-edge); }
+details.callout-cite { border-left: 4px solid var(--today-border); }
 
 body {
   background-color: var(--today-bg);
@@ -1584,38 +1604,48 @@ html[data-theme="dark"] .alert-primary {
   border-color: #1d4ed8;
 }
 
-/* MDB's info alert text (#3b7e94) is 4.05:1 on its own background */
+/* STATUS alerts, both modes, from the status tokens. These used to be MDB's
+   own light values plus a hand-written dark override per variant, which meant
+   a vault palette could move the warning and success tokens and not the
+   alerts that are the main thing wearing them. MDB's own info ink (#3b7e94)
+   was 4.05:1 on its own background, which is why that one already had a
+   correction here; now all four resolve the same way.
+
+   Specificity is MDB's own (one class), so these must stay after MDB's
+   stylesheet, which they are. */
 .alert-info {
-  --mdb-alert-color: #1d5566;
-  color: #1d5566;
+  --mdb-alert-color: var(--today-info-text);
+  background-color: var(--today-info-bg);
+  color: var(--today-info-text);
+  border-color: var(--today-info-edge);
 }
 
-html[data-theme="dark"] .alert-info {
-  background-color: #164e63;
-  color: #cffafe;
-  border-color: #0e7490;
+.alert-success {
+  --mdb-alert-color: var(--today-ok-text);
+  background-color: var(--today-ok-bg);
+  color: var(--today-ok-text);
+  border-color: var(--today-ok-edge);
 }
 
-html[data-theme="dark"] .alert-success {
-  background-color: #14532d;
-  color: #dcfce7;
-  border-color: #15803d;
+.alert-warning {
+  --mdb-alert-color: var(--today-attn-text);
+  background-color: var(--today-attn-bg);
+  color: var(--today-attn-text);
+  border-color: var(--today-attn-edge);
 }
 
-html[data-theme="dark"] .alert-warning {
-  background-color: #713f12;
-  color: #fef3c7;
-  border-color: #a16207;
+.alert-danger {
+  --mdb-alert-color: var(--today-err-text);
+  background-color: var(--today-err-bg);
+  color: var(--today-err-text);
+  border-color: var(--today-err-edge);
 }
 
-html[data-theme="dark"] .alert-danger {
-  background-color: #7f1d1d;
-  color: #fee2e2;
-  border-color: #b91c1c;
+.alert a:not(.btn) {
+  color: inherit;
 }
 
-html[data-theme="dark"] .alert strong,
-html[data-theme="dark"] .alert a:not(.btn) {
+html[data-theme="dark"] .alert strong {
   color: inherit;
 }
 
