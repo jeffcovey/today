@@ -542,6 +542,276 @@ function updatePomodoroCountdown() {
 }
 
 // Collapse/expand functionality for sections
+// ── The calm tab ────────────────────────────────────────────────────────────
+// Unsplash photographs, grouped by the light in them so the picture matches
+// the hour, and rotating by date so a given hour is not the same view every
+// day. These are direct CDN links: Unsplash retired source.unsplash.com, and
+// its licence allows hotlinking without a key.
+
+const MOMENT_PHOTOS = {
+  dawn: [
+    '1506905925346-21bda4d32df4',
+    '1426604966848-d7adac402bff',
+    '1439853949127-fa647821eba0'
+  ],
+  day: [
+    '1441974231531-c6227db76b6e',
+    '1501854140801-50d01698950b',
+    '1518837695005-2083093ee35b',
+    '1433086966358-54859d0ed716',
+    '1447752875215-b2761acb3c5d',
+    '1465146344425-f00d5f5c8f07',
+    '1486870591958-9b9d0d1dda99',
+    '1458668383970-8ddd3927deed',
+    '1419133203517-f3b3ed0ba2bb'
+  ],
+  dusk: [
+    '1470071459604-3b5ec3a7fe05',
+    '1472214103451-9374bd1c798e',
+    '1475924156734-496f6cac6ec1',
+    '1495616811223-4d98c6e9c869',
+    '1472120435266-53107fd0c44a'
+  ],
+  night: [
+    '1419242902214-272b3f66ee7a',
+    '1507400492013-162706c8c05e',
+    '1531306728370-e2ebd9d7bb99'
+  ]
+};
+
+
+// Which light the photograph should be in. Dawn and dusk are deliberately
+// narrow: they are the hours when a daylight picture would look wrong.
+const MOMENT_BUCKETS = ['dawn', 'day', 'dusk', 'night'];
+
+function momentBucket(hour) {
+  if (hour < 5 || hour >= 21) return 'night';
+  if (hour < 8) return 'dawn';
+  if (hour < 18) return 'day';
+  return 'dusk';
+}
+
+const MOMENT_WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+// AP style: the short months are not abbreviated.
+const MOMENT_MONTHS = ['Jan.', 'Feb.', 'March', 'April', 'May', 'June', 'July',
+  'Aug.', 'Sept.', 'Oct.', 'Nov.', 'Dec.'];
+
+function momentGreeting(hour) {
+  if (hour < 5) return 'Good night';
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+// A stable number for the day, so the photograph and the quote hold still
+// across page loads and move only when the date or the hour does.
+function momentDayIndex(now) {
+  // UTC timestamps built from the local calendar fields, so a 23- or 25-hour
+  // day across a DST change still counts as exactly one day.
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.floor((today - Date.UTC(now.getFullYear(), 0, 0)) / 86400000);
+}
+
+// The photograph turns over when the day does or when the light does, so this
+// is the number the quote follows too: one quote per picture.
+function momentSlot(now) {
+  return momentDayIndex(now) * MOMENT_BUCKETS.length
+    + MOMENT_BUCKETS.indexOf(momentBucket(now.getHours()));
+}
+
+function momentPhotoUrl(now) {
+  const set = MOMENT_PHOTOS[momentBucket(now.getHours())];
+  return 'https://images.unsplash.com/photo-'
+    + set[momentDayIndex(now) % set.length]
+    + '?auto=format&fit=crop&w=2000&q=80';
+}
+
+function paintMomentClock() {
+  const clock = document.getElementById('momentClock');
+  const greeting = document.getElementById('momentGreeting');
+  if (!clock || !greeting) return;
+
+  const now = new Date();
+  clock.textContent = (now.getHours() % 12 || 12) + ':' + String(now.getMinutes()).padStart(2, '0');
+
+  const panel = document.getElementById('momentPanel');
+  const name = panel ? panel.dataset.name : '';
+  greeting.textContent = momentGreeting(now.getHours()) + (name ? ', ' + name : '') + '.';
+}
+
+function paintMomentPhoto() {
+  const holder = document.getElementById('momentPhoto');
+  if (!holder) return;
+  const url = momentPhotoUrl(new Date());
+  if (holder.dataset.url === url) return;
+
+  // Loaded out of view first, so the panel never shows a half-painted photo
+  // and never flashes an empty box if the network is slow or absent.
+  const image = new Image();
+  image.onload = () => {
+    holder.style.backgroundImage = 'url("' + url + '")';
+    holder.dataset.url = url;
+    holder.classList.add('is-loaded');
+  };
+  image.src = url;
+}
+
+// Today's date, and which stage it is when the stages plugin is on. The whole
+// week arrives in data-stages because the markup is cached; the day is picked
+// here, where the clock is honest.
+function paintMomentDate() {
+  const target = document.getElementById('momentDate');
+  const panel = document.getElementById('momentPanel');
+  if (!target || !panel) return;
+
+  const now = new Date();
+  const parts = [
+    MOMENT_WEEKDAYS[now.getDay()],
+    MOMENT_MONTHS[now.getMonth()] + ' ' + now.getDate()
+  ];
+
+  if (panel.dataset.stages) {
+    try {
+      const stages = JSON.parse(panel.dataset.stages);
+      if (Array.isArray(stages) && stages[now.getDay()]) parts.push(stages[now.getDay()]);
+    } catch (error) {
+      // No stage, then. The date is still worth showing on its own.
+    }
+  }
+
+  target.textContent = parts.join(' \u2022 ');
+}
+
+// The quotes are the user's own, in vault/quotes.md, so they are fetched
+// rather than shipped. Keyed on the photograph's slot: a new quote arrives
+// with each new picture and not before.
+async function paintMomentQuote() {
+  const target = document.getElementById('momentQuote');
+  if (!target) return;
+
+  const slot = momentSlot(new Date());
+  if (target.dataset.slot === String(slot)) return;
+
+  try {
+    const response = await fetch('/api/quote?index=' + slot);
+    const data = await response.json();
+    if (!data.success || !data.count) {
+      // No vault/quotes.md, or it is empty. Nothing to say, so say nothing.
+      target.textContent = '';
+      return;
+    }
+    target.dataset.slot = String(slot);
+    target.textContent = '\u201c' + data.text + '\u201d'
+      + (data.author ? ' \u2014 ' + data.author : '');
+  } catch (error) {
+    // Leave whatever is already up; a quote is not worth an error message.
+  }
+}
+
+function initializeMoment() {
+  const panel = document.getElementById('momentPanel');
+  if (!panel) return;
+
+  paintMomentClock();
+  paintMomentDate();
+  paintMomentPhoto();
+  paintMomentQuote();
+
+  // Often enough that the clock is never visibly behind, that the picture
+  // changes when the hour crosses into a different light, and that the date
+  // turns over at midnight on a page left open overnight.
+  setInterval(() => {
+    paintMomentClock();
+    paintMomentDate();
+    paintMomentPhoto();
+    paintMomentQuote();
+  }, 20000);
+}
+
+// Every control inside a timer card reloads the page, so without this a tap on
+// Pause would close the card it was in. The memory is deliberately short: it
+// only survives the reload that a control press causes, so arriving at the
+// page later always finds the timers collapsed, which is the whole point of
+// them being one line.
+const TIMER_CARD_MEMORY_MS = 10000;
+
+// A card is opened to do one thing. Once the timer is running, or once it has
+// been stopped, that thing is done and the card goes back to being one line.
+// Pause and skip are not on this list: those are adjustments made with the
+// card in hand, and the next press is likely to be in it too.
+const COLLAPSING_ACTIONS = new Set(['start', 'next', 'resume', 'stop']);
+
+function initializeTimerCards() {
+  for (const card of document.querySelectorAll('.timer-card[data-timer-key]')) {
+    const key = 'timer-card:' + card.dataset.timerKey;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(key) || 'null');
+      if (saved && saved.open && Date.now() - saved.at < TIMER_CARD_MEMORY_MS) {
+        card.open = true;
+      } else {
+        sessionStorage.removeItem(key);
+      }
+    } catch (error) {
+      // Private window, or storage is blocked. The card starts collapsed.
+    }
+    const remember = () => {
+      try {
+        sessionStorage.setItem(key, JSON.stringify({ open: card.open, at: Date.now() }));
+      } catch (error) {
+        // It still opens and closes; it just will not survive the reload.
+      }
+    };
+    card.addEventListener('toggle', remember);
+    // The expiry should measure time since the action, not since opening.
+    card.addEventListener('click', event => {
+      const control = event.target.closest('.timer-detail button, .timer-detail a');
+      if (!control) return;
+      // Collapse first, then remember: the memory records the card as the
+      // control left it, so the reload the control causes comes back closed.
+      if (COLLAPSING_ACTIONS.has(control.dataset.timerAction)) card.open = false;
+      remember();
+    });
+  }
+}
+
+// ── The home page's tabbed card ─────────────────────────────────────────────
+// Driven here rather than through MDB's tab plugin, which arrives from a CDN:
+// the vault listing lives inside a tab panel, and the page's main content
+// should not be one failed script away from being unreachable.
+
+function selectHomeTab(name) {
+  document.querySelectorAll('[data-home-tab]').forEach(tab => {
+    const selected = tab.dataset.homeTab === name;
+    tab.classList.toggle('active', selected);
+    tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+    // Roving tabindex: the tablist is one stop, and the arrows move within it.
+    tab.tabIndex = selected ? 0 : -1;
+  });
+  document.querySelectorAll('[data-home-panel]').forEach(panel => {
+    panel.hidden = panel.dataset.homePanel !== name;
+  });
+}
+
+function moveHomeTab(event) {
+  const keys = { ArrowLeft: -1, ArrowRight: 1, Home: 'first', End: 'last' };
+  const step = keys[event.key];
+  if (step === undefined) return;
+
+  const tabs = Array.from(document.querySelectorAll('[data-home-tab]'));
+  if (!tabs.length) return;
+  const current = tabs.findIndex(tab => tab.getAttribute('aria-selected') === 'true');
+
+  let next;
+  if (step === 'first') next = 0;
+  else if (step === 'last') next = tabs.length - 1;
+  else next = (current + step + tabs.length) % tabs.length;
+
+  event.preventDefault();
+  selectHomeTab(tabs[next].dataset.homeTab);
+  tabs[next].focus();
+}
+
 function toggleCollapse(sectionId) {
   const section = document.getElementById(sectionId);
   if (!section) return;
@@ -646,6 +916,8 @@ function initializeLoadingSpinner() {
 document.addEventListener('DOMContentLoaded', () => {
   initializeTheme();
   initializePalettes();
+  initializeMoment();
+  initializeTimerCards();
   initializeTextSize();
   initializeAIAssistant();
   restoreCollapseStates();

@@ -34,11 +34,12 @@ import { convertEmojisToIcons } from './emoji-mappings.js';
 import { getMarkdownFileCache } from './markdown-file-cache.js';
 import { getAbsoluteVaultPath, getConfig, getPublicBaseUrl, getVaultPath } from './config.js';
 import { formatDate, formatDisplayDate, getDayName, getTodayDate } from './date-utils.js';
-import { isPluginConfigured } from './plugin-loader.js';
+import { isPluginConfigured, getPluginSources } from './plugin-loader.js';
 import { createAiCommitMessageHandler } from './git-ai-commit-message-route.js';
 import { runTrackCommand } from './track-command.js';
 import {
   getDateComponents as getPlanDateComponents,
+  getDailyPlanRelativePath,
   getPlanFileHierarchy,
   getPlanFilePath,
 } from './plan-utils.js';
@@ -126,12 +127,21 @@ const __dirname = dirname(__filename);
 // even though express.static still sends a long max-age. Falls back to a
 // boot timestamp if git is unavailable (eg. detached source dir).
 const STATIC_VERSION = (() => {
+  const git = (args) => execSync(`git ${args}`, {
+    cwd: path.join(__dirname, '..'),
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim();
   try {
-    return execSync('git rev-parse --short HEAD', {
-      cwd: path.join(__dirname, '..'),
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim() || Date.now().toString(36);
+    const head = git('rev-parse --short HEAD');
+    // A dirty tree means someone is editing this checkout in place, and the
+    // sha alone would pin every browser to whatever was last committed — the
+    // stylesheet changes and nobody sees it. Stamp those with the boot time,
+    // so a restart is enough. A clean tree still gets the plain sha, so a
+    // deployed version is stable and shared across visitors.
+    const dirty = git('status --porcelain --untracked-files=no');
+    if (dirty) return `${head || 'dev'}-${Date.now().toString(36)}`;
+    return head || Date.now().toString(36);
   } catch {
     return Date.now().toString(36);
   }
@@ -508,6 +518,77 @@ app.get('/api/themes', authMiddleware, async (req, res) => {
   }
 });
 
+// ── The calm panel's quotes ────────────────────────────────────────────────
+// They live in the vault, in vault/quotes.md, one per line as "Text — Author",
+// because they are the user's own words to choose rather than a list shipped
+// with the app. Read on demand and held until the file's mtime moves, so
+// editing the file shows up without a restart.
+const QUOTE_SEPARATOR = ' \u2014 ';
+let quotesCache = { mtimeMs: 0, quotes: [] };
+
+async function readVaultQuotes() {
+  const quotesPath = path.join(VAULT_PATH, 'quotes.md');
+  let stat;
+  try {
+    stat = await fs.stat(quotesPath);
+  } catch {
+    // No file is a legitimate state: the panel simply shows no quote.
+    quotesCache = { mtimeMs: 0, quotes: [] };
+    return quotesCache.quotes;
+  }
+
+  if (stat.mtimeMs === quotesCache.mtimeMs) return quotesCache.quotes;
+
+  const content = await fs.readFile(quotesPath, 'utf-8');
+  const quotes = [];
+  for (const line of content.split('\n')) {
+    const item = line.match(/^\s*[-*]\s+(.*)$/);
+    if (!item) continue;
+    const text = item[1].trim();
+    if (!text) continue;
+    // Split on the last separator, so a quote may contain a dash of its own.
+    const cut = text.lastIndexOf(QUOTE_SEPARATOR);
+    quotes.push(cut === -1
+      ? { text, author: '' }
+      : { text: text.slice(0, cut).trim(), author: text.slice(cut + QUOTE_SEPARATOR.length).trim() });
+  }
+
+  quotesCache = { mtimeMs: stat.mtimeMs, quotes };
+  return quotes;
+}
+
+// One quote, chosen by the page. The index comes from the client because it is
+// the client that knows which photograph is up — the two turn over together —
+// and because this markup is cached to disk, so the server cannot bake it in.
+app.get('/api/quote', authMiddleware, async (req, res) => {
+  try {
+    const quotes = await readVaultQuotes();
+    if (quotes.length === 0) return res.json({ success: true, count: 0 });
+    const asked = Number.parseInt(req.query.index, 10);
+    const index = Number.isFinite(asked)
+      ? ((asked % quotes.length) + quotes.length) % quotes.length
+      : Math.floor(Math.random() * quotes.length);
+    res.json({ success: true, count: quotes.length, ...quotes[index] });
+  } catch (error) {
+    console.error('Error reading the vault quotes:', error);
+    res.status(500).json({ success: false, message: 'Failed to read quotes' });
+  }
+});
+
+// ── Today's diary and plan, without a date in the URL ───────────────────────
+// The calm panel links here instead of to a dated path. Its markup is cached
+// to disk, so a link with today's date baked into it would still be pointing
+// at Sunday's file on Monday; resolving the date per request is what keeps
+// them honest. Under /_today/ rather than /diary/today so they cannot shadow
+// a vault file of that name.
+app.get('/_today/diary', authMiddleware, (req, res) => {
+  res.redirect(`/diary/${getTodayDate(getConfiguredTimezone())}.md`);
+});
+
+app.get('/_today/plan', authMiddleware, (req, res) => {
+  res.redirect(`/${getDailyPlanRelativePath(getTodayDate(getConfiguredTimezone()))}`);
+});
+
 app.post('/api/theme', authMiddleware, express.json(), async (req, res) => {
   const { mode, name } = req.body || {};
   // Either may be sent on its own: the menu has a control for each.
@@ -639,15 +720,16 @@ function getFloatingToggleBtn() {
 // Helper to get timer widget (active or idle state)
 function getTimerWidget(timer) {
   if (timer) {
-    return `
-        <div class="alert alert-info d-flex align-items-center mb-3" role="alert" data-timer-start="${timer.startTimeISO}">
-          <i class="fas fa-clock me-2"></i>
-          <div class="flex-grow-1">
-            <strong>${timer.description}</strong>
-            <br>
-            <small>Started at ${timer.startTime} • Duration: <span class="timer-duration">${timer.duration}</span></small>
-          </div>
-          <a href="#" id="stopTimerBtn" onclick="
+    return timerCard({
+      key: 'focus',
+      classes: 'alert-info',
+      extraClass: 'timer-card-grow',
+      attrs: ` data-timer-start="${timer.startTimeISO}"`,
+      emoji: EMOJI_FOCUS,
+      title: timer.description,
+      clock: `<span class="timer-duration">${timer.duration}</span>`,
+      detail: `
+            <a href="#" id="stopTimerBtn" data-timer-action="stop" onclick="
             const btn = this;
             const icon = btn.querySelector('i');
             const text = btn.querySelector('.btn-text');
@@ -661,17 +743,21 @@ function getTimerWidget(timer) {
               icon.className = 'fas fa-stop';
               text.textContent = ' Stop';
             });
-            return false;" class="btn btn-sm btn-outline-dark ms-2">
+            return false;" class="btn btn-sm btn-outline-dark">
             <i class="fas fa-stop"></i><span class="btn-text"> Stop</span>
-          </a>
-        </div>`;
+          </a>`
+    });
   } else {
-    return `
-        <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
-          <i class="fas fa-clock me-2"></i>
-          <div class="input-group flex-grow-1">
-            <input type="text" class="form-control" id="timerDescription" placeholder="What are you working on? (include #topic/tags)" onkeypress="if(event.key==='Enter'){event.preventDefault();document.getElementById('startTimerBtn').click();}">
-            <button class="btn btn-primary" id="startTimerBtn" onclick="
+    return timerCard({
+      key: 'focus',
+      classes: 'alert-info',
+      extraClass: 'timer-card-tight',
+      emoji: EMOJI_FOCUS,
+      title: 'Track',
+      detail: `
+        <div class="input-group">
+          <input type="text" class="form-control" id="timerDescription" placeholder="What are you working on? (include #topic/tags)" onkeypress="if(event.key==='Enter'){event.preventDefault();document.getElementById('startTimerBtn').click();}">
+            <button class="btn btn-primary" id="startTimerBtn" data-timer-action="start" onclick="
               const btn = this;
               const icon = btn.querySelector('i');
               const text = btn.querySelector('.btn-text');
@@ -687,8 +773,8 @@ function getTimerWidget(timer) {
               })">
               <i class="fas fa-play"></i><span class="btn-text"> Start</span>
             </button>
-          </div>
-        </div>`;
+          </div>`
+    });
   }
 }
 
@@ -1224,31 +1310,46 @@ async function getTaskTimerWidget() {
       }
       const nextText = nextItem ? processMarkdownLinks(nextItem.displayText) : null;
 
-      return `
-        <div class="alert alert-info mb-3 py-2 px-3" role="alert"
-          data-timer-start="${taskTimerState.startTime}" data-timer-total-seconds="${restSeconds}" data-timer-phase="rest">
-          <div><strong>Rest</strong> — <span class="task-timer-countdown">${initMin}:${String(initSec).padStart(2, '0')}</span></div>
-          ${nextText ? `<div class="mt-1"><small>Up next: <strong>${nextText}</strong></small></div>` : ''}
+      return timerCard({
+        key: 'tasks',
+        classes: 'alert-success',
+        extraClass: 'timer-card-tight',
+        attrs: ` data-timer-start="${taskTimerState.startTime}" data-timer-total-seconds="${restSeconds}" data-timer-phase="rest"`,
+        emoji: EMOJI_TASKS,
+        title: 'Rest',
+        clock: `<span class="task-timer-countdown">${initMin}:${String(initSec).padStart(2, '0')}</span>`,
+        detail: `
+          ${nextText ? `<div><small>Up next: <strong>${nextText}</strong></small></div>` : ''}
           <small class="d-flex gap-2 mt-1">
             <span>${position}/${total}</span>
             <a href="#" onclick="event.preventDefault(); fetch('/api/task-timer/skip', {method: 'POST'}).then(function(r) { return r.json(); }).then(function(data) {
               if (data.message === 'All tasks completed!') alert('All tasks completed!'); location.reload();
             }).catch(function() { alert('Failed to skip'); });">Skip Rest</a>
-            <a href="#" onclick="event.preventDefault(); fetch('/api/task-timer/stop', {method: 'POST'}).then(function() { location.reload(); });">Stop</a>
-          </small>
-        </div>`;
+            <a href="#" data-timer-action="stop" onclick="event.preventDefault(); fetch('/api/task-timer/stop', {method: 'POST'}).then(function() { location.reload(); });">Stop</a>
+          </small>`
+      });
     }
 
-    const alertClass = isPaused ? 'alert-warning' : 'alert-success';
-    const iconClass = isPaused ? 'fas fa-pause-circle' : 'fas fa-play-circle';
+    // One colour, always. Paused is a difference in the text, not in the card.
+    const alertClass = 'alert-success';
+
+    // The checklist, as on its pill: which timer this is matters more at a
+    // glance than whether it is paused, which the colour, the label and the
+    // buttons all say already.
+
     const phaseLabel = isPaused ? 'Paused' : 'Work';
     const pausedAttr = isPaused ? ' data-timer-paused="true"' : '';
 
-    return `
-      <div class="alert ${alertClass} mb-3" role="alert"
-        data-timer-start="${taskTimerState.startTime}" data-timer-total-seconds="${workSeconds}" data-timer-phase="work"${pausedAttr}>
+    return timerCard({
+      key: 'tasks',
+      classes: alertClass,
+      extraClass: 'timer-card-grow',
+      attrs: ` data-timer-start="${taskTimerState.startTime}" data-timer-total-seconds="${workSeconds}" data-timer-phase="work"${pausedAttr}`,
+      emoji: EMOJI_TASKS,
+      title: displayText,
+      clock: `<span class="task-timer-countdown">${initMin}:${String(initSec).padStart(2, '0')}</span>${isPaused ? ' \u23F8' : ''}`,
+      detail: `
         <div class="d-flex align-items-start">
-          <i class="${iconClass} me-2 mt-1"></i>
           ${item.canComplete && item.toggleData ?
             `<input type="checkbox" class="form-check-input me-2 mt-1" style="min-width:1em"
               data-toggle='${JSON.stringify(item.toggleData).replace(/'/g, '&#39;')}'
@@ -1259,23 +1360,20 @@ async function getTaskTimerWidget() {
             ''
           }
           <div>
-            <strong>${item.linkUrl ?
-              `<a href="${item.linkUrl}" class="text-decoration-none">${displayText}</a>` :
-              displayText
-            }</strong>
-            <div><small><span class="task-timer-countdown">${initMin}:${String(initSec).padStart(2, '0')}</span> (${phaseLabel}) · Item ${position} of ${total}</small></div>
+            ${item.linkUrl ? `<div><a href="${item.linkUrl}">${displayText}</a></div>` : ''}
+            <div><small>(${phaseLabel}) · Item ${position} of ${total}</small></div>
             <div class="mt-1 d-flex gap-1">
               ${isPaused ?
-                `<button class="btn btn-sm btn-outline-warning" onclick="
+                `<button class="btn btn-sm btn-outline-dark" data-timer-action="resume" onclick="
                   fetch('/api/task-timer/resume', {method: 'POST'}).then(function() { location.reload(); });">
                   <i class="fas fa-play"></i> Resume
                 </button>` :
-                `<button class="btn btn-sm btn-outline-success" onclick="
+                `<button class="btn btn-sm btn-outline-dark" onclick="
                   fetch('/api/task-timer/pause', {method: 'POST'}).then(function() { location.reload(); });">
                   <i class="fas fa-pause"></i> Pause
                 </button>`
               }
-              <button class="btn btn-sm btn-outline-secondary" onclick="
+              <button class="btn btn-sm btn-outline-secondary" data-timer-action="stop" onclick="
                 fetch('/api/task-timer/stop', {method: 'POST'}).then(function() { location.reload(); });">
                 <i class="fas fa-stop"></i> Stop
               </button>
@@ -1288,55 +1386,50 @@ async function getTaskTimerWidget() {
               </button>
             </div>
           </div>
-        </div>
-      </div>`;
+        </div>`
+    });
   } else {
     // Timer is not running — fetch items only now (avoids DB queries on every page load when running)
     const items = await getTodayTaskTimerItems();
     if (!items || items.length === 0) {
-      return `
-      <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
-        <i class="fas fa-tasks me-2"></i>
-        <div class="flex-grow-1">
-          No tasks, habits, or project reviews due today.
-        </div>
-      </div>`;
+      return timerCard({
+        key: 'tasks',
+        classes: 'alert-success',
+        extraClass: 'timer-card-tight',
+        emoji: EMOJI_TASKS,
+        title: 'Tasks',
+        clock: '<span class="timer-count timer-count-zero">0</span>',
+        detail: '<small>Nothing scheduled for today.</small>'
+      });
     }
-    return `
-      <div class="alert alert-primary d-flex align-items-center mb-3" role="alert">
-        <i class="fas fa-tasks me-2"></i>
-        <div class="flex-grow-1">
-          <div class="row g-2 align-items-center">
-            <div class="col">
-              <strong>Task Timer</strong> — ${items.length} items ready
-            </div>
-            <div class="col-auto">
-              <div class="input-group input-group-sm">
-                <input type="number" class="form-control" id="taskTimerMinutes" aria-label="Minutes per task" value="${taskTimerState.duration}" min="1" max="60" style="width: 60px;">
-                <span class="input-group-text">min</span>
-              </div>
-            </div>
-            <div class="col-auto">
-              <button class="btn btn-sm btn-primary" onclick="
-                const btn = this;
-                const icon = btn.querySelector('i');
-                const text = btn.querySelector('.btn-text');
-                const minutesInput = document.getElementById('taskTimerMinutes');
-                const duration = parseInt(minutesInput.value) || 2;
-                btn.disabled = true;
-                icon.className = 'fas fa-spinner fa-spin';
-                text.textContent = ' Starting...';
-                fetch('/api/task-timer/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({duration})}).then(function() { location.reload(); }).catch(function() {
-                  btn.disabled = false;
-                  icon.className = 'fas fa-play';
-                  text.textContent = ' Start';
-                });">
-                <i class="fas fa-play"></i><span class="btn-text"> Start</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>`;
+    return timerCard({
+      key: 'tasks',
+      classes: 'alert-success',
+      extraClass: 'timer-card-tight',
+      emoji: EMOJI_TASKS,
+      title: 'Tasks',
+      clock: `<span class="timer-count">${items.length}</span>`,
+      detail: `
+        <div class="d-flex align-items-center gap-2">
+          <input type="number" class="timer-minutes" id="taskTimerMinutes" aria-label="Minutes per task"
+          title="Minutes per task" value="${taskTimerState.duration}" min="1" max="60">
+        <span class="timer-unit">min</span>
+        <button class="timer-go" title="Start task timer" aria-label="Start task timer"
+          data-timer-action="start" onclick="
+          const btn = this;
+          const icon = btn.querySelector('i');
+          const minutesInput = document.getElementById('taskTimerMinutes');
+          const duration = parseInt(minutesInput.value) || 2;
+          btn.disabled = true;
+          icon.className = 'fas fa-spinner fa-spin';
+          fetch('/api/task-timer/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({duration})}).then(function() { location.reload(); }).catch(function() {
+            btn.disabled = false;
+            icon.className = 'fas fa-play';
+          });">
+          <i class="fas fa-play"></i>
+        </button>
+        </div>`
+    });
   }
 }
 
@@ -1445,11 +1538,44 @@ function sendPomodoroNudge() {
 }
 
 function pomodoroButton(action, icon, label, style) {
-  return `<button class="btn btn-sm ${style}" onclick="
+  return `<button class="btn btn-sm ${style}" data-timer-action="${action}" onclick="
     fetch('/api/pomodoro/${action}', {method: 'POST'}).then(function() { location.reload(); });">
     <i class="fas ${icon}"></i> ${label}
   </button>`;
 }
+
+// Font Awesome 6 Free has no tomato (fa-tomato is Pro) and a drawn one reads
+// as a bomb at 16px, so the pill wears the emoji. It is the one icon here
+// that is not monochrome, which suits the one timer named after an object.
+// A running timer is one line until you tap it: the emoji, what it is, and the
+// clock. Everything else — the detail and every control — sits behind the
+// disclosure, because a timer you are not touching should cost one row.
+//
+// <details> rather than a script, so it works before the CDN does and is
+// operable from the keyboard for free. role="alert" stays on the outer element
+// because that is what announces a timer starting.
+function timerCard({ key, classes = '', extraClass = '', attrs = '', emoji, title = '', clock = '', detail }) {
+  return `
+      <details class="timer-card alert ${classes}${extraClass ? ` ${extraClass}` : ''}" role="alert" data-timer-key="${key}"${attrs}>
+        <summary class="timer-summary">
+          ${timerEmoji(emoji)}
+          ${title ? `<span class="timer-title">${title}</span>` : ''}
+          ${clock ? `<span class="timer-clock">${clock}</span>` : ''}
+        </summary>
+        <div class="timer-detail">${detail}
+        </div>
+      </details>`;
+}
+
+const timerEmoji = (glyph, extraClass = '') =>
+  `<span class="activity-emoji${extraClass ? ` ${extraClass}` : ''}" aria-hidden="true">${glyph}</span>`;
+
+// One emoji each, so the three timers are told apart before the labels are
+// read. Font Awesome has no tomato at all, and once one of them was an emoji
+// the other two had to be or the row looked assembled from spare parts.
+const EMOJI_FOCUS = '\u{1F3AF}';
+const EMOJI_TASKS = '\u{1F4CB}';
+const EMOJI_POMODORO = '\u{1F345}';
 
 function getPomodoroWidget() {
   const config = getPomodoroConfig();
@@ -1462,36 +1588,46 @@ function getPomodoroWidget() {
   }
 
   if (!pomodoroState.isRunning) {
-    return `
-      <div class="alert alert-secondary d-flex align-items-center mb-3" role="alert">
-        <i class="fas fa-stopwatch me-2"></i>
-        <div class="flex-grow-1">
-          <div class="row g-2 align-items-center">
-            <div class="col">
-              <strong>Pomodoro</strong> — ${config.workPeriods} × ${config.workMinutes} min,
-              ${config.shortRestMinutes} min breaks, ${config.longRestMinutes} min long break
-            </div>
-            <div class="col-auto">
-              ${pomodoroButton('start', 'fa-play', 'Start', 'btn-primary')}
-            </div>
-          </div>
-        </div>
-      </div>`;
+    // The schedule is configuration, not status, so it moves to the tooltip:
+    // what you need at a glance is that Pomodoro is here and not running.
+    const schedule = `${config.workPeriods} \u00d7 ${config.workMinutes} min, `
+      + `${config.shortRestMinutes} min breaks, ${config.longRestMinutes} min long break`;
+    return timerCard({
+      key: 'pomodoro',
+      classes: 'alert-danger',
+      extraClass: 'timer-card-tight',
+      emoji: EMOJI_POMODORO,
+      title: 'Pomodoro',
+      detail: `
+        <div class="d-flex align-items-center gap-2">
+          <button class="timer-go" title="Start pomodoro" aria-label="Start pomodoro — ${schedule}"
+          data-timer-action="start" onclick="
+          fetch('/api/pomodoro/start', {method: 'POST'}).then(function() { location.reload(); });">
+          <i class="fas fa-play"></i>
+        </button>
+          <small>${schedule}</small>
+        </div>`
+    });
   }
 
   const upcoming = intervalDescription(pomodoroState.phase, pomodoroState.periodIndex, config);
 
   if (pomodoroState.awaitingStart) {
     const finished = intervalDescription(pomodoroState.finishedPhase, pomodoroState.finishedPeriodIndex, config);
-    return `
-      <div class="alert alert-info mb-3 py-2 px-3" role="alert" data-pomodoro-awaiting="true">
-        <div><i class="fas fa-bell me-2"></i><strong>${finished} complete</strong></div>
-        <div class="mt-1"><small>Up next: <strong>${upcoming}</strong> — ${phaseMinutes(pomodoroState.phase, config)} min</small></div>
+    return timerCard({
+      key: 'pomodoro',
+      classes: 'alert-danger',
+      extraClass: 'timer-card-tight',
+      attrs: ' data-pomodoro-awaiting="true"',
+      emoji: EMOJI_POMODORO,
+      title: `${finished} complete`,
+      detail: `
+        <div><small>Up next: <strong>${upcoming}</strong> — ${phaseMinutes(pomodoroState.phase, config)} min</small></div>
         <div class="mt-1 d-flex gap-1">
-          ${pomodoroButton('next', 'fa-play', `Start ${upcoming.toLowerCase()}`, 'btn-outline-primary')}
+          ${pomodoroButton('next', 'fa-play', `Start ${upcoming.toLowerCase()}`, 'btn-outline-dark')}
           ${pomodoroButton('stop', 'fa-stop', 'Stop', 'btn-outline-secondary')}
-        </div>
-      </div>`;
+        </div>`
+    });
   }
 
   const { isPaused } = pomodoroState;
@@ -1501,29 +1637,55 @@ function getPomodoroWidget() {
   const initSec = remaining % 60;
 
   const isWork = pomodoroState.phase === PHASE_WORK;
-  const alertClass = isPaused ? 'alert-warning' : (isWork ? 'alert-success' : 'alert-info');
-  const iconClass = isPaused ? 'fa-pause-circle' : (isWork ? 'fa-play-circle' : 'fa-mug-hot');
+  // Tomato, always: the pomodoro looks like the pomodoro whether it is
+  // working, resting, paused or idle. Which of those it is, is text.
+  const alertClass = 'alert-danger';
+
   const pausedAttr = isPaused ? ' data-pomodoro-paused="true"' : '';
   const after = nextInterval(pomodoroState.phase, pomodoroState.periodIndex, config);
   const afterLabel = intervalDescription(after.phase, after.periodIndex, config);
 
-  return `
-    <div class="alert ${alertClass} mb-3 py-2 px-3" role="alert"
-      data-pomodoro-start="${pomodoroState.startTime}" data-pomodoro-total-seconds="${totalSeconds}"${pausedAttr}>
-      <div>
-        <i class="fas ${iconClass} me-2"></i>
-        <strong>${phaseLabel(pomodoroState.phase)}</strong> —
-        <span class="pomodoro-countdown">${initMin}:${String(initSec).padStart(2, '0')}</span>
-        ${isPaused ? ' <small>(Paused)</small>' : ''}
-      </div>
-      <div class="mt-1"><small>${upcoming} · then ${afterLabel}</small></div>
+  return timerCard({
+    key: 'pomodoro',
+    classes: alertClass,
+    attrs: ` data-pomodoro-start="${pomodoroState.startTime}" data-pomodoro-total-seconds="${totalSeconds}"${pausedAttr}`,
+    emoji: EMOJI_POMODORO,
+    extraClass: 'timer-card-tight',
+    clock: `<span class="visually-hidden">Pomodoro, ${phaseLabel(pomodoroState.phase)}${isPaused ? ', paused' : ''}: </span><span class="pomodoro-countdown">${initMin}:${String(initSec).padStart(2, '0')}</span>${isPaused ? ' \u23F8' : ''}`,
+    detail: `
+      <div><small>${phaseLabel(pomodoroState.phase)}${isPaused ? ' (Paused)' : ''} · ${upcoming} · then ${afterLabel}</small></div>
       <div class="mt-1 d-flex gap-1">
         ${isPaused
-          ? pomodoroButton('resume', 'fa-play', 'Resume', 'btn-outline-warning')
-          : pomodoroButton('pause', 'fa-pause', 'Pause', 'btn-outline-success')}
+          ? pomodoroButton('resume', 'fa-play', 'Resume', 'btn-outline-dark')
+          : pomodoroButton('pause', 'fa-pause', 'Pause', 'btn-outline-dark')}
         ${pomodoroButton('stop', 'fa-stop', 'Stop', 'btn-outline-secondary')}
         ${pomodoroButton('skip', 'fa-forward', 'Skip', 'btn-outline-secondary')}
-      </div>
+      </div>`
+  });
+}
+
+// ── The activity bar ────────────────────────────────────────────────────────
+// One strip above the page instead of a stack of full-width alerts. All three
+// timers sit on a single row and look the same whether they are running or
+// not; what changes is the text they show and what a tap reveals. Idle has to
+// be cheap, because idle is the usual case.
+//
+// This used to be built inline at three call sites, identically, which is why
+// it lives in one function now.
+
+async function getActivityBar({ timer }) {
+  const taskTimerHtml = await getTaskTimerWidget();
+  const pomodoroHtml = getPomodoroWidget();
+
+  // All three on one row, each a card that is one line until you tap it and
+  // looks the same whether it is running or not. There is no banner/pill split
+  // to decide any more: the state is in the text and the clock, not in two
+  // different shapes.
+  const rowed = [getTimerWidget(timer), taskTimerHtml, pomodoroHtml].filter(Boolean);
+
+  return `
+    <div class="activity-bar mb-3">
+      ${rowed.length ? `<div class="timer-row">${rowed.join('\n')}</div>` : ''}
     </div>`;
 }
 
@@ -1673,6 +1835,126 @@ function getPlanHierarchyLevel(filename) {
   }
 }
 
+// ── The calm tab ────────────────────────────────────────────────────────────
+// A still photograph, the time, a greeting and one question, after
+// momentumdash.com. Everything on it that depends on the clock — the time
+// itself, the greeting, which photograph, which quote — is filled in by the
+// page, because this markup is cached to disk and would otherwise be stuck
+// saying "Good morning" all evening. Only the name is baked in, since that
+// does not change between renders.
+// Which stage each day of the week belongs to, indexed the way Date#getDay()
+// counts. The stages plugin is optional, so this is null when it is off and
+// the calm tab simply shows the date on its own.
+//
+// The whole week goes to the page rather than just today's name, because this
+// markup is cached to disk: a panel rendered on Sunday would still be calling
+// it Sunday on Wednesday. The day mapping is configuration, which does not
+// move between renders, so handing over all seven and letting the page pick
+// is both correct and cheaper than defeating the cache.
+const MOMENT_WEEKDAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+// Mirrors the defaults in plugins/stages/plugin.toml, for a source that is
+// enabled without overriding anything — which is the common case.
+const MOMENT_DEFAULT_STAGE_DAYS = {
+  sunday: 'back',
+  monday: 'front',
+  tuesday: 'off',
+  wednesday: 'front',
+  thursday: 'back',
+  friday: 'off',
+  saturday: 'front'
+};
+
+function getStageNamesByWeekday() {
+  const [source] = getPluginSources('stages');
+  if (!source) return null;
+
+  const settings = source.config || {};
+  const names = {
+    front: settings.front_stage_name || 'Front Stage',
+    back: settings.back_stage_name || 'Back Stage',
+    off: settings.off_stage_name || 'Off Stage'
+  };
+
+  return MOMENT_WEEKDAY_KEYS.map((day) => {
+    const key = settings[day] || MOMENT_DEFAULT_STAGE_DAYS[day];
+    return names[key] || names.front;
+  });
+}
+
+function renderMomentPanel(displayName, stageNames, links = []) {
+  const stages = stageNames && stageNames.length
+    ? ` data-stages="${escapeHtmlEntities(JSON.stringify(stageNames))}"`
+    : '';
+  // Whether the diary and the plan exist at all is configuration, not time, so
+  // unlike the date these can be rendered here and cached with the panel.
+  const linksHtml = links.length
+    ? `
+                <p class="moment-links">${links
+      .map(link => `<a href="${link.href}">${escapeHtmlEntities(link.label)}</a>`)
+      .join('<span class="moment-links-sep" aria-hidden="true"> • </span>')}</p>`
+    : '';
+  return `
+            <div class="moment" id="momentPanel" data-name="${escapeHtmlEntities(displayName || '')}"${stages}>
+              <div class="moment-photo" id="momentPhoto" aria-hidden="true"></div>
+              <div class="moment-scrim" aria-hidden="true"></div>
+              <div class="moment-inner">
+                <p class="moment-clock" id="momentClock"></p>
+                <p class="moment-greeting" id="momentGreeting"></p>
+                <p class="moment-date" id="momentDate"></p>${linksHtml}
+                <p class="moment-quote" id="momentQuote"></p>
+              </div>
+            </div>`;
+}
+
+// ── The home page's one card ────────────────────────────────────────────────
+// Vault, Now, Plans and Recent Pages used to be four stacked cards, three of
+// them collapsed, so reaching the vault listing meant scrolling past three
+// headers that were shut. They are one card with tabs now, Vault first,
+// because the listing is what the page is for.
+//
+// The tabs are driven by the page's own script rather than by MDB's tab
+// plugin: that arrives from a CDN, and a card whose only content is behind a
+// tab should not depend on a third-party script to open.
+function renderHomeTabCard(tabs, links = null) {
+  const nav = tabs.map((tab, index) => `
+            <li class="nav-item" role="presentation">
+              <button type="button" role="tab" id="homeTab-${tab.id}" data-home-tab="${tab.id}"
+                class="nav-link${index === 0 ? ' active' : ''}"
+                aria-controls="homePanel-${tab.id}" aria-selected="${index === 0 ? 'true' : 'false'}"
+                tabindex="${index === 0 ? '0' : '-1'}" onclick="selectHomeTab('${tab.id}')">
+                <i class="fas ${tab.icon} me-2" aria-hidden="true"></i>${tab.label}
+              </button>
+            </li>`).join('');
+
+  // Deliberately a second list, outside the tablist. These leave the page
+  // rather than swapping a panel, and a link inside role="tablist" would tell
+  // a screen reader it is a tab and then not behave like one.
+  const linkNav = (links || []).map(link => `
+            <li class="nav-item">
+              <a class="nav-link home-tab-link" href="${link.href}"${link.detail ? ` title="${link.detail}"` : ''}>
+                <i class="fas ${link.icon} me-2" aria-hidden="true"></i>${link.label}
+                ${link.count === undefined || link.count === null ? '' : `<span class="home-tab-count">${link.count}</span>`}
+              </a>
+            </li>`).join('');
+
+  const panels = tabs.map((tab, index) => `
+          <div class="home-tab-panel" role="tabpanel" id="homePanel-${tab.id}"
+            data-home-panel="${tab.id}" aria-labelledby="homeTab-${tab.id}"${index === 0 ? '' : ' hidden'}>
+            ${tab.body}
+          </div>`).join('');
+
+  return `
+        <div class="card shadow-sm mb-3">
+          <div class="card-header home-tabbar">
+            <ul class="nav home-tabs" role="tablist" onkeydown="moveHomeTab(event)">${nav}
+            </ul>${linkNav ? `
+            <ul class="nav home-tabs home-tab-links">${linkNav}
+            </ul>` : ''}
+          </div>${panels}
+        </div>`;
+}
+
 // Directory listing
 async function renderDirectory(dirPath, urlPath) {
   let items = await fs.readdir(dirPath, { withFileTypes: true });
@@ -1703,6 +1985,9 @@ async function renderDirectory(dirPath, urlPath) {
   // Build breadcrumb items
   const breadcrumbParts = urlPath ? urlPath.split('/').filter(Boolean) : [];
   let breadcrumbHtml = '<li class="breadcrumb-item"><a href="/" aria-label="Home"><i class="fas fa-home" aria-hidden="true"></i></a></li>';
+  // On the home page the breadcrumb is a single crumb linking to the page you
+  // are already on, so the whole nav goes rather than rendering as an empty bar.
+  const showBreadcrumb = breadcrumbParts.length > 0;
   let currentPath = '';
   breadcrumbParts.forEach((part, index) => {
     currentPath += '/' + part;
@@ -1714,6 +1999,18 @@ async function renderDirectory(dirPath, urlPath) {
   });
 
   let contentHtml = '';
+  // The home page's two shortcuts sit on the card's tab row, after the tabs.
+  // They are links rather than tabs: they leave the page instead of swapping
+  // a panel, which is why they are kept out of the tablist below.
+  let homeLinks = null;
+  // The home page's one card: Vault plus whichever of Now/Plans/Recents the
+  // configured plugins give us. Vault is added last, so it can carry the
+  // directory listing that is built further down, and shown first.
+  let homeTabs = null;
+  // Today's diary and plan, shown on the calm panel under the date. Hoisted
+  // for the same reason as the two above: they are filled in inside the home
+  // page branch and read from the tab block, which is a sibling of it.
+  let homeMomentLinks = [];
 
   // Special homepage content
   if (!urlPath) {
@@ -1765,67 +2062,29 @@ async function renderDirectory(dirPath, urlPath) {
     // Determine "Today" link: diary if markdown-diary enabled, else plan if markdown-plans enabled
     const diaryEnabled = isPluginConfigured('markdown-diary');
     const plansEnabled = isPluginConfigured('markdown-plans');
+    homeMomentLinks = [
+      diaryEnabled && { href: '/_today/diary', label: 'Diary' },
+      plansEnabled && { href: '/_today/plan', label: 'Plan' }
+    ].filter(Boolean);
     const nowUpdatesEnabled = isPluginConfigured('now-updates');
 
-    // Build Today's Plan/Diary and Today's Tasks cards side-by-side on larger screens
-    contentHtml += `<div class="row">`;
+    homeTabs = [];
 
-    // Add Today's Plan/Diary button based on enabled plugins
-    if (diaryEnabled) {
-      contentHtml += `
-              <div class="col-12 col-lg-6 mb-3">
-                <div class="card shadow-sm h-100">
-                  <a href="/diary/${todayISO}.md" class="list-group-item list-group-item-action bg-primary h-100">
-                    <div class="d-flex align-items-center ps-2 py-2">
-                      <i class="fas fa-book me-2"></i>
-                      <div>
-                        <strong>Today's Diary</strong>
-                        <br>
-                        <small>${todayDisplay}</small>
-                      </div>
-                    </div>
-                  </a>
-                </div>
-              </div>`;
-    } else if (plansEnabled) {
-      contentHtml += `
-              <div class="col-12 col-lg-6 mb-3">
-                <div class="card shadow-sm h-100">
-                  <a href="/plans/${todayPlanFile}" class="list-group-item list-group-item-action bg-primary h-100">
-                    <div class="d-flex align-items-center ps-2 py-2">
-                      <i class="fas fa-calendar-day me-2"></i>
-                      <div>
-                        <strong>Today's Plan</strong>
-                        <br>
-                        <small>${todayDisplay}</small>
-                      </div>
-                    </div>
-                  </a>
-                </div>
-              </div>`;
-    }
-
-    // Add Today's Tasks button
-    contentHtml += `
-              <div class="col-12 ${diaryEnabled || plansEnabled ? 'col-lg-6' : ''} mb-3">
-                <div class="card shadow-sm h-100">
-                  <a href="/tasks/today.md" class="list-group-item list-group-item-action ${taskCount > 0 ? 'bg-warning text-dark' : 'bg-secondary text-white'} h-100">
-                    <div class="d-flex align-items-center justify-content-between ps-2 py-2">
-                      <div class="d-flex align-items-center">
-                        <i class="fas fa-tasks me-2"></i>
-                        <div>
-                          <strong>Today's Tasks</strong>
-                          <br>
-                          <small>${taskCount > 0 ? `${taskCount} task${taskCount !== 1 ? 's' : ''} scheduled/due today` : 'No tasks scheduled for today'}</small>
-                        </div>
-                      </div>
-                      ${taskCount > 0 ? `<span class="badge bg-light text-dark fs-6">${taskCount}</span>` : ''}
-                    </div>
-                  </a>
-                </div>
-              </div>`;
-
-    contentHtml += `</div>`;
+    // Today's tasks are a link with a count; they were a saturated full-width
+    // tile, which made the loudest thing on the page a fact that is almost
+    // always true. Today's diary and plan used to sit here too — they are on
+    // the calm panel now, under the date, where the day is already the
+    // subject.
+    homeLinks = [];
+    homeLinks.push({
+      href: '/tasks/today.md',
+      icon: 'fa-tasks',
+      label: 'Tasks',
+      detail: taskCount > 0
+        ? `${taskCount} task${taskCount !== 1 ? 's' : ''} scheduled/due today`
+        : 'No tasks scheduled for today',
+      count: taskCount
+    });
 
     if (nowUpdatesEnabled) {
       const nowPath = path.join(VAULT_PATH, 'now.md');
@@ -1841,105 +2100,92 @@ async function renderDirectory(dirPath, urlPath) {
         }
       }
 
-      contentHtml += `
-            <div class="card shadow-sm mb-3">
-              <div class="card-header" style="cursor: pointer;" onclick="toggleCollapse('nowSection')">
-                <div class="d-flex justify-content-between align-items-center">
-                  <span><i class="fas fa-bolt me-2"></i> Now</span>
-                  <i class="fas fa-chevron-down" id="nowChevron"></i>
-                </div>
-              </div>
-              <div class="collapse" id="nowSection">
+      homeTabs.push({
+        id: 'now',
+        label: 'Now',
+        icon: 'fa-bolt',
+        body: `
                 <div class="card-body">
                   ${nowEntryHtml}
                   <a href="/now.md" class="btn btn-sm btn-outline-primary mt-2">View full now.md</a>
-                </div>
-              </div>
-            </div>`;
+                </div>`
+      });
     }
 
     // Add Plans section (collapsed) - only if markdown-plans plugin is enabled
     if (plansEnabled) {
       const plansDir = path.join(dirPath, 'plans');
+      const dayPlanExists = await fs.access(path.join(plansDir, todayPlanFile)).then(() => true).catch(() => false);
       const weekPlanExists = await fs.access(path.join(plansDir, weekPlanFile)).then(() => true).catch(() => false);
       const monthPlanExists = await fs.access(path.join(plansDir, monthPlanFile)).then(() => true).catch(() => false);
       const quarterPlanExists = await fs.access(path.join(plansDir, quarterPlanFile)).then(() => true).catch(() => false);
       const yearPlanExists = await fs.access(path.join(plansDir, yearPlanFile)).then(() => true).catch(() => false);
 
-      contentHtml += `
-            <div class="card shadow-sm mb-3">
-              <div class="card-header" style="cursor: pointer;" onclick="toggleCollapse('plansSection')">
-                <div class="d-flex justify-content-between align-items-center">
-                  <span><i class="fas fa-calendar-alt me-2"></i> Plans</span>
-                  <i class="fas fa-chevron-down" id="plansChevron"></i>
-                </div>
-              </div>
-              <div class="collapse" id="plansSection">
-                <div class="list-group list-group-flush">`;
+      let plansBody = '<div class="list-group list-group-flush">';
 
+      // Today's own plan heads the list: the tab runs day, week, month,
+      // quarter, year, so it reads outward from now.
+      if (dayPlanExists) {
+        plansBody += `
+                  <a href="/plans/${todayPlanFile}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-calendar-day today-text-link me-3"></i>
+                    Today — ${todayDisplay}
+                  </a>`;
+      }
       if (weekPlanExists) {
-        contentHtml += `
+        plansBody += `
                   <a href="/plans/${weekPlanFile}" class="list-group-item list-group-item-action">
                     <i class="fas fa-calendar-week text-info me-3"></i>
                     Week ${week}
                   </a>`;
       }
       if (monthPlanExists) {
-        contentHtml += `
+        plansBody += `
                   <a href="/plans/${monthPlanFile}" class="list-group-item list-group-item-action">
                     <i class="fas fa-calendar text-success me-3"></i>
                     ${today.toLocaleDateString('en-US', { month: 'long' })} ${year}
                   </a>`;
       }
       if (quarterPlanExists) {
-        contentHtml += `
+        plansBody += `
                   <a href="/plans/${quarterPlanFile}" class="list-group-item list-group-item-action">
                     <i class="fas fa-business-time text-warning me-3"></i>
                     Quarter ${quarter.slice(1)} - ${year}
                   </a>`;
       }
       if (yearPlanExists) {
-        contentHtml += `
+        plansBody += `
                   <a href="/plans/${yearPlanFile}" class="list-group-item list-group-item-action">
                     <i class="fas fa-calendar-check text-danger me-3"></i>
                     Year ${year}
                   </a>`;
       }
 
-      contentHtml += `
-                </div>
-              </div>
-            </div>`;
+      plansBody += '</div>';
+
+      homeTabs.push({ id: 'plans', label: 'Plans', icon: 'fa-calendar-alt', body: plansBody });
     }
     
-    // Add Recents section (collapsed) - placeholder for now
-    contentHtml += `
-            <div class="card shadow-sm mb-3">
-              <div class="card-header" style="cursor: pointer;" onclick="toggleCollapse('recentsSection')">
-                <div class="d-flex justify-content-between align-items-center">
-                  <span><i class="fas fa-history me-2"></i> Recent Pages</span>
-                  <i class="fas fa-chevron-down" id="recentsChevron"></i>
-                </div>
-              </div>
-              <div class="collapse" id="recentsSection">
+    // Recents is still a placeholder; the list is filled in by the page.
+    homeTabs.push({
+      id: 'recents',
+      label: 'Recent',
+      icon: 'fa-history',
+      body: `
                 <div class="list-group list-group-flush" id="recentsList">
                   <div class="list-group-item text-muted">
                     <small>Recent pages will appear here</small>
                   </div>
-                </div>
-              </div>
-            </div>`;
+                </div>`
+    });
   }
   
-  contentHtml += `
-            <div class="card shadow-sm h-100">
-              <div class="list-group list-group-flush">
-  `;
+  let listingHtml = '';
   
   // Add parent directory link if not at root
   if (urlPath) {
     const parentPath = path.dirname(urlPath);
-    contentHtml += `
+    listingHtml += `
       <a href="/${parentPath === '.' ? '' : parentPath}" class="list-group-item list-group-item-action">
         <i class="fas fa-level-up-alt text-muted me-3"></i>
         <span class="text-muted">..</span>
@@ -1950,7 +2196,7 @@ async function renderDirectory(dirPath, urlPath) {
   for (const item of items) {
     if (item.isDirectory()) {
       const itemPath = urlPath ? `${urlPath}/${item.name}` : item.name;
-      contentHtml += `
+      listingHtml += `
         <a href="/${itemPath}" class="list-group-item list-group-item-action">
           <i class="fas fa-folder text-warning me-3"></i>
           <strong>${item.name}/</strong>
@@ -2032,13 +2278,44 @@ async function renderDirectory(dirPath, urlPath) {
           </div>`;
       }
 
-      contentHtml += `
+      listingHtml += `
         <a href="/${itemPath}" class="list-group-item list-group-item-action" style="${indentStyle}">
           ${displayContent}
         </a>`;
     }
   }
   
+
+  // The listing is the Vault tab's body on the home page, and the whole card
+  // everywhere else, so it is built on its own and placed afterwards. It used
+  // to leave its <div>s unclosed and let the column element close them.
+  if (homeTabs) {
+    homeTabs.unshift({
+      id: 'vault',
+      label: 'Vault',
+      icon: 'fa-folder-open',
+      body: `<div class="list-group list-group-flush">${listingHtml}</div>`
+    });
+    // The calm tab goes in front of Vault and opens first.
+    homeTabs.unshift({
+      id: 'moment',
+      label: 'Today',
+      icon: 'fa-sun',
+      body: renderMomentPanel(
+        getConfig('profile.display_name')
+          || String(getConfig('profile.name') || '').trim().split(/\s+/)[0],
+        getStageNamesByWeekday(),
+        homeMomentLinks
+      )
+    });
+    contentHtml += renderHomeTabCard(homeTabs, homeLinks);
+  } else {
+    contentHtml += `
+            <div class="card shadow-sm h-100">
+              <div class="list-group list-group-flush">${listingHtml}</div>
+            </div>`;
+  }
+
   // Build page using directory template
   const dirTemplate = await loadTemplate('directory');
   const dirInlineScript = `<script>
@@ -2307,7 +2584,9 @@ Contents:
   const html = renderTemplate(dirTemplate, {
     title: `Vault: ${urlPath || '/'}`,
     navbar: getNavbar(),
-    breadcrumb: breadcrumbHtml,
+    breadcrumbNav: showBreadcrumb
+      ? `<nav aria-label="breadcrumb"><ol class="breadcrumb">${breadcrumbHtml}</ol></nav>`
+      : '',
     content: contentHtml,
     sidebar: getAIAssistantPanel('Ask questions about this directory and its contents'),
     floatingToggle: getFloatingToggleBtn(),
@@ -2315,16 +2594,7 @@ Contents:
   });
 
   // Inject timer widgets
-  const widgetsHtml = `
-    <div class="row g-3 mb-3">
-      <div class="col-12 col-lg-6">
-        ${getTimerWidget(currentTimer)}
-      </div>
-      <div class="col-12 col-lg-6">
-        ${await getTaskTimerWidget()}
-        ${getPomodoroWidget()}
-      </div>
-    </div>`;
+  const widgetsHtml = await getActivityBar({ timer: currentTimer });
 
   return html.replace('<!--TIMER_WIDGETS_PLACEHOLDER-->', widgetsHtml);
 }
@@ -5606,16 +5876,7 @@ async function renderMarkdown(filePath, urlPath) {
   // Inject live timer widgets on every request (not cached)
   const currentTimer = await getCurrentTimer();
 
-  const widgetsHtml = `
-    <div class="row g-3 mb-3">
-      <div class="col-12 col-lg-6">
-        ${getTimerWidget(currentTimer)}
-      </div>
-      <div class="col-12 col-lg-6">
-        ${await getTaskTimerWidget()}
-        ${getPomodoroWidget()}
-      </div>
-    </div>`;
+  const widgetsHtml = await getActivityBar({ timer: currentTimer });
 
   return html.replace('<!--TIMER_WIDGETS_PLACEHOLDER-->', widgetsHtml);
 }
@@ -5945,7 +6206,7 @@ app.get('/_git', authMiddleware, async (req, res) => {
         ${ahead > 0 ? `<span class="badge bg-primary">${ahead} ahead</span>` : ''}
         ${behind > 0 ? `<span class="badge bg-secondary">${behind} behind</span>` : ''}
         <div class="ms-auto d-flex gap-2">
-          ${hasRemote ? `<button class="btn btn-sm btn-outline-success" onclick="gitPull()" id="pullBtn">
+          ${hasRemote ? `<button class="btn btn-sm btn-outline-dark" onclick="gitPull()" id="pullBtn">
             <i class="fas fa-download me-1"></i>Pull${behind > 0 ? ' (' + behind + ')' : ''}
           </button>` : ''}
           ${hasRemote ? `<button class="btn btn-sm btn-outline-primary" onclick="gitPush()" id="pushBtn">
@@ -8418,16 +8679,7 @@ app.get('/*path', authMiddleware, async (req, res) => {
         // Inject live timer widgets (not cached)
         const currentTimer = await getCurrentTimer();
 
-        const widgetsHtml = `
-          <div class="row g-3 mb-3">
-            <div class="col-12 col-lg-6">
-              ${getTimerWidget(currentTimer)}
-            </div>
-            <div class="col-12 col-lg-6">
-              ${await getTaskTimerWidget()}
-              ${getPomodoroWidget()}
-            </div>
-          </div>`;
+        const widgetsHtml = await getActivityBar({ timer: currentTimer });
 
         const html = injectRoleReplyForms(
           cachedHtml.replace('<!--TIMER_WIDGETS_PLACEHOLDER-->', widgetsHtml),
