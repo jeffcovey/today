@@ -246,14 +246,27 @@ describe('reading the vault', () => {
   });
 
   test('mixed layouts keep root themes unless the app directory has that filename', async () => {
-    await writeTheme('cocoa.toml', 'name = "Root Cocoa"\n\n[light]\nbg = "#000000"\n');
+    const contents = (name, color) => `name = "${name}"\n\n[light]\nbg = "${color}"\n`;
+    const sameTime = new Date('2026-01-01T00:00:00Z');
+    await writeTheme('cocoa.toml', contents('Old Cocoa', '#000000'));
+    const rootCocoa = path.join(vaultDir, 'themes', 'cocoa.toml');
     await writeTheme('plum.toml', 'name = "Plum"\n\n[light]\nbg = "#990099"\n');
-    await writeTheme('cocoa.toml', 'name = "App Cocoa"\n\n[light]\nbg = "#ffffff"\n', 'today/themes');
+    await writeTheme('cream.toml', 'name = "Cream"\n\n[light]\nbg = "#fffdd0"\n', 'today/themes');
+    await fs.utimes(rootCocoa, sameTime, sameTime);
 
-    const { themes } = await readVaultThemes(vaultDir);
+    const beforeMove = await readVaultThemes(vaultDir);
+    expect(beforeMove.themes.get('cocoa').name).toBe('Old Cocoa');
+    expect(beforeMove.themes.has('plum')).toBe(true);
+    expect(beforeMove.themes.has('cream')).toBe(true);
 
-    expect(themes.get('cocoa').name).toBe('App Cocoa');
-    expect(themes.get('plum').name).toBe('Plum');
+    await writeTheme('cocoa.toml', contents('New Cocoa', '#ffffff'), 'today/themes');
+    const appCocoa = path.join(vaultDir, 'today', 'themes', 'cocoa.toml');
+    await fs.utimes(appCocoa, sameTime, sameTime);
+    const afterMove = await readVaultThemes(vaultDir);
+
+    expect(afterMove.themes.get('cocoa').name).toBe('New Cocoa');
+    expect(afterMove.themes.has('cream')).toBe(true);
+    expect(afterMove.themes.get('plum').name).toBe('Plum');
   });
 
   test('an edit is picked up without a restart', async () => {

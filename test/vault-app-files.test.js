@@ -179,8 +179,10 @@ describe('what a links file may say', () => {
     expect(parseVaultLinks([
       '- [Fine](https://example.com)',
       '- [Not fine](javascript:alert)',
-      '- [Hidden control](\u0001javascript:alert)',
-      '- [Backslash host](\\\\evil.example.com/path)'
+      '- [Hidden control](\u0001javascript:alert`1`)',
+      '- [C1 control](https://exa\u0085mple.com)',
+      '- [Backslash host](\\\\evil.example.com/path)',
+      '- [Mixed slash host](\\/evil.example.com/path)'
     ].join('\n'))).toEqual([{ label: 'Fine', href: 'https://example.com' }]);
   });
 
