@@ -56,7 +56,14 @@ export const THEME_TOKENS = [
   'attn-bg',
   'attn-edge',
   'ok-text',
-  'ok-bg'
+  'ok-bg',
+  'ok-edge',
+  'info-text',
+  'info-bg',
+  'info-edge',
+  'err-text',
+  'err-bg',
+  'err-edge'
 ];
 
 const TOKEN_SET = new Set(THEME_TOKENS);

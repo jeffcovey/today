@@ -272,6 +272,12 @@ Two things to watch:
   should stay light under `[light]` and dark under `[dark]` whatever the rest
   of the palette does.
 
+**Status** — `ok-*`, `attn-*`, `info-*`, `err-*` — says how something *went*.
+Green worked, amber needs a look, red is wrong. These carry meaning on their
+own, so they are the same everywhere they appear regardless of what they sit
+inside, and each is a trio: the `-bg` tint, the `-text` ink that has to clear
+4.5:1 on it, and the `-edge` for a border or stripe.
+
 `test/fixtures/a11y-vault/themes/cocoa.toml` is a complete, contrast-checked
 example.
 
