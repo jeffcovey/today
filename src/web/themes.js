@@ -65,7 +65,16 @@ export const THEME_TOKENS = [
   'info-edge',
   'err-text',
   'err-bg',
-  'err-edge'
+  'err-edge',
+  // FAMILY: what a thing is about. Deliberately a separate set from the
+  // status tokens above, so darkening a status colour for contrast cannot
+  // move a family with it. See the comment on these in style.css.
+  'family-work',
+  'family-day',
+  'family-time',
+  'family-world',
+  'family-self',
+  'family-site'
 ];
 
 const TOKEN_SET = new Set(THEME_TOKENS);

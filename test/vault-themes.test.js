@@ -54,6 +54,54 @@ test('source never uses the brand fill as text-primary foreground ink', async ()
   expect(consumers).toEqual([]);
 });
 
+// The two vocabularies: FAMILY says what a thing is, STATUS says how it went.
+// The rule that keeps them useful is that a family colour is never ink -- it
+// is a stripe and a wash, with body ink on top -- which is also what frees it
+// from any contrast floor. Documented in README.md; asserted here, because a
+// rule that lives only in a comment gets rediscovered instead of followed.
+describe('family and status stay separate', () => {
+  const cssPath = fileURLToPath(new URL('../src/web/public/css/style.css', import.meta.url));
+
+  test('a family colour is never used as ink', async () => {
+    const css = await fs.readFile(cssPath, 'utf8');
+    const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    // Every `color:` / `-webkit-text-fill-color:` declaration, wherever it
+    // sits -- a one-line rule puts it after the brace, not at line start,
+    // which is what an earlier version of this test missed. The leading
+    // boundary is what keeps `background-color` and `border-color` out.
+    // Catch both --today-family-* tokens and the cards' --family alias.
+    const declaration = /(?:^|[\s;{])(?:-webkit-text-fill-)?color\s*:\s*([^;}]*)/g;
+    const inkUses = [];
+    for (const match of withoutComments.matchAll(declaration)) {
+      if (/--(?:today-family-|family\b)/.test(match[1])) inkUses.push(match[0].trim());
+    }
+    expect(inkUses).toEqual([]);
+  });
+
+  test('the two sets share no token', () => {
+    const families = THEME_TOKENS.filter(token => token.startsWith('family-'));
+    const statuses = THEME_TOKENS.filter(token => /^(ok|attn|info|err)-/.test(token));
+    expect(families.length).toBeGreaterThan(0);
+    expect(statuses.length).toBeGreaterThan(0);
+    expect(families.filter(token => statuses.includes(token))).toEqual([]);
+  });
+
+  test('every family and status token has a value in both modes', async () => {
+    const css = await fs.readFile(cssPath, 'utf8');
+    const light = css.slice(css.indexOf(':root {'), css.indexOf('html[data-theme="dark"] {'));
+    const dark = css.slice(css.indexOf('html[data-theme="dark"] {'));
+    const wanted = THEME_TOKENS.filter(
+      token => token.startsWith('family-') || /^(ok|attn|info|err)-/.test(token)
+    );
+    const missing = [];
+    for (const token of wanted) {
+      if (!light.includes(`--today-${token}:`)) missing.push(`light ${token}`);
+      if (!dark.includes(`--today-${token}:`)) missing.push(`dark ${token}`);
+    }
+    expect(missing).toEqual([]);
+  });
+});
+
 describe('reading a colour', () => {
   test.each([
     ['#abc', { r: 170, g: 187, b: 204, a: 1 }],
