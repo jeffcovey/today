@@ -177,7 +177,7 @@ export function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}
         <div class="loading-spinner"></div>
       </div>
       <!-- Navbar -->
-      <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+      <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container-fluid has-display-menu">
           <a class="navbar-brand" href="/" title="${title}">
             <i class="fas ${icon}" aria-hidden="true"></i><span class="navbar-brand-text d-none d-sm-inline ms-2">${title}</span>

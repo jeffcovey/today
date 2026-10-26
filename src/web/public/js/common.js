@@ -579,27 +579,23 @@ const MOMENT_PHOTOS = {
   ]
 };
 
-const MOMENT_QUOTES = [
-  ['The best way out is always through.', 'Robert Frost'],
-  ['Nothing is less productive than to make more efficient what should not be done at all.', 'Peter Drucker'],
-  ['It does not matter how slowly you go as long as you do not stop.', 'Confucius'],
-  ['Simplicity is the ultimate sophistication.', 'Leonardo da Vinci'],
-  ['You can do anything, but not everything.', 'David Allen'],
-  ['Well begun is half done.', 'Aristotle'],
-  ['How we spend our days is, of course, how we spend our lives.', 'Annie Dillard'],
-  ['Tension is who you think you should be. Relaxation is who you are.', 'Chinese proverb'],
-  ['Begin anywhere.', 'John Cage'],
-  ['Do not wait to strike till the iron is hot; but make it hot by striking.', 'William Butler Yeats']
-];
 
 // Which light the photograph should be in. Dawn and dusk are deliberately
 // narrow: they are the hours when a daylight picture would look wrong.
+const MOMENT_BUCKETS = ['dawn', 'day', 'dusk', 'night'];
+
 function momentBucket(hour) {
   if (hour < 5 || hour >= 21) return 'night';
   if (hour < 8) return 'dawn';
   if (hour < 18) return 'day';
   return 'dusk';
 }
+
+const MOMENT_WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+// AP style: the short months are not abbreviated.
+const MOMENT_MONTHS = ['Jan.', 'Feb.', 'March', 'April', 'May', 'June', 'July',
+  'Aug.', 'Sept.', 'Oct.', 'Nov.', 'Dec.'];
 
 function momentGreeting(hour) {
   if (hour < 5) return 'Good night';
@@ -611,7 +607,17 @@ function momentGreeting(hour) {
 // A stable number for the day, so the photograph and the quote hold still
 // across page loads and move only when the date or the hour does.
 function momentDayIndex(now) {
-  return Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+  // UTC timestamps built from the local calendar fields, so a 23- or 25-hour
+  // day across a DST change still counts as exactly one day.
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.floor((today - Date.UTC(now.getFullYear(), 0, 0)) / 86400000);
+}
+
+// The photograph turns over when the day does or when the light does, so this
+// is the number the quote follows too: one quote per picture.
+function momentSlot(now) {
+  return momentDayIndex(now) * MOMENT_BUCKETS.length
+    + MOMENT_BUCKETS.indexOf(momentBucket(now.getHours()));
 }
 
 function momentPhotoUrl(now) {
@@ -651,66 +657,157 @@ function paintMomentPhoto() {
   image.src = url;
 }
 
-function paintMomentQuote() {
-  const target = document.getElementById('momentQuote');
-  if (!target) return;
-  const quote = MOMENT_QUOTES[momentDayIndex(new Date()) % MOMENT_QUOTES.length];
-  target.textContent = '“' + quote[0] + '” — ' + quote[1];
+// Today's date, and which stage it is when the stages plugin is on. The whole
+// week arrives in data-stages because the markup is cached; the day is picked
+// here, where the clock is honest.
+function paintMomentDate() {
+  const target = document.getElementById('momentDate');
+  const panel = document.getElementById('momentPanel');
+  if (!target || !panel) return;
+
+  const now = new Date();
+  const parts = [
+    MOMENT_WEEKDAYS[now.getDay()],
+    MOMENT_MONTHS[now.getMonth()] + ' ' + now.getDate()
+  ];
+
+  if (panel.dataset.stages) {
+    try {
+      const stages = JSON.parse(panel.dataset.stages);
+      if (Array.isArray(stages) && stages[now.getDay()]) parts.push(stages[now.getDay()]);
+    } catch (error) {
+      // No stage, then. The date is still worth showing on its own.
+    }
+  }
+
+  target.textContent = parts.join(' \u2022 ');
 }
 
-async function initializeMoment() {
+// The quotes are the user's own, in the vault's quotes.md, so they are fetched
+// rather than shipped. Keyed on the photograph's slot: a new quote arrives
+// with each new picture and not before.
+async function paintMomentQuote() {
+  const target = document.getElementById('momentQuote');
+  if (!target) return;
+
+  const slot = momentSlot(new Date());
+  if (target.dataset.slot === String(slot)) return;
+
+  try {
+    const response = await fetch('/api/quote?index=' + slot);
+    const data = await response.json();
+    if (!data.success || !data.count) {
+      // No quotes.md, or it is empty. Nothing to say, so say nothing.
+      target.textContent = '';
+      return;
+    }
+    target.dataset.slot = String(slot);
+    target.textContent = '\u201c' + data.text + '\u201d'
+      + (data.author ? ' \u2014 ' + data.author : '');
+  } catch (error) {
+    // Leave whatever is already up; a quote is not worth an error message.
+  }
+}
+
+// The links across the top are the user's own, in the vault's links.md, so
+// they are fetched like the quote. Painted once per page load and left alone
+// by the interval below: nothing about them follows the clock, and the
+// response revalidates, so a reload costs a stat and an empty 304.
+async function paintMomentBookmarks() {
+  const target = document.getElementById('momentBookmarks');
+  if (!target || target.dataset.painted) return;
+
+  try {
+    const response = await fetch('/api/links');
+    const data = await response.json();
+    if (!data.success || !Array.isArray(data.links) || data.links.length === 0) return;
+
+    target.dataset.painted = '1';
+    data.links.forEach((link, index) => {
+      if (index > 0) {
+        const separator = document.createElement('span');
+        separator.className = 'moment-links-sep';
+        separator.setAttribute('aria-hidden', 'true');
+        separator.textContent = ' \u2022 ';
+        target.appendChild(separator);
+      }
+      // Built as nodes rather than markup: the label is whatever the file
+      // says, and it is going onto the page either way.
+      const anchor = document.createElement('a');
+      anchor.href = link.href;
+      anchor.textContent = link.label;
+      target.appendChild(anchor);
+    });
+  } catch (error) {
+    // Leave the row empty; a bookmark is not worth an error message.
+  }
+}
+
+function initializeMoment() {
   const panel = document.getElementById('momentPanel');
   if (!panel) return;
 
   paintMomentClock();
+  paintMomentDate();
   paintMomentPhoto();
   paintMomentQuote();
+  paintMomentBookmarks();
 
-  // Often enough that the clock is never visibly behind, and so the picture
-  // changes when the hour crosses into a different light.
+  // Often enough that the clock is never visibly behind, that the picture
+  // changes when the hour crosses into a different light, and that the date
+  // turns over at midnight on a page left open overnight.
   setInterval(() => {
     paintMomentClock();
+    paintMomentDate();
     paintMomentPhoto();
+    paintMomentQuote();
   }, 20000);
+}
 
-  const input = document.getElementById('momentGoal');
-  const saved = document.getElementById('momentGoalSaved');
-  const form = document.getElementById('momentGoalForm');
-  if (!input || !form) return;
+// Every control inside a timer card reloads the page, so without this a tap on
+// Pause would close the card it was in. The memory is deliberately short: it
+// only survives the reload that a control press causes, so arriving at the
+// page later always finds the timers collapsed, which is the whole point of
+// them being one line.
+const TIMER_CARD_MEMORY_MS = 10000;
 
-  try {
-    const response = await fetch('/api/daily-goal');
-    const data = await response.json();
-    if (data.success && typeof data.goal === 'string') input.value = data.goal;
-  } catch (error) {
-    // Leave it empty. The goal is a nicety, not something to interrupt over.
-  }
+// A card is opened to do one thing. Once the timer is running, or once it has
+// been stopped, that thing is done and the card goes back to being one line.
+// Pause and skip are not on this list: those are adjustments made with the
+// card in hand, and the next press is likely to be in it too.
+const COLLAPSING_ACTIONS = new Set(['start', 'next', 'resume', 'stop']);
 
-  let saveTimer = null;
-  const save = async () => {
+function initializeTimerCards() {
+  for (const card of document.querySelectorAll('.timer-card[data-timer-key]')) {
+    const key = 'timer-card:' + card.dataset.timerKey;
     try {
-      const response = await fetch('/api/daily-goal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ goal: input.value })
-      });
-      saved.textContent = response.ok ? 'Saved' : 'Not saved';
+      const saved = JSON.parse(sessionStorage.getItem(key) || 'null');
+      if (saved && saved.open && Date.now() - saved.at < TIMER_CARD_MEMORY_MS) {
+        card.open = true;
+      } else {
+        sessionStorage.removeItem(key);
+      }
     } catch (error) {
-      saved.textContent = 'Not saved';
+      // Private window, or storage is blocked. The card starts collapsed.
     }
-    setTimeout(() => { saved.textContent = ''; }, 2000);
-  };
-
-  input.addEventListener('input', () => {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(save, 800);
-  });
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
-    clearTimeout(saveTimer);
-    input.blur();
-    save();
-  });
+    const remember = () => {
+      try {
+        sessionStorage.setItem(key, JSON.stringify({ open: card.open, at: Date.now() }));
+      } catch (error) {
+        // It still opens and closes; it just will not survive the reload.
+      }
+    };
+    card.addEventListener('toggle', remember);
+    // The expiry should measure time since the action, not since opening.
+    card.addEventListener('click', event => {
+      const control = event.target.closest('.timer-detail button, .timer-detail a');
+      if (!control) return;
+      // Collapse first, then remember: the memory records the card as the
+      // control left it, so the reload the control causes comes back closed.
+      if (COLLAPSING_ACTIONS.has(control.dataset.timerAction)) card.open = false;
+      remember();
+    });
+  }
 }
 
 // ── The home page's tabbed card ─────────────────────────────────────────────
@@ -855,6 +952,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initializeTheme();
   initializePalettes();
   initializeMoment();
+  initializeTimerCards();
   initializeTextSize();
   initializeAIAssistant();
   restoreCollapseStates();

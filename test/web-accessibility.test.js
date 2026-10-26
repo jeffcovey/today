@@ -27,6 +27,7 @@ import {
 import fs from 'fs';
 import path from 'path';
 import Database from 'better-sqlite3';
+import { buildTheme, renderThemeCss } from '../src/web/themes.js';
 
 jest.setTimeout(240_000);
 
@@ -65,6 +66,147 @@ describe('web view layout', () => {
     const overlaps = await findPinnedOverlaps(browser, { baseUrl: server.baseUrl, page, theme, viewport });
     expect(overlaps).toEqual([]);
   });
+
+  test('a wrapped bookmark list stays above the centred block on a phone', async () => {
+    const bookmarksServer = await startServer();
+    const page = await browser.newPage();
+    const linksPath = path.join(bookmarksServer.vaultDir, 'today', 'links.md');
+    try {
+      await page.setViewport(VIEWPORTS.phone);
+      await page.setExtraHTTPHeaders({ Authorization: 'Bearer ' + PASSWORD });
+      await page.goto(bookmarksServer.baseUrl, { waitUntil: 'networkidle0' });
+
+      const emptyLayout = await page.evaluate(() => {
+        const bookmarks = document.querySelector('#momentBookmarks');
+        const panel = document.querySelector('#momentPanel').getBoundingClientRect();
+        const content = document.querySelector('.moment-inner').getBoundingClientRect();
+        return {
+          bookmarksDisplay: getComputedStyle(bookmarks).display,
+          bookmarksHeight: bookmarks.getBoundingClientRect().height,
+          panelCenterY: panel.top + panel.height / 2,
+          contentCenterY: content.top + content.height / 2
+        };
+      });
+      expect(emptyLayout.bookmarksDisplay).toBe('none');
+      expect(emptyLayout.bookmarksHeight).toBe(0);
+      expect(emptyLayout.contentCenterY).toBeCloseTo(emptyLayout.panelCenterY, 0);
+
+      fs.mkdirSync(path.dirname(linksPath), { recursive: true });
+      fs.writeFileSync(linksPath, Array.from(
+        { length: 24 },
+        (_, index) => `- [Bookmark number ${index + 1}](notes/kitchen-sink.md)`
+      ).join('\n'));
+      await page.reload({ waitUntil: 'networkidle0' });
+      await page.waitForFunction(() => document.querySelectorAll('#momentBookmarks a').length === 24);
+
+      const layout = await page.evaluate(() => {
+        const bookmarks = document.querySelector('#momentBookmarks');
+        const content = document.querySelector('.moment-inner');
+        return {
+          bookmarkBottom: bookmarks.getBoundingClientRect().bottom,
+          bookmarkHeight: bookmarks.getBoundingClientRect().height,
+          lineHeight: parseFloat(getComputedStyle(bookmarks).lineHeight),
+          contentTop: content.getBoundingClientRect().top
+        };
+      });
+
+      expect(layout.bookmarkHeight).toBeGreaterThan(layout.lineHeight * 3);
+      expect(layout.contentTop).toBeGreaterThanOrEqual(layout.bookmarkBottom);
+    } finally {
+      await page.close();
+      await bookmarksServer.stop();
+    }
+  });
+});
+
+describe('navbar header surface', () => {
+  const css = fs.readFileSync(new URL('../src/web/public/css/style.css', import.meta.url), 'utf8');
+
+  test.each(THEMES)('%s theme: mobile search Cancel uses header ink in every state', async (theme) => {
+    const page = await browser.newPage();
+    try {
+      await page.setViewport(VIEWPORTS.phone);
+      await page.setContent(`<style>${css}</style>
+        <nav class="navbar" style="--today-header-bg: #fff7ec; --today-header-text: #212529; --today-brand-text: #fff">
+          <div class="navbar-search-row">
+            <form><input><button class="btn btn-link navbar-search-cancel" type="button">Cancel</button></form>
+          </div>
+        </nav>`);
+      await page.evaluate(theme => document.documentElement.dataset.theme = theme, theme);
+      const ink = () => page.$eval('.navbar-search-cancel', el => getComputedStyle(el).color);
+      expect(await ink()).toBe('rgb(33, 37, 41)');
+      await page.hover('.navbar-search-cancel');
+      expect(await ink()).toBe('rgb(33, 37, 41)');
+      await page.mouse.move(0, 0);
+      await page.focus('.navbar-search-cancel');
+      expect(await ink()).toBe('rgb(33, 37, 41)');
+    } finally {
+      await page.close();
+    }
+  });
+
+  test.each([true, false])('hover wash with color-mix support enabled: %s', async (supported) => {
+    const page = await browser.newPage();
+    try {
+      await page.setContent(`<style>${css}</style>
+        <nav class="navbar" style="--today-header-text: #000">
+          <a class="nav-link" href="#">Link</a>
+          <button class="navbar-icon-btn">Icon</button>
+          <button class="navbar-icon-btn" aria-expanded="true">Expanded</button>
+        </nav>`);
+      const condition = await page.evaluate((supported) => {
+        const sheet = document.styleSheets[0];
+        const index = [...sheet.cssRules].findIndex(rule =>
+          rule instanceof CSSSupportsRule && [...rule.cssRules].some(child =>
+            child.selectorText?.includes('.navbar .nav-link:hover')));
+        if (index < 0) return null;
+        const condition = sheet.cssRules[index].conditionText;
+        if (!supported) sheet.deleteRule(index);
+        return condition;
+      }, supported);
+      expect(condition).toMatch(/color-mix\(/);
+      expect(condition).not.toContain('var(');
+      const expected = await page.evaluate((supported) => {
+        const probe = document.createElement('div');
+        probe.style.background = supported
+          ? 'color-mix(in srgb, #000 14%, transparent)'
+          : 'rgba(255, 255, 255, 0.16)';
+        document.body.appendChild(probe);
+        return getComputedStyle(probe).backgroundColor;
+      }, supported);
+      for (const selector of ['.nav-link', '.navbar-icon-btn:not([aria-expanded])', '[aria-expanded="true"]']) {
+        if (!selector.startsWith('[aria-expanded')) await page.hover(selector);
+        expect(await page.$eval(selector, el => getComputedStyle(el).backgroundColor)).toBe(expected);
+      }
+    } finally {
+      await page.close();
+    }
+  });
+
+  test.each([{}, { 'header-bg': '#162030' }, { 'header-text': '#fafafa' }])(
+    'omitted dark header tokens default to the dark brand: %j', async (darkHeader) => {
+      const page = await browser.newPage();
+      try {
+        const { theme } = buildTheme('header-test', {
+          light: { 'header-bg': '#fff7ec', 'header-text': '#212529' },
+          dark: { 'brand-bg': '#123456', 'brand-text': '#ffffff', ...darkHeader }
+        });
+        await page.setContent(`<style>${css}</style><style>${renderThemeCss(theme)}</style>
+          <nav class="navbar">Header</nav>`);
+        expect(await page.$eval('.navbar', el => getComputedStyle(el).backgroundColor))
+          .toBe('rgb(255, 247, 236)');
+        await page.evaluate(() => document.documentElement.dataset.theme = 'dark');
+        expect(await page.$eval('.navbar', el => ({
+          background: getComputedStyle(el).backgroundColor,
+          ink: getComputedStyle(el).color
+        }))).toEqual({
+          background: darkHeader['header-bg'] ? 'rgb(22, 32, 48)' : 'rgb(18, 52, 86)',
+          ink: darkHeader['header-text'] ? 'rgb(250, 250, 250)' : 'rgb(255, 255, 255)'
+        });
+      } finally {
+        await page.close();
+      }
+    });
 });
 
 describe('git page diffs', () => {
@@ -268,6 +410,12 @@ describe('pomodoro banner', () => {
   }
 
   async function press(page, action) {
+    // A running timer is collapsed to one line; its controls live behind the
+    // card's disclosure, so open it before reaching for them.
+    await page.evaluate(() => {
+      const card = document.querySelector('.timer-card[data-timer-key="pomodoro"]');
+      if (card) card.open = true;
+    });
     await Promise.all([
       page.waitForNavigation({ waitUntil: 'networkidle0' }),
       page.click(control(action))
@@ -278,21 +426,23 @@ describe('pomodoro banner', () => {
   function bannerText(page) {
     return page.$eval(
       '[data-pomodoro-start], [data-pomodoro-awaiting], [onclick*="pomodoro/start"]',
-      el => el.closest('[role="alert"], .activity-pill').textContent.replace(/\s+/g, ' ').trim()
+      el => el.closest('[role="alert"]').textContent.replace(/\s+/g, ' ').trim()
     );
   }
 
   // Idle, the schedule is configuration rather than status, so it is in the
   // pill's tooltip instead of being spelled out across the strip.
+  // The schedule used to be a tooltip on the idle pill, which touch could not
+  // reach; it is text in the card's detail now.
   function idleSchedule(page) {
     return page.$eval('[onclick*="pomodoro/start"]',
-      el => el.closest('.activity-pill').getAttribute('title'));
+      el => el.closest('.timer-card').textContent.replace(/\s+/g, ' ').trim());
   }
 
   test('starts, pauses, resumes, skips and stops from the page', async () => {
     const page = await openPage();
     try {
-      // Idle: a pill, with the configured schedule on its tooltip.
+      // Idle: the same card shape as when running, schedule in its detail.
       expect(await bannerText(page)).toContain('Pomodoro');
       expect(await idleSchedule(page)).toContain('2 × 25 min');
 
@@ -335,7 +485,9 @@ describe('timer banner', () => {
     try {
       await page.setExtraHTTPHeaders({ Authorization: `Bearer ${PASSWORD}` });
       await page.goto(`${server.baseUrl}/notes/kitchen-sink.md`, { waitUntil: 'networkidle0' });
-      expect(await page.$eval('.alert-info[data-timer-start]', el => el.textContent)).toContain('Write the accessibility tests');
+      // family-time, not alert-info: the tracker wears the colour of the
+      // content it is about, not a status colour.
+      expect(await page.$eval('.family-time[data-timer-start]', el => el.textContent)).toContain('Write the accessibility tests');
     } finally {
       await page.close();
     }
@@ -470,6 +622,12 @@ describe('a palette from the vault', () => {
   // var() — a var() colour cannot feed an rgba(). Both halves are checked
   // here: the fill at full opacity, and a tint of it, which is the case that
   // would silently come out transparent if the triple were ever a var().
+  //
+  // The navbar is no longer a .bg-primary: it paints itself from --today-
+  // header-bg, which defaults to the brand fill. So this now covers two
+  // things at once -- that the triple still reaches everything MDB tints,
+  // and that a palette setting only brand-bg, as cocoa does, still moves the
+  // header exactly as it did before the header token existed.
   const BRAND_FILL = { light: 'rgb(122, 66, 16)', dark: 'rgb(161, 85, 26)' };
 
   test.each(THEMES)('%s theme: the vault\'s brand fill reaches the navbar', async (theme) => {
@@ -486,7 +644,7 @@ describe('a palette from the vault', () => {
         tint.className = 'bg-primary bg-opacity-10';
         document.body.appendChild(tint);
         const colours = {
-          navbar: getComputedStyle(document.querySelector('.navbar.bg-primary')).backgroundColor,
+          navbar: getComputedStyle(document.querySelector('.navbar')).backgroundColor,
           tint: getComputedStyle(tint).backgroundColor
         };
         tint.remove();
@@ -514,11 +672,15 @@ describe('a palette from the vault', () => {
     }
   });
 
-  test.each(THEMES.flatMap(theme =>
-    ['markdown-diary', 'markdown-plans'].map(plugin => [theme, plugin])
-  ))('%s theme, %s: non-white brand ink reaches filled surfaces', async (theme, plugin) => {
+  // This covered the two day tiles as well, under both markdown-diary and
+  // markdown-plans, which is what the plugin parametrisation was for. The
+  // home page's tiles are tabs now and nothing Today renders is a
+  // .list-group-item.bg-primary any more, so the tile assertions and the
+  // second plugin case have gone with them. The surfaces left are the ones
+  // that still exist.
+  test.each(THEMES)('%s theme: non-white brand ink reaches filled surfaces', async (theme) => {
     const brandServer = await startServer({
-      configLines: [`[plugins.${plugin}.default]`, 'enabled = true']
+      configLines: ['[plugins.markdown-diary.default]', 'enabled = true']
     });
     const { baseUrl } = brandServer;
     const view = await browser.newPage();
@@ -529,14 +691,10 @@ describe('a palette from the vault', () => {
       await useTheme(view, theme, baseUrl);
       await view.goto(baseUrl, { waitUntil: 'networkidle0' });
 
-      const tile = '.list-group-item.bg-primary';
       const colors = {
-        tile: await view.$eval(tile, el => getComputedStyle(el).color),
         header: await view.$eval('#aiAssistantHeader', el => getComputedStyle(el).color),
         chevron: await view.$eval('#aiAssistantHeader .toggle-btn #toggleIcon', el => getComputedStyle(el).color)
       };
-      await view.hover(tile);
-      colors.hoveredTile = await view.$eval(tile, el => getComputedStyle(el).color);
 
       await view.goto(`${baseUrl}/_git`, { waitUntil: 'networkidle0' });
       await openDiff(view, 'code/example.js');
@@ -567,7 +725,7 @@ describe('a palette from the vault', () => {
         return color;
       });
       expect(colors).toEqual({
-        tile: ink, hoveredTile: ink, header: ink, chevron: ink,
+        header: ink, chevron: ink,
         activeFile: ink, activeFileText: [ink], badge: ink
       });
     } finally {

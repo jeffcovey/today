@@ -32,13 +32,14 @@ import { getDatabase } from './database-service.js';
 import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
 import { convertEmojisToIcons } from './emoji-mappings.js';
 import { getMarkdownFileCache } from './markdown-file-cache.js';
-import { getAbsoluteVaultPath, getConfig, getPublicBaseUrl, getVaultPath } from './config.js';
+import { getAbsoluteVaultPath, getAppDirectory, getConfig, getPublicBaseUrl, getVaultPath } from './config.js';
 import { formatDate, formatDisplayDate, getDayName, getTodayDate } from './date-utils.js';
-import { isPluginConfigured } from './plugin-loader.js';
+import { isPluginConfigured, getPluginSources } from './plugin-loader.js';
 import { createAiCommitMessageHandler } from './git-ai-commit-message-route.js';
 import { runTrackCommand } from './track-command.js';
 import {
   getDateComponents as getPlanDateComponents,
+  getDailyPlanRelativePath,
   getPlanFileHierarchy,
   getPlanFilePath,
 } from './plan-utils.js';
@@ -68,6 +69,7 @@ import { getNavbar, getThemeBootstrapScript, getDisplayMenuHtml, getSearchToggle
 import { getStoredThemeMode, setStoredThemeMode, isThemeMode, THEME_MODES,
   getStoredThemeName, setStoredThemeName, isThemeName, readWebPreferences } from './web-preferences.js';
 import { listThemes, getThemeStylesheet, BUILT_IN_THEME_ID } from './web/themes.js';
+import { readVaultQuotes, readVaultLinks } from './vault-app-files.js';
 import { createSaveHandler } from './save-route.js';
 import { listPlanSummaries, savePlanSummary, savePlanPriorities, PLAN_TYPE_ORDER } from './plan-summaries.js';
 import { getPlanStatusBadge, PLAN_STATUS_BADGES } from './plan-summary-status.js';
@@ -474,7 +476,7 @@ app.get('/theme.css', async (req, res) => {
   res.set('Cache-Control', 'no-cache');
   let css = '';
   try {
-    ({ css } = await getThemeStylesheet(getAbsoluteVaultPath(), await getStoredThemeName()));
+    ({ css } = await getThemeStylesheet(getAbsoluteVaultPath(), await getStoredThemeName(), getAppDirectory()));
   } catch (error) {
     // A palette we can't read is not worth failing a page load over; the
     // built-in one is always underneath.
@@ -505,7 +507,7 @@ app.get('/api/theme', authMiddleware, async (req, res) => {
 app.get('/api/themes', authMiddleware, async (req, res) => {
   try {
     const { themeName } = await readWebPreferences();
-    const themes = await listThemes(getAbsoluteVaultPath());
+    const themes = await listThemes(getAbsoluteVaultPath(), getAppDirectory());
     res.json({
       success: true,
       themes,
@@ -517,44 +519,61 @@ app.get('/api/themes', authMiddleware, async (req, res) => {
   }
 });
 
-// ── The day's one goal ──────────────────────────────────────────────────────
-// Kept in .data rather than the vault: it is a scratch intention for today,
-// not a note worth a file and a sync. It resets by date, so asking for it on
-// a new day returns an empty string rather than yesterday's answer.
-const DAILY_GOAL_PATH = path.join(__dirname, '..', '.data', 'daily-goal.json');
+// ── The calm panel's quotes and links ──────────────────────────────────────
+// Both live in the vault, under the app directory, because they are the
+// user's own to write rather than lists shipped with the app. Both are
+// fetched by the page rather than rendered into it: this markup is cached to
+// disk, so anything baked in would outlive the next edit of the file.
+// Reading and parsing them is in src/vault-app-files.js.
 
-async function readDailyGoal() {
+// One quote, chosen by the page. The index comes from the client because it is
+// the client that knows which photograph is up — the two turn over together —
+// and because this markup is cached to disk, so the server cannot bake it in.
+app.get('/api/quote', authMiddleware, async (req, res) => {
   try {
-    const stored = JSON.parse(await fs.readFile(DAILY_GOAL_PATH, 'utf-8'));
-    const today = getTodayDate(getConfiguredTimezone());
-    return stored && stored.date === today && typeof stored.goal === 'string'
-      ? { date: today, goal: stored.goal }
-      : { date: today, goal: '' };
-  } catch {
-    return { date: getTodayDate(getConfiguredTimezone()), goal: '' };
+    const { value: quotes } = await readVaultQuotes(VAULT_PATH, getAppDirectory());
+    if (quotes.length === 0) return res.json({ success: true, count: 0 });
+    const asked = Number.parseInt(req.query.index, 10);
+    const index = Number.isFinite(asked)
+      ? ((asked % quotes.length) + quotes.length) % quotes.length
+      : Math.floor(Math.random() * quotes.length);
+    res.json({ success: true, count: quotes.length, ...quotes[index] });
+  } catch (error) {
+    console.error('Error reading the vault quotes:', error);
+    res.status(500).json({ success: false, message: 'Failed to read quotes' });
   }
-}
-
-app.get('/api/daily-goal', authMiddleware, async (req, res) => {
-  res.json({ success: true, ...(await readDailyGoal()) });
 });
 
-app.post('/api/daily-goal', authMiddleware, express.json(), async (req, res) => {
-  const goal = typeof req.body?.goal === 'string' ? req.body.goal.slice(0, 200) : null;
-  if (goal === null) {
-    return res.status(400).json({ success: false, message: 'goal must be a string' });
-  }
-  const date = getTodayDate(getConfiguredTimezone());
+// The links across the top of the panel. Unlike the quote this is the whole
+// file every time, so it revalidates instead: the stamp the reader hands back
+// moves only when the file does, which makes the repeat cost of a page load
+// one stat and a 304 with no body.
+app.get('/api/links', authMiddleware, async (req, res) => {
   try {
-    await fs.mkdir(path.dirname(DAILY_GOAL_PATH), { recursive: true });
-    const tempPath = `${DAILY_GOAL_PATH}.${process.pid}.${crypto.randomUUID()}.tmp`;
-    await fs.writeFile(tempPath, `${JSON.stringify({ date, goal }, null, 2)}\n`, 'utf-8');
-    await fs.rename(tempPath, DAILY_GOAL_PATH);
-    res.json({ success: true, date, goal });
+    const { value: links, stamp } = await readVaultLinks(VAULT_PATH, getAppDirectory());
+    res.set('Cache-Control', 'no-cache');
+    const etag = `W/"links:${stamp}"`;
+    res.set('ETag', etag);
+    if (req.headers['if-none-match'] === etag) return res.status(304).end();
+    res.json({ success: true, links });
   } catch (error) {
-    console.error('Error saving the daily goal:', error);
-    res.status(500).json({ success: false, message: 'Failed to save the goal' });
+    console.error('Error reading the vault links:', error);
+    res.status(500).json({ success: false, message: 'Failed to read links' });
   }
+});
+
+// ── Today's diary and plan, without a date in the URL ───────────────────────
+// The calm panel links here instead of to a dated path. Its markup is cached
+// to disk, so a link with today's date baked into it would still be pointing
+// at Sunday's file on Monday; resolving the date per request is what keeps
+// them honest. Under /_today/ rather than /diary/today so they cannot shadow
+// a vault file of that name.
+app.get('/_today/diary', authMiddleware, (req, res) => {
+  res.redirect(`/diary/${getTodayDate(getConfiguredTimezone())}.md`);
+});
+
+app.get('/_today/plan', authMiddleware, (req, res) => {
+  res.redirect(`/${getDailyPlanRelativePath(getTodayDate(getConfiguredTimezone()))}`);
 });
 
 app.post('/api/theme', authMiddleware, express.json(), async (req, res) => {
@@ -574,7 +593,7 @@ app.post('/api/theme', authMiddleware, express.json(), async (req, res) => {
   }
   try {
     if (name !== undefined) {
-      const themes = await listThemes(getAbsoluteVaultPath());
+      const themes = await listThemes(getAbsoluteVaultPath(), getAppDirectory());
       if (!themes.some((theme) => theme.id === name)) {
         return res.status(400).json({ success: false, message: `No such palette: ${name}` });
       }
@@ -688,15 +707,16 @@ function getFloatingToggleBtn() {
 // Helper to get timer widget (active or idle state)
 function getTimerWidget(timer) {
   if (timer) {
-    return `
-        <div class="alert alert-info d-flex align-items-center mb-2 py-2 px-3" role="alert" data-timer-start="${timer.startTimeISO}">
-          <i class="fas fa-clock me-2"></i>
-          <div class="flex-grow-1">
-            <strong>${timer.description}</strong>
-            <br>
-            <small class="activity-tracker-meta">Started ${timer.startTime} · <span class="timer-duration">${timer.duration}</span></small>
-          </div>
-          <a href="#" id="stopTimerBtn" onclick="
+    return timerCard({
+      key: 'focus',
+      classes: 'family-time',
+      extraClass: 'timer-card-grow',
+      attrs: ` data-timer-start="${timer.startTimeISO}"`,
+      emoji: EMOJI_FOCUS,
+      title: timer.description,
+      clock: `<span class="timer-duration">${timer.duration}</span>`,
+      detail: `
+            <a href="#" id="stopTimerBtn" data-timer-action="stop" onclick="
             const btn = this;
             const icon = btn.querySelector('i');
             const text = btn.querySelector('.btn-text');
@@ -710,17 +730,21 @@ function getTimerWidget(timer) {
               icon.className = 'fas fa-stop';
               text.textContent = ' Stop';
             });
-            return false;" class="btn btn-sm btn-outline-dark ms-2">
+            return false;" class="btn btn-sm btn-outline-dark">
             <i class="fas fa-stop"></i><span class="btn-text"> Stop</span>
-          </a>
-        </div>`;
+          </a>`
+    });
   } else {
-    return `
-        <div class="activity-tracker mb-2">
-          <i class="fas fa-clock activity-tracker-icon" aria-hidden="true"></i>
-          <div class="input-group flex-grow-1">
-            <input type="text" class="form-control" id="timerDescription" placeholder="What are you working on? (include #topic/tags)" onkeypress="if(event.key==='Enter'){event.preventDefault();document.getElementById('startTimerBtn').click();}">
-            <button class="btn btn-primary" id="startTimerBtn" onclick="
+    return timerCard({
+      key: 'focus',
+      classes: 'family-time',
+      extraClass: 'timer-card-tight',
+      emoji: EMOJI_FOCUS,
+      title: 'Track',
+      detail: `
+        <div class="input-group">
+          <input type="text" class="form-control" id="timerDescription" placeholder="What are you working on? (include #topic/tags)" onkeypress="if(event.key==='Enter'){event.preventDefault();document.getElementById('startTimerBtn').click();}">
+            <button class="btn btn-primary" id="startTimerBtn" data-timer-action="start" onclick="
               const btn = this;
               const icon = btn.querySelector('i');
               const text = btn.querySelector('.btn-text');
@@ -736,8 +760,8 @@ function getTimerWidget(timer) {
               })">
               <i class="fas fa-play"></i><span class="btn-text"> Start</span>
             </button>
-          </div>
-        </div>`;
+          </div>`
+    });
   }
 }
 
@@ -1273,31 +1297,46 @@ async function getTaskTimerWidget() {
       }
       const nextText = nextItem ? processMarkdownLinks(nextItem.displayText) : null;
 
-      return `
-        <div class="alert alert-info mb-2 py-2 px-3" role="alert"
-          data-timer-start="${taskTimerState.startTime}" data-timer-total-seconds="${restSeconds}" data-timer-phase="rest">
-          <div><strong>Rest</strong> — <span class="task-timer-countdown">${initMin}:${String(initSec).padStart(2, '0')}</span></div>
-          ${nextText ? `<div class="mt-1"><small>Up next: <strong>${nextText}</strong></small></div>` : ''}
+      return timerCard({
+        key: 'tasks',
+        classes: 'family-work',
+        extraClass: 'timer-card-tight',
+        attrs: ` data-timer-start="${taskTimerState.startTime}" data-timer-total-seconds="${restSeconds}" data-timer-phase="rest"`,
+        emoji: EMOJI_TASKS,
+        title: 'Rest',
+        clock: `<span class="task-timer-countdown">${initMin}:${String(initSec).padStart(2, '0')}</span>`,
+        detail: `
+          ${nextText ? `<div><small>Up next: <strong>${nextText}</strong></small></div>` : ''}
           <small class="d-flex gap-2 mt-1">
             <span>${position}/${total}</span>
             <a href="#" onclick="event.preventDefault(); fetch('/api/task-timer/skip', {method: 'POST'}).then(function(r) { return r.json(); }).then(function(data) {
               if (data.message === 'All tasks completed!') alert('All tasks completed!'); location.reload();
             }).catch(function() { alert('Failed to skip'); });">Skip Rest</a>
-            <a href="#" onclick="event.preventDefault(); fetch('/api/task-timer/stop', {method: 'POST'}).then(function() { location.reload(); });">Stop</a>
-          </small>
-        </div>`;
+            <a href="#" data-timer-action="stop" onclick="event.preventDefault(); fetch('/api/task-timer/stop', {method: 'POST'}).then(function() { location.reload(); });">Stop</a>
+          </small>`
+      });
     }
 
-    const alertClass = isPaused ? 'alert-warning' : 'alert-success';
-    const iconClass = isPaused ? 'fas fa-pause-circle' : 'fas fa-play-circle';
+    // One colour, always. Paused is a difference in the text, not in the card.
+    const familyClass = 'family-work';
+
+    // The checklist, as on its pill: which timer this is matters more at a
+    // glance than whether it is paused, which the colour, the label and the
+    // buttons all say already.
+
     const phaseLabel = isPaused ? 'Paused' : 'Work';
     const pausedAttr = isPaused ? ' data-timer-paused="true"' : '';
 
-    return `
-      <div class="alert ${alertClass} mb-2" role="alert"
-        data-timer-start="${taskTimerState.startTime}" data-timer-total-seconds="${workSeconds}" data-timer-phase="work"${pausedAttr}>
+    return timerCard({
+      key: 'tasks',
+      classes: familyClass,
+      extraClass: 'timer-card-grow',
+      attrs: ` data-timer-start="${taskTimerState.startTime}" data-timer-total-seconds="${workSeconds}" data-timer-phase="work"${pausedAttr}`,
+      emoji: EMOJI_TASKS,
+      title: displayText,
+      clock: `<span class="task-timer-countdown">${initMin}:${String(initSec).padStart(2, '0')}</span>${isPaused ? ' \u23F8' : ''}`,
+      detail: `
         <div class="d-flex align-items-start">
-          <i class="${iconClass} me-2 mt-1"></i>
           ${item.canComplete && item.toggleData ?
             `<input type="checkbox" class="form-check-input me-2 mt-1" style="min-width:1em"
               data-toggle='${JSON.stringify(item.toggleData).replace(/'/g, '&#39;')}'
@@ -1308,23 +1347,20 @@ async function getTaskTimerWidget() {
             ''
           }
           <div>
-            <strong>${item.linkUrl ?
-              `<a href="${item.linkUrl}" class="text-decoration-none">${displayText}</a>` :
-              displayText
-            }</strong>
-            <div><small><span class="task-timer-countdown">${initMin}:${String(initSec).padStart(2, '0')}</span> (${phaseLabel}) · Item ${position} of ${total}</small></div>
+            ${item.linkUrl ? `<div><a href="${item.linkUrl}">${displayText}</a></div>` : ''}
+            <div><small>(${phaseLabel}) · Item ${position} of ${total}</small></div>
             <div class="mt-1 d-flex gap-1">
               ${isPaused ?
-                `<button class="btn btn-sm btn-outline-warning" onclick="
+                `<button class="btn btn-sm btn-outline-dark" data-timer-action="resume" onclick="
                   fetch('/api/task-timer/resume', {method: 'POST'}).then(function() { location.reload(); });">
                   <i class="fas fa-play"></i> Resume
                 </button>` :
-                `<button class="btn btn-sm btn-outline-success" onclick="
+                `<button class="btn btn-sm btn-outline-dark" onclick="
                   fetch('/api/task-timer/pause', {method: 'POST'}).then(function() { location.reload(); });">
                   <i class="fas fa-pause"></i> Pause
                 </button>`
               }
-              <button class="btn btn-sm btn-outline-secondary" onclick="
+              <button class="btn btn-sm btn-outline-secondary" data-timer-action="stop" onclick="
                 fetch('/api/task-timer/stop', {method: 'POST'}).then(function() { location.reload(); });">
                 <i class="fas fa-stop"></i> Stop
               </button>
@@ -1337,28 +1373,36 @@ async function getTaskTimerWidget() {
               </button>
             </div>
           </div>
-        </div>
-      </div>`;
+        </div>`
+    });
   } else {
     // Timer is not running — fetch items only now (avoids DB queries on every page load when running)
     const items = await getTodayTaskTimerItems();
     if (!items || items.length === 0) {
-      return `
-      <div class="activity-pill activity-pill-quiet">
-        <i class="fas fa-tasks" aria-hidden="true"></i>
-        <span>Task Timer</span>
-        <span class="activity-pill-count activity-pill-count-zero">0</span>
-      </div>`;
+      return timerCard({
+        key: 'tasks',
+        classes: 'family-work',
+        extraClass: 'timer-card-tight',
+        emoji: EMOJI_TASKS,
+        title: 'Tasks',
+        clock: '<span class="timer-count timer-count-zero">0</span>',
+        detail: '<small>Nothing scheduled for today.</small>'
+      });
     }
-    return `
-      <div class="activity-pill">
-        <i class="fas fa-tasks" aria-hidden="true"></i>
-        <span>Task Timer</span>
-        <span class="activity-pill-count">${items.length}</span>
-        <input type="number" class="activity-pill-number" id="taskTimerMinutes" aria-label="Minutes per task"
+    return timerCard({
+      key: 'tasks',
+      classes: 'family-work',
+      extraClass: 'timer-card-tight',
+      emoji: EMOJI_TASKS,
+      title: 'Tasks',
+      clock: `<span class="timer-count">${items.length}</span>`,
+      detail: `
+        <div class="d-flex align-items-center gap-2">
+          <input type="number" class="timer-minutes" id="taskTimerMinutes" aria-label="Minutes per task"
           title="Minutes per task" value="${taskTimerState.duration}" min="1" max="60">
-        <span class="activity-pill-unit">min</span>
-        <button class="activity-pill-go" title="Start task timer" aria-label="Start task timer" onclick="
+        <span class="timer-unit">min</span>
+        <button class="timer-go" title="Start task timer" aria-label="Start task timer"
+          data-timer-action="start" onclick="
           const btn = this;
           const icon = btn.querySelector('i');
           const minutesInput = document.getElementById('taskTimerMinutes');
@@ -1371,7 +1415,8 @@ async function getTaskTimerWidget() {
           });">
           <i class="fas fa-play"></i>
         </button>
-      </div>`;
+        </div>`
+    });
   }
 }
 
@@ -1480,11 +1525,44 @@ function sendPomodoroNudge() {
 }
 
 function pomodoroButton(action, icon, label, style) {
-  return `<button class="btn btn-sm ${style}" onclick="
+  return `<button class="btn btn-sm ${style}" data-timer-action="${action}" onclick="
     fetch('/api/pomodoro/${action}', {method: 'POST'}).then(function() { location.reload(); });">
     <i class="fas ${icon}"></i> ${label}
   </button>`;
 }
+
+// Font Awesome 6 Free has no tomato (fa-tomato is Pro) and a drawn one reads
+// as a bomb at 16px, so the pill wears the emoji. It is the one icon here
+// that is not monochrome, which suits the one timer named after an object.
+// A running timer is one line until you tap it: the emoji, what it is, and the
+// clock. Everything else — the detail and every control — sits behind the
+// disclosure, because a timer you are not touching should cost one row.
+//
+// <details> rather than a script, so it works before the CDN does and is
+// operable from the keyboard for free. role="alert" stays on the outer element
+// because that is what announces a timer starting.
+function timerCard({ key, classes = '', extraClass = '', attrs = '', emoji, title = '', clock = '', detail }) {
+  return `
+      <details class="timer-card family-card ${classes}${extraClass ? ` ${extraClass}` : ''}" role="alert" data-timer-key="${key}"${attrs}>
+        <summary class="timer-summary">
+          ${timerEmoji(emoji)}
+          ${title ? `<span class="timer-title">${title}</span>` : ''}
+          ${clock ? `<span class="timer-clock">${clock}</span>` : ''}
+        </summary>
+        <div class="timer-detail">${detail}
+        </div>
+      </details>`;
+}
+
+const timerEmoji = (glyph, extraClass = '') =>
+  `<span class="activity-emoji${extraClass ? ` ${extraClass}` : ''}" aria-hidden="true">${glyph}</span>`;
+
+// One emoji each, so the three timers are told apart before the labels are
+// read. Font Awesome has no tomato at all, and once one of them was an emoji
+// the other two had to be or the row looked assembled from spare parts.
+const EMOJI_FOCUS = '\u{1F3AF}';
+const EMOJI_TASKS = '\u{1F4CB}';
+const EMOJI_POMODORO = '\u{1F345}';
 
 function getPomodoroWidget() {
   const config = getPomodoroConfig();
@@ -1501,30 +1579,42 @@ function getPomodoroWidget() {
     // what you need at a glance is that Pomodoro is here and not running.
     const schedule = `${config.workPeriods} \u00d7 ${config.workMinutes} min, `
       + `${config.shortRestMinutes} min breaks, ${config.longRestMinutes} min long break`;
-    return `
-      <div class="activity-pill" title="${schedule}">
-        <i class="fas fa-stopwatch" aria-hidden="true"></i>
-        <span>Pomodoro</span>
-        <button class="activity-pill-go" title="Start pomodoro" aria-label="Start pomodoro — ${schedule}" onclick="
+    return timerCard({
+      key: 'pomodoro',
+      classes: 'family-site',
+      extraClass: 'timer-card-tight',
+      emoji: EMOJI_POMODORO,
+      title: 'Pomodoro',
+      detail: `
+        <div class="d-flex align-items-center gap-2">
+          <button class="timer-go" title="Start pomodoro" aria-label="Start pomodoro — ${schedule}"
+          data-timer-action="start" onclick="
           fetch('/api/pomodoro/start', {method: 'POST'}).then(function() { location.reload(); });">
           <i class="fas fa-play"></i>
         </button>
-      </div>`;
+          <small>${schedule}</small>
+        </div>`
+    });
   }
 
   const upcoming = intervalDescription(pomodoroState.phase, pomodoroState.periodIndex, config);
 
   if (pomodoroState.awaitingStart) {
     const finished = intervalDescription(pomodoroState.finishedPhase, pomodoroState.finishedPeriodIndex, config);
-    return `
-      <div class="alert alert-info mb-2 py-2 px-3" role="alert" data-pomodoro-awaiting="true">
-        <div><i class="fas fa-bell me-2"></i><strong>${finished} complete</strong></div>
-        <div class="mt-1"><small>Up next: <strong>${upcoming}</strong> — ${phaseMinutes(pomodoroState.phase, config)} min</small></div>
+    return timerCard({
+      key: 'pomodoro',
+      classes: 'family-site',
+      extraClass: 'timer-card-tight',
+      attrs: ' data-pomodoro-awaiting="true"',
+      emoji: EMOJI_POMODORO,
+      title: `${finished} complete`,
+      detail: `
+        <div><small>Up next: <strong>${upcoming}</strong> — ${phaseMinutes(pomodoroState.phase, config)} min</small></div>
         <div class="mt-1 d-flex gap-1">
-          ${pomodoroButton('next', 'fa-play', `Start ${upcoming.toLowerCase()}`, 'btn-outline-primary')}
+          ${pomodoroButton('next', 'fa-play', `Start ${upcoming.toLowerCase()}`, 'btn-outline-dark')}
           ${pomodoroButton('stop', 'fa-stop', 'Stop', 'btn-outline-secondary')}
-        </div>
-      </div>`;
+        </div>`
+    });
   }
 
   const { isPaused } = pomodoroState;
@@ -1534,38 +1624,45 @@ function getPomodoroWidget() {
   const initSec = remaining % 60;
 
   const isWork = pomodoroState.phase === PHASE_WORK;
-  const alertClass = isPaused ? 'alert-warning' : (isWork ? 'alert-success' : 'alert-info');
-  const iconClass = isPaused ? 'fa-pause-circle' : (isWork ? 'fa-play-circle' : 'fa-mug-hot');
+  // Tomato, always: the pomodoro looks like the pomodoro whether it is
+  // working, resting, paused or idle. Which of those it is, is text.
+  const familyClass = 'family-site';
+
   const pausedAttr = isPaused ? ' data-pomodoro-paused="true"' : '';
   const after = nextInterval(pomodoroState.phase, pomodoroState.periodIndex, config);
   const afterLabel = intervalDescription(after.phase, after.periodIndex, config);
 
-  return `
-    <div class="alert ${alertClass} mb-2 py-2 px-3" role="alert"
-      data-pomodoro-start="${pomodoroState.startTime}" data-pomodoro-total-seconds="${totalSeconds}"${pausedAttr}>
-      <div>
-        <i class="fas ${iconClass} me-2"></i>
-        <strong>${phaseLabel(pomodoroState.phase)}</strong> —
-        <span class="pomodoro-countdown">${initMin}:${String(initSec).padStart(2, '0')}</span>
-        ${isPaused ? ' <small>(Paused)</small>' : ''}
-      </div>
-      <div class="mt-1"><small>${upcoming} · then ${afterLabel}</small></div>
+  return timerCard({
+    key: 'pomodoro',
+    classes: familyClass,
+    attrs: ` data-pomodoro-start="${pomodoroState.startTime}" data-pomodoro-total-seconds="${totalSeconds}"${pausedAttr}`,
+    emoji: EMOJI_POMODORO,
+    extraClass: 'timer-card-tight',
+    clock: `<span class="visually-hidden">Pomodoro, ${phaseLabel(pomodoroState.phase)}${isPaused ? ', paused' : ''}: </span><span class="pomodoro-countdown">${initMin}:${String(initSec).padStart(2, '0')}</span>${isPaused ? ' \u23F8' : ''}`,
+    detail: `
+      <div><small>${phaseLabel(pomodoroState.phase)}${isPaused ? ' (Paused)' : ''} · ${upcoming} · then ${afterLabel}</small></div>
       <div class="mt-1 d-flex gap-1">
         ${isPaused
-          ? pomodoroButton('resume', 'fa-play', 'Resume', 'btn-outline-warning')
-          : pomodoroButton('pause', 'fa-pause', 'Pause', 'btn-outline-success')}
+          ? pomodoroButton('resume', 'fa-play', 'Resume', 'btn-outline-dark')
+          : pomodoroButton('pause', 'fa-pause', 'Pause', 'btn-outline-dark')}
         ${pomodoroButton('stop', 'fa-stop', 'Stop', 'btn-outline-secondary')}
         ${pomodoroButton('skip', 'fa-forward', 'Skip', 'btn-outline-secondary')}
-      </div>
-    </div>`;
+      </div>`
+  });
 }
 
 // ── The activity bar ────────────────────────────────────────────────────────
-// One strip above the page instead of a stack of full-width alerts. The three
-// timers are *state*, and almost always idle, so idle is what has to be cheap:
-// each one shrinks to a pill and expands into its own banner only while it is
-// actually running. The tracker keeps a full-width row either way, because it
-// is the one thing here you type into.
+// One strip above the page instead of a stack of full-width alerts. All three
+// timers sit on a single row and look the same whether they are running or
+// not; what changes is the text they show and what a tap reveals. Idle has to
+// be cheap, because idle is the usual case.
+//
+// Their colours are FAMILY colours, not status ones. Each takes the family of
+// the content it is about -- the tracker is time logs, the task timer is
+// tasks, the pomodoro is Today's own instrument -- which is why none of them
+// is an .alert any more. They were alert-info, alert-success and alert-danger,
+// chosen only to tell them apart, and that had the pomodoro permanently
+// wearing the colour that means something is wrong.
 //
 // This used to be built inline at three call sites, identically, which is why
 // it lives in one function now.
@@ -1574,22 +1671,15 @@ async function getActivityBar({ timer }) {
   const taskTimerHtml = await getTaskTimerWidget();
   const pomodoroHtml = getPomodoroWidget();
 
-  // Whether each one rendered a banner or a pill is decided by the same state
-  // the widget itself read, rather than by inspecting the markup it returned.
-  const taskTimerRunning = Boolean(taskTimerState.isRunning && taskTimerState.currentItem);
-  const pomodoroRunning = Boolean(pomodoroState.isRunning);
-
-  const banners = [];
-  const pills = [];
-
-  if (taskTimerHtml) (taskTimerRunning ? banners : pills).push(taskTimerHtml);
-  if (pomodoroHtml) (pomodoroRunning ? banners : pills).push(pomodoroHtml);
+  // All three on one row, each a card that is one line until you tap it and
+  // looks the same whether it is running or not. There is no banner/pill split
+  // to decide any more: the state is in the text and the clock, not in two
+  // different shapes.
+  const rowed = [getTimerWidget(timer), taskTimerHtml, pomodoroHtml].filter(Boolean);
 
   return `
     <div class="activity-bar mb-3">
-      ${getTimerWidget(timer)}
-      ${banners.join('\n')}
-      ${pills.length ? `<div class="activity-pills">${pills.join('\n')}</div>` : ''}
+      ${rowed.length ? `<div class="timer-row">${rowed.join('\n')}</div>` : ''}
     </div>`;
 }
 
@@ -1746,22 +1836,73 @@ function getPlanHierarchyLevel(filename) {
 // page, because this markup is cached to disk and would otherwise be stuck
 // saying "Good morning" all evening. Only the name is baked in, since that
 // does not change between renders.
-function renderMomentPanel(displayName) {
+// Which stage each day of the week belongs to, indexed the way Date#getDay()
+// counts. The stages plugin is optional, so this is null when it is off and
+// the calm tab simply shows the date on its own.
+//
+// The row of links across the top is a sibling of .moment-inner rather than
+// part of it: that block is centred in the panel, and the links belong to the
+// corner. It arrives empty and the page fills it from /api/links.
+//
+// The whole week goes to the page rather than just today's name, because this
+// markup is cached to disk: a panel rendered on Sunday would still be calling
+// it Sunday on Wednesday. The day mapping is configuration, which does not
+// move between renders, so handing over all seven and letting the page pick
+// is both correct and cheaper than defeating the cache.
+const MOMENT_WEEKDAY_KEYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+// Mirrors the defaults in plugins/stages/plugin.toml, for a source that is
+// enabled without overriding anything — which is the common case.
+const MOMENT_DEFAULT_STAGE_DAYS = {
+  sunday: 'back',
+  monday: 'front',
+  tuesday: 'off',
+  wednesday: 'front',
+  thursday: 'back',
+  friday: 'off',
+  saturday: 'front'
+};
+
+function getStageNamesByWeekday() {
+  const [source] = getPluginSources('stages');
+  if (!source) return null;
+
+  const settings = source.config || {};
+  const names = {
+    front: settings.front_stage_name || 'Front Stage',
+    back: settings.back_stage_name || 'Back Stage',
+    off: settings.off_stage_name || 'Off Stage'
+  };
+
+  return MOMENT_WEEKDAY_KEYS.map((day) => {
+    const key = settings[day] || MOMENT_DEFAULT_STAGE_DAYS[day];
+    return names[key] || names.front;
+  });
+}
+
+function renderMomentPanel(displayName, stageNames, links = []) {
+  const stages = stageNames && stageNames.length
+    ? ` data-stages="${escapeHtmlEntities(JSON.stringify(stageNames))}"`
+    : '';
+  // Whether the diary and the plan exist at all is configuration, not time, so
+  // unlike the date these can be rendered here and cached with the panel.
+  const linksHtml = links.length
+    ? `
+                <p class="moment-links">${links
+      .map(link => `<a href="${link.href}">${escapeHtmlEntities(link.label)}</a>`)
+      .join('<span class="moment-links-sep" aria-hidden="true"> • </span>')}</p>`
+    : '';
   return `
-            <div class="moment" id="momentPanel" data-name="${escapeHtmlEntities(displayName || '')}">
+            <div class="moment" id="momentPanel" data-name="${escapeHtmlEntities(displayName || '')}"${stages}>
               <div class="moment-photo" id="momentPhoto" aria-hidden="true"></div>
               <div class="moment-scrim" aria-hidden="true"></div>
               <div class="moment-inner">
                 <p class="moment-clock" id="momentClock"></p>
                 <p class="moment-greeting" id="momentGreeting"></p>
-                <form class="moment-goal" id="momentGoalForm" autocomplete="off">
-                  <label class="moment-goal-label" for="momentGoal">What is your main goal for today?</label>
-                  <input class="moment-goal-input" type="text" id="momentGoal" maxlength="200"
-                    aria-describedby="momentGoalSaved">
-                  <span class="moment-goal-saved" id="momentGoalSaved" role="status"></span>
-                </form>
+                <p class="moment-date" id="momentDate"></p>${linksHtml}
                 <p class="moment-quote" id="momentQuote"></p>
               </div>
+              <nav class="moment-bookmarks" id="momentBookmarks" aria-label="Links"></nav>
             </div>`;
 }
 
@@ -1865,6 +2006,10 @@ async function renderDirectory(dirPath, urlPath) {
   // configured plugins give us. Vault is added last, so it can carry the
   // directory listing that is built further down, and shown first.
   let homeTabs = null;
+  // Today's diary and plan, shown on the calm panel under the date. Hoisted
+  // for the same reason as the two above: they are filled in inside the home
+  // page branch and read from the tab block, which is a sibling of it.
+  let homeMomentLinks = [];
 
   // Special homepage content
   if (!urlPath) {
@@ -1916,29 +2061,20 @@ async function renderDirectory(dirPath, urlPath) {
     // Determine "Today" link: diary if markdown-diary enabled, else plan if markdown-plans enabled
     const diaryEnabled = isPluginConfigured('markdown-diary');
     const plansEnabled = isPluginConfigured('markdown-plans');
+    homeMomentLinks = [
+      diaryEnabled && { href: '/_today/diary', label: 'Diary' },
+      plansEnabled && { href: '/_today/plan', label: 'Plan' }
+    ].filter(Boolean);
     const nowUpdatesEnabled = isPluginConfigured('now-updates');
 
     homeTabs = [];
 
-    // Today's diary/plan and today's tasks are two links with a count; they
-    // were two saturated full-width tiles, which made the loudest thing on the
-    // page a fact that is almost always true.
+    // Today's tasks are a link with a count; they were a saturated full-width
+    // tile, which made the loudest thing on the page a fact that is almost
+    // always true. Today's diary and plan used to sit here too — they are on
+    // the calm panel now, under the date, where the day is already the
+    // subject.
     homeLinks = [];
-    if (diaryEnabled) {
-      homeLinks.push({
-        href: `/diary/${todayISO}.md`,
-        icon: 'fa-book',
-        label: 'Diary',
-        detail: todayDisplay
-      });
-    } else if (plansEnabled) {
-      homeLinks.push({
-        href: `/plans/${todayPlanFile}`,
-        icon: 'fa-calendar-day',
-        label: 'Plan',
-        detail: todayDisplay
-      });
-    }
     homeLinks.push({
       href: '/tasks/today.md',
       icon: 'fa-tasks',
@@ -2032,7 +2168,7 @@ async function renderDirectory(dirPath, urlPath) {
     // Recents is still a placeholder; the list is filled in by the page.
     homeTabs.push({
       id: 'recents',
-      label: 'Recent Pages',
+      label: 'Recent',
       icon: 'fa-history',
       body: `
                 <div class="list-group list-group-flush" id="recentsList">
@@ -2166,7 +2302,9 @@ async function renderDirectory(dirPath, urlPath) {
       icon: 'fa-sun',
       body: renderMomentPanel(
         getConfig('profile.display_name')
-          || String(getConfig('profile.name') || '').trim().split(/\s+/)[0]
+          || String(getConfig('profile.name') || '').trim().split(/\s+/)[0],
+        getStageNamesByWeekday(),
+        homeMomentLinks
       )
     });
     contentHtml += renderHomeTabCard(homeTabs, homeLinks);
@@ -6067,7 +6205,7 @@ app.get('/_git', authMiddleware, async (req, res) => {
         ${ahead > 0 ? `<span class="badge bg-primary">${ahead} ahead</span>` : ''}
         ${behind > 0 ? `<span class="badge bg-secondary">${behind} behind</span>` : ''}
         <div class="ms-auto d-flex gap-2">
-          ${hasRemote ? `<button class="btn btn-sm btn-outline-success" onclick="gitPull()" id="pullBtn">
+          ${hasRemote ? `<button class="btn btn-sm btn-outline-dark" onclick="gitPull()" id="pullBtn">
             <i class="fas fa-download me-1"></i>Pull${behind > 0 ? ' (' + behind + ')' : ''}
           </button>` : ''}
           ${hasRemote ? `<button class="btn btn-sm btn-outline-primary" onclick="gitPush()" id="pushBtn">

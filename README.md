@@ -139,6 +139,43 @@ Many file-based plugins look for a "vault" directory and follow some [Obsidian](
 
 **Important:** The `vault/` directory is gitignored because it contains personal data. Initialize it as a separate repository or sync it with your preferred solution. Plugins have permission to read and write from the vault. We *strongly suggest* you run `git init` within the vault and monitor its changes to make sure you're happy with any changes `today` makes.
 
+### Today's own files in the vault
+
+A handful of files in the vault belong to Today rather than to you: the
+palettes it offers, the quotes on the calm panel, the links across the top of
+it. They gather under one directory inside the vault — `today/` by default —
+so the vault root stays yours.
+
+| file | what it is |
+|---|---|
+| `vault/today/themes/<name>.toml` | a palette (see [Themes](#themes)) |
+| `vault/today/quotes.md` | the calm panel's quotes, one per line as `- Text — Author` |
+| `vault/today/links.md` | the links across the top of the calm panel, one per line as `- [Label](https://example.com)` |
+
+Each is looked for under that directory first and at the vault root second, so
+a vault written before the directory existed keeps working and can be tidied
+whenever you feel like it. Rename the directory, or put everything back at the
+root, with `app_directory` in `config.toml`:
+
+```toml
+app_directory = "today"   # the default
+app_directory = ""        # everything at the vault root
+```
+
+All three are read on demand and held until their modification time moves, so
+an edit shows up on the next page load without a restart.
+
+`links.md` is an ordinary markdown list, so it reads as a page in the vault and
+is editable from a phone like any other note. A link whose target names a
+scheme other than `http`, `https` or `mailto` is dropped rather than rendered —
+the file is yours, but it arrives over whatever syncs your vault, and a
+`javascript:` target in something that looks like notes is not Today's to
+honour. Vault-relative paths are fine.
+
+Not part of this: `vault/scripts/` stays at the vault root, because notes call
+its widgets by path (`dv.view("scripts/time-tracking-widget")`) and moving it
+would break every caller, including archived plans.
+
 Multi-device vault sync has two distinct layers:
 
 **Working-tree sync** (the files themselves) keeps the vault's actual file contents identical across devices. When you edit a file on one device, the change appears on all other devices — uncommitted, unstaged, just the raw bytes. Use any file-level sync tool you prefer: Resilio Sync, Syncthing, iCloud, Dropbox, Unison, etc. Make sure `.git`, `.git.nosync`, and `node_modules` are excluded from the sync — unignored git directories will flood most sync daemons with inotify events.
@@ -222,11 +259,11 @@ choice is stored on the server, so every device you open the vault on agrees
 on it.
 
 The colours themselves come from a palette, and you can keep your own in the
-vault. Put a TOML file in `vault/themes/`, one per palette, and it appears in
-the gear menu as soon as you reload a page — no restart:
+vault. Put a TOML file in `vault/today/themes/`, one per palette, and it
+appears in the gear menu as soon as you reload a page — no restart:
 
 ```toml
-# vault/themes/cocoa.toml
+# vault/today/themes/cocoa.toml
 name = "Cocoa"
 
 [light]
@@ -271,6 +308,37 @@ Two things to watch:
   highlight.js, which picks its own colours per mode, so `code-block-bg`
   should stay light under `[light]` and dark under `[dark]` whatever the rest
   of the palette does.
+
+The keys come in two sets, and the difference between them matters more than
+any individual colour.
+
+**Status** — `ok-*`, `attn-*`, `info-*`, `err-*` — says how something *went*.
+Green worked, amber needs a look, red is wrong. These carry meaning on their
+own, so they are the same everywhere they appear regardless of what they sit
+inside, and each is a trio: the `-bg` tint, the `-text` ink that has to clear
+4.5:1 on it, and the `-edge` for a border or stripe.
+
+**Family** — `family-work`, `family-day`, `family-time`, `family-world`,
+`family-self`, `family-site` — says what a thing *is*. A task is `work`
+wherever it turns up; the pomodoro is `site`, Today's own instrument. Six of
+them, collapsed from Today's eleven plugin types, because eleven hues cannot
+be told apart. Which type landed in which family is arbitrary-but-consistent,
+and that is all a family colour has to be: its only job is that the same kind
+of thing looks the same way twice.
+
+Keeping them apart is the point. A family colour is used as a stripe and as a
+wash mixed into the card beneath it, never as ink — the text on a family wash
+stays `text`, in both modes. So **a family colour has no contrast floor**,
+which is why a palette can put a fully saturated hue there and have it come
+out legible. Status colours do carry ink, and they move for status reasons: if
+the two sets shared a key, darkening the error red to fix its contrast would
+silently restyle every card of whatever family happened to share it.
+
+The practical rule when you are picking a colour: **ask whether it is carrying
+text before reaching for the accessible tone.** Contrast measures luminance,
+and a saturated hue against a pale wash differs mostly in chromaticity, so a
+bright stripe can measure badly and still read perfectly. Substituting a
+"legible" tone there usually just makes it muddy.
 
 `test/fixtures/a11y-vault/themes/cocoa.toml` is a complete, contrast-checked
 example.

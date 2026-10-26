@@ -22,6 +22,14 @@
      palette renders exactly as it did before the bridge below existed. */
   --today-brand-bg: #3b71ca;
   --today-brand-text: #ffffff;
+  /* The header is its own surface, not a second duty for the brand fill. The
+     brand fill is also the badges, the AI card header and border-primary on a
+     blockquote, so a palette that wants a pale header -- which is a common
+     thing to want -- cannot say so through that token without erasing the
+     borders. These default to the brand pair, so a palette that sets only the
+     brand still moves the header exactly as it did before. */
+  --today-header-bg: var(--today-brand-bg);
+  --today-header-text: var(--today-brand-text);
   /* Controls and filled buttons carry their own contrast duties, so they are
      palette entries in their own right rather than shades of the two above.
      --today-border separates surfaces that already differ, but on an input
@@ -46,7 +54,7 @@
   /* The same bridge for the brand fill. MDB 7.1.0 never reads --mdb-primary
      itself — Today's own rules do, here and in web-server.js — and what MDB
      reads is the triple, which it composes as rgba(var(--mdb-primary-rgb), a)
-     for .bg-primary (the navbar, the day tiles), .text-primary and
+     for .bg-primary (the AI card header, the badges), .text-primary and
      .border-primary. So the triple is spelled out here and re-emitted by a
      vault theme (see src/web/themes.js). Both lines hold MDB's own primary,
      #3b71ca, so the built-in palette is unmoved. */
@@ -67,6 +75,43 @@
   --today-attn-edge: #d97706;
   --today-ok-text: #1e6b3d;
   --today-ok-bg: #e3f4ea;
+  --today-ok-edge: #1a7f4b;
+  --today-info-text: #1d5566;
+  --today-info-bg: #cff4fc;
+  --today-info-edge: #0aa2c0;
+  --today-err-text: #842029;
+  --today-err-bg: #f8d7da;
+  --today-err-edge: #dc3545;
+  /* FAMILY colours. These say what a thing *is* -- a task, a diary entry, a
+     calendar event -- and never how it went. That is what the status tokens
+     above are for, and keeping the two sets apart is the point: a status
+     colour moves for status reasons, and if the two shared a token, darkening
+     the error red for contrast would silently restyle every card of whatever
+     family happened to share it.
+
+     A family colour has no contrast floor of its own. It is used as a stripe,
+     which carries no information, and as a wash mixed into the card
+     underneath; the ink on that wash stays --today-text in both modes. So no
+     family can fail contrast on its own surface, which is the failure mode
+     these replace.
+
+     Six, collapsed from Today's eleven plugin types, because eleven hues are
+     not tellable apart. There is no deep logic to which type landed where and
+     it is better not to pretend otherwise -- the job of a family colour is
+     only that the same kind of thing looks the same way twice.
+
+       work   tasks, projects, issues
+       day    diary, plans, now, stage
+       time   time logs, routines
+       world  calendar events, contacts, email
+       self   health, finance
+       site   Today's own instruments, and the default */
+  --today-family-work: #2563eb;
+  --today-family-day: #b45309;
+  --today-family-time: #7c3aed;
+  --today-family-world: #047857;
+  --today-family-self: #be123c;
+  --today-family-site: #475569;
 }
 
 html[data-theme="dark"] {
@@ -86,6 +131,10 @@ html[data-theme="dark"] {
      same stock values in both modes and the built-in palette is unmoved. */
   --today-brand-bg: #3b71ca;
   --today-brand-text: #ffffff;
+  /* Reset aliases in each mode, just like their base tokens: otherwise a
+     light palette override on :root survives when the dark key is omitted. */
+  --today-header-bg: var(--today-brand-bg);
+  --today-header-text: var(--today-brand-text);
   --today-control-border: #6b7280;
   --today-button-bg: #2563eb;
   --today-button-hover-bg: #1d4ed8;
@@ -105,6 +154,21 @@ html[data-theme="dark"] {
   --today-attn-edge: #f59e0b;
   --today-ok-text: #86efac;
   --today-ok-bg: #173a27;
+  --today-ok-edge: #15803d;
+  --today-info-text: #cffafe;
+  --today-info-bg: #164e63;
+  --today-info-edge: #0e7490;
+  --today-err-text: #fee2e2;
+  --today-err-bg: #7f1d1d;
+  --today-err-edge: #b91c1c;
+  /* The same six, lifted for a dark ground. The wash percentage drops to 12%
+     below, because an identical mix reads much heavier against dark. */
+  --today-family-work: #60a5fa;
+  --today-family-day: #fbbf24;
+  --today-family-time: #a78bfa;
+  --today-family-world: #34d399;
+  --today-family-self: #fb7185;
+  --today-family-site: #94a3b8;
   /* MDB's own dark palette is neutral grey (#424242 surfaces) where Today's
      is slate, which is why its cards, dropdowns and modals used to be
      corrected by hand further down this file. Pointing the tokens those
@@ -646,19 +710,25 @@ details.role-reply .form-text {
   color: var(--today-muted-text);
 }
 
-/* Obsidian-style callout variations */
-details.callout-note { border-left: 4px solid var(--today-link); }
-details.callout-tip { border-left: 4px solid #28a745; }
-details.callout-warning { border-left: 4px solid #ffc107; }
-details.callout-danger { border-left: 4px solid #dc3545; }
-details.callout-info { border-left: 4px solid #17a2b8; }
-details.callout-success, details.callout-check, details.callout-done { border-left: 4px solid #28a745; }
-details.callout-abstract, details.callout-summary, details.callout-tldr { border-left: 4px solid #00b0ff; }
-details.callout-hint, details.callout-important { border-left: 4px solid #00bcd4; }
-details.callout-question, details.callout-help, details.callout-faq { border-left: 4px solid #ffc107; }
-details.callout-caution, details.callout-attention { border-left: 4px solid #ff9800; }
-details.callout-failure, details.callout-fail, details.callout-missing, details.callout-error, details.callout-bug { border-left: 4px solid #f44336; }
-details.callout-cite { border-left: 4px solid #9e9e9e; }
+/* Obsidian-style callout variations. A callout reports an outcome, so these
+   are status, and they resolve to the four status edges rather than to twelve
+   literal hexes. That collapses four separate blues (note, info, abstract,
+   hint) into one and two ambers (warning, question) into one -- deliberately:
+   they were never four different kinds of information, and a palette could
+   not reach any of them while they were literals. */
+details.callout-note,
+details.callout-info,
+details.callout-abstract, details.callout-summary, details.callout-tldr,
+details.callout-hint, details.callout-important { border-left: 4px solid var(--today-info-edge); }
+details.callout-tip,
+details.callout-success, details.callout-check, details.callout-done { border-left: 4px solid var(--today-ok-edge); }
+details.callout-warning,
+details.callout-question, details.callout-help, details.callout-faq,
+details.callout-caution, details.callout-attention { border-left: 4px solid var(--today-attn-edge); }
+details.callout-danger,
+details.callout-failure, details.callout-fail, details.callout-missing,
+details.callout-error, details.callout-bug { border-left: 4px solid var(--today-err-edge); }
+details.callout-cite { border-left: 4px solid var(--today-border); }
 
 body {
   background-color: var(--today-bg);
@@ -1234,6 +1304,12 @@ html[data-theme="dark"] .editor-toolbar {
   z-index: 1020;
   font-size: 16px;
   padding: 0;
+  /* Painted here rather than by .bg-primary, which is !important and would
+     win over any token. The border is what separates a pale header from a
+     pale page; on a dark one it simply disappears into the surround. */
+  background-color: var(--today-header-bg);
+  color: var(--today-header-text);
+  border-bottom: 1px solid var(--today-border);
 }
 
 .navbar > .container-fluid {
@@ -1246,7 +1322,7 @@ html[data-theme="dark"] .editor-toolbar {
 .navbar .navbar-brand {
   display: inline-flex;
   align-items: center;
-  color: var(--today-brand-text);
+  color: var(--today-header-text);
   min-height: 44px;
   margin: 0 8px 0 0;
   padding: 0 4px;
@@ -1258,9 +1334,10 @@ html[data-theme="dark"] .editor-toolbar {
   font-size: 22px;
 }
 
-/* The navbar is painted from the brand fill, so its ink is the brand's.
-   The hover wash stays a translucent white: it lightens whatever it sits
-   on rather than naming a colour of its own. */
+/* The navbar is painted from the header surface, so its ink is the header's.
+   The hover wash defaults to translucent white. Where the literal @supports
+   check passes, it is mixed from the header ink instead, so it darkens a pale
+   header and lightens a dark one without either naming a colour. */
 .navbar .nav-link,
 .navbar .navbar-icon-btn {
   display: inline-flex;
@@ -1271,7 +1348,7 @@ html[data-theme="dark"] .editor-toolbar {
   padding: 0 6px;
   font-size: 18px;
   line-height: 1;
-  color: var(--today-brand-text);
+  color: var(--today-header-text);
   background: none;
   border: 0;
   border-radius: 6px;
@@ -1280,13 +1357,21 @@ html[data-theme="dark"] .editor-toolbar {
 .navbar .nav-link:hover,
 .navbar .navbar-icon-btn:hover,
 .navbar .navbar-icon-btn[aria-expanded="true"] {
-  color: var(--today-brand-text);
+  color: var(--today-header-text);
   background: rgba(255, 255, 255, 0.16);
+}
+
+@supports (background: color-mix(in srgb, #fff 14%, transparent)) {
+  .navbar .nav-link:hover,
+  .navbar .navbar-icon-btn:hover,
+  .navbar .navbar-icon-btn[aria-expanded="true"] {
+    background: color-mix(in srgb, var(--today-header-text) 14%, transparent);
+  }
 }
 
 .navbar .navbar-icon-btn:focus-visible,
 .navbar .nav-link:focus-visible {
-  outline: 2px solid var(--today-brand-text);
+  outline: 2px solid var(--today-header-text);
   outline-offset: 2px;
 }
 
@@ -1322,7 +1407,7 @@ html[data-theme="dark"] .editor-toolbar {
 }
 
 .navbar-search-cancel {
-  color: var(--today-brand-text);
+  color: var(--today-header-text);
   font-size: 16px;
   padding: 0 4px;
   text-decoration: none;
@@ -1330,7 +1415,7 @@ html[data-theme="dark"] .editor-toolbar {
 
 .navbar-search-cancel:hover,
 .navbar-search-cancel:focus {
-  color: var(--today-brand-text);
+  color: var(--today-header-text);
   text-decoration: underline;
 }
 
@@ -1584,38 +1669,48 @@ html[data-theme="dark"] .alert-primary {
   border-color: #1d4ed8;
 }
 
-/* MDB's info alert text (#3b7e94) is 4.05:1 on its own background */
+/* STATUS alerts, both modes, from the status tokens. These used to be MDB's
+   own light values plus a hand-written dark override per variant, which meant
+   a vault palette could move the warning and success tokens and not the
+   alerts that are the main thing wearing them. MDB's own info ink (#3b7e94)
+   was 4.05:1 on its own background, which is why that one already had a
+   correction here; now all four resolve the same way.
+
+   Specificity is MDB's own (one class), so these must stay after MDB's
+   stylesheet, which they are. */
 .alert-info {
-  --mdb-alert-color: #1d5566;
-  color: #1d5566;
+  --mdb-alert-color: var(--today-info-text);
+  background-color: var(--today-info-bg);
+  color: var(--today-info-text);
+  border-color: var(--today-info-edge);
 }
 
-html[data-theme="dark"] .alert-info {
-  background-color: #164e63;
-  color: #cffafe;
-  border-color: #0e7490;
+.alert-success {
+  --mdb-alert-color: var(--today-ok-text);
+  background-color: var(--today-ok-bg);
+  color: var(--today-ok-text);
+  border-color: var(--today-ok-edge);
 }
 
-html[data-theme="dark"] .alert-success {
-  background-color: #14532d;
-  color: #dcfce7;
-  border-color: #15803d;
+.alert-warning {
+  --mdb-alert-color: var(--today-attn-text);
+  background-color: var(--today-attn-bg);
+  color: var(--today-attn-text);
+  border-color: var(--today-attn-edge);
 }
 
-html[data-theme="dark"] .alert-warning {
-  background-color: #713f12;
-  color: #fef3c7;
-  border-color: #a16207;
+.alert-danger {
+  --mdb-alert-color: var(--today-err-text);
+  background-color: var(--today-err-bg);
+  color: var(--today-err-text);
+  border-color: var(--today-err-edge);
 }
 
-html[data-theme="dark"] .alert-danger {
-  background-color: #7f1d1d;
-  color: #fee2e2;
-  border-color: #b91c1c;
+.alert a:not(.btn) {
+  color: inherit;
 }
 
-html[data-theme="dark"] .alert strong,
-html[data-theme="dark"] .alert a:not(.btn) {
+html[data-theme="dark"] .alert strong {
   color: inherit;
 }
 
@@ -1948,44 +2043,175 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
   flex: 0 0 auto;
 }
 
-.activity-pills {
+
+
+
+/* ── A running timer ───────────────────────────────────────────────────────
+   Collapsed it is one row: emoji, what it is, the clock. The detail and the
+   controls are behind the disclosure, so three running timers cost three
+   lines rather than most of a phone screen. */
+
+/* The task timer and the pomodoro sit on one row. The task timer takes the
+   slack because its title is the part worth reading; the pomodoro stays its
+   own width, since collapsed it is only a tomato and a clock. They wrap to
+   two rows rather than squeezing if a phone is narrow enough. */
+/* A FAMILY card: what it is, not how it went. Carries the family stripe and a
+   wash of the same colour mixed into the card it sits on, with body ink on
+   top in both modes.
+
+   The stripe is the family colour undiluted. That is on purpose: a stripe
+   carries no information, so WCAG's 3:1 does not apply to it, and the
+   temptation to "fix" a bright one is worth resisting -- contrast measures
+   luminance, and a saturated hue against a pale wash differs mostly in
+   chromaticity, so it reads perfectly well while measuring badly.
+
+   The literal @supports check below keeps --today-card-bg when color-mix is
+   unavailable. Without it, a declaration containing var() would become
+   invalid at computed-value time and reset the background to transparent
+   rather than falling back to the plain value. */
+.family-card {
+  --family: var(--today-family-site);
+  background: var(--today-card-bg);
+  color: var(--today-text);
+  border: 1px solid var(--today-border);
+  border-left: 4px solid var(--family);
+  border-radius: 0.5rem;
+}
+
+@supports (background: color-mix(in srgb, #fff 85%, #000)) {
+  .family-card {
+    background: color-mix(in srgb, var(--family) 14%, var(--today-card-bg));
+  }
+
+  html[data-theme="dark"] .family-card {
+    background: color-mix(in srgb, var(--family) 12%, var(--today-card-bg));
+  }
+}
+
+.family-work { --family: var(--today-family-work); }
+.family-day { --family: var(--today-family-day); }
+.family-time { --family: var(--today-family-time); }
+.family-world { --family: var(--today-family-world); }
+.family-self { --family: var(--today-family-self); }
+.family-site { --family: var(--today-family-site); }
+
+.timer-row {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   gap: 0.5rem;
 }
 
-.activity-pill {
-  display: inline-flex;
+/* Basis zero, not a content width: a growing card takes whatever is left once
+   the compact ones have theirs, which is what keeps all three on one line at
+   phone width instead of wrapping. */
+.timer-card-grow {
+  flex: 1 1 0;
+  /* A floor rather than 0: below about this the description is a couple of
+     characters and an ellipsis, which is worth less than the row it saves, so
+     the card wraps to its own line instead. All three still share one line
+     whenever they genuinely fit. */
+  min-width: 9rem;
+}
+
+/* An opened card takes the row to itself. Sharing a line is for the collapsed
+   state; a card with controls in it squeezed beside another is the layout the
+   row was meant to avoid. */
+.timer-card[open] {
+  flex: 1 1 100%;
+}
+
+/* Sized by content, but allowed to shrink: three collapsed cards came to a
+   few pixels more than a 390px phone, and giving back those pixels by
+   truncating a label is better than spending a whole row on them. */
+.timer-card-tight {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* Padding here rather than Bootstrap's px-3, so a phone can have a little
+   less of it: three collapsed cards came to three pixels more than a 390px
+   screen, and a wrapping flex row wraps before it shrinks, so those three
+   pixels cost a whole row. Also beats MDB's own alert margin. */
+.timer-card {
+  margin-bottom: 0.5rem;
+  padding: 0.25rem 1rem;
+}
+
+@media (max-width: 768px) {
+  .timer-card {
+    padding-left: 0.625rem;
+    padding-right: 0.625rem;
+  }
+}
+
+.timer-row > .timer-card {
+  margin-bottom: 0;
+}
+
+.timer-card > summary {
+  display: flex;
   align-items: center;
-  gap: 0.4rem;
-  min-height: 2.25rem;
-  padding: 0.25rem 0.75rem;
-  border: 1px solid var(--today-control-border);
-  border-radius: 999px;
-  background: var(--today-card-bg);
-  color: var(--today-text);
-  font-size: 0.875rem;
-  line-height: 1.2;
-  text-decoration: none;
+  gap: 0.5rem;
+  cursor: pointer;
+  /* Both are needed: the second is what removes the triangle in Safari. */
+  list-style: none;
 }
 
-a.activity-pill:hover,
-a.activity-pill:focus-visible {
-  background: var(--today-hover-bg);
-  color: var(--today-text);
-  text-decoration: none;
+.timer-card > summary::-webkit-details-marker {
+  display: none;
 }
 
-.activity-pill > i {
-  color: var(--today-muted-text);
+.timer-card > summary:focus-visible {
+  outline: 2px solid var(--today-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
-.activity-pill-quiet {
-  border-style: dashed;
-  color: var(--today-muted-text);
+/* The title is the only part that can give, so it is the only part that
+   truncates; min-width: 0 is what lets a flex child shrink that far. */
+.timer-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 600;
 }
 
-.activity-pill-count {
+/* Truncation is for the one-line collapsed card; once opened, the title wraps
+   so a long description can be read in full. */
+.timer-card[open] .timer-title {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+
+/* Tabular figures, or the row twitches every second as the digits change.
+   Not dimmed: at 0.85 the countdown came out at 3.73:1 on the pomodoro's
+   tint, and the remaining time is the whole point of the collapsed row. */
+.timer-clock {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.timer-detail {
+  margin-top: 0.5rem;
+}
+
+/* The timer emoji. They bring their own colour, so no ink token applies;
+   what they need is to sit level with the text beside them. */
+.activity-emoji {
+  flex: 0 0 auto;
+  display: inline-block;
+  font-size: 0.95rem;
+  line-height: 1;
+  font-style: normal;
+}
+
+
+.timer-count {
   display: inline-block;
   min-width: 1.5rem;
   padding: 0 0.4rem;
@@ -1999,13 +2225,13 @@ a.activity-pill:focus-visible {
 
 /* Nothing due is not news, so the count stops shouting rather than disappearing
    — the control should not change shape depending on the number in it. */
-.activity-pill-count-zero {
+.timer-count-zero {
   background: var(--today-muted-bg);
   color: var(--today-muted-text);
   font-weight: 400;
 }
 
-.activity-pill-number {
+.timer-minutes {
   width: 2.75rem;
   padding: 0.1rem 0.35rem;
   border: 1px solid var(--today-control-border);
@@ -2016,7 +2242,7 @@ a.activity-pill:focus-visible {
   text-align: center;
 }
 
-.activity-pill-go {
+.timer-go {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2030,23 +2256,47 @@ a.activity-pill:focus-visible {
   font-size: 0.75rem;
 }
 
-.activity-pill-go:hover {
+.timer-go:hover {
   background: var(--today-button-hover-bg);
   color: #ffffff;
 }
 
-.activity-pill-go:disabled {
+.timer-go:disabled {
   opacity: 0.65;
 }
 
-.activity-pill-unit {
-  color: var(--today-muted-text);
+/* No colour of its own: it sits inside a tinted card, and the muted token was
+   3.58:1 against the dark green one. The card's own ink is the only thing
+   guaranteed to contrast with the card. */
+.timer-unit {
   font-size: 0.75rem;
+}
+
+/* The row's own spacing, rather than a margin on each piece. ms-auto on the
+   Stop button collapses to nothing once the description has eaten the slack,
+   which on a phone left the duration touching the button; a gap is a floor
+   that an auto margin cannot take away. */
+.activity-tracker-running {
+  gap: 0.5rem;
+}
+
+/* The running timer is one line: a clock, what is being worked on, how long,
+   and Stop. The description is the only part that can give, so it is the only
+   part that truncates — min-width: 0 is what lets it, since a flex child
+   otherwise refuses to shrink below its content and overflows the row
+   instead of ellipsing. */
+.activity-tracker-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .activity-tracker-meta {
   font-size: 0.8125rem;
 }
+
 
 /* ── The home page's tabbed card ───────────────────────────────────────────
    Vault, Now, Plans and Recent Pages were four stacked cards, three of them
@@ -2155,8 +2405,13 @@ a.activity-pill:focus-visible {
   border-bottom-right-radius: inherit;
 }
 
-/* Chips on a phone. Six folder tabs wrap to three lines at 390px; the same
-   six as chips fit in two, and each is still a 32px-tall target. */
+/* Chips on a phone, in one row that slides sideways. Seven folder tabs wrap
+   to three lines at 390px; as chips on a single scrolling row they cost one,
+   and each is still a 32px-tall target.
+
+   The strip is the scroll container rather than either list inside it,
+   because the tablist and the two pass-through links are separate <ul>s and
+   the point is that they read as one row. */
 @media (max-width: 768px) {
   .home-tabbar {
     gap: 6px;
@@ -2164,10 +2419,31 @@ a.activity-pill:focus-visible {
        folder tabs joined to the panel, so the list below needs daylight. */
     padding: 0.5rem 0.5rem 0.75rem;
     border-bottom: 0;
+    flex-wrap: nowrap;
+    align-items: center;
+    overflow-x: auto;
+    /* Without this, a flick at either end of the row becomes Safari's
+       swipe-to-go-back. */
+    overscroll-behavior-x: contain;
+    /* A visible scrollbar is taller than the line of chips this saves. What
+       shows the row continues is the chip cut off at the edge. */
+    scrollbar-width: none;
+  }
+
+  .home-tabbar::-webkit-scrollbar {
+    display: none;
   }
 
   .home-tabs {
     gap: 6px;
+    flex-wrap: nowrap;
+  }
+
+  /* Chips in a row that cannot wrap would otherwise be squeezed until their
+     labels clipped, rather than overflowing the row. */
+  .home-tabbar > *,
+  .home-tabs > * {
+    flex: 0 0 auto;
   }
 
   .home-tabs .nav-link {
@@ -2205,6 +2481,7 @@ a.activity-pill:focus-visible {
 .moment {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 26rem;
@@ -2246,6 +2523,7 @@ a.activity-pill:focus-visible {
   position: relative;
   width: 100%;
   max-width: 34rem;
+  margin: auto;
   padding: 2.5rem 1.5rem;
   color: #ffffff;
   text-align: center;
@@ -2266,43 +2544,70 @@ a.activity-pill:focus-visible {
   font-weight: 400;
 }
 
-.moment-goal {
-  margin-top: 2.5rem;
+/* The day itself, and which stage it belongs to when the stages plugin is on.
+   Lighter than the greeting: it is a fact about today, not a salutation. */
+.moment-date {
+  margin: 1.75rem 0 0;
+  font-size: clamp(0.95rem, 2.8vw, 1.15rem);
+  font-weight: 300;
+  letter-spacing: 0.02em;
+  opacity: 0.9;
 }
 
-.moment-goal-label {
-  display: block;
-  margin-bottom: 0.75rem;
-  font-size: clamp(1rem, 3vw, 1.2rem);
-  font-weight: 400;
+/* Today's diary and plan, under the date. Underlined rather than merely
+   white, because on a photograph there is no other cue that they are links. */
+.moment-links {
+  margin: 0.6rem 0 0;
+  font-size: clamp(0.95rem, 2.8vw, 1.1rem);
+  font-weight: 300;
 }
 
-/* A rule to write on rather than a box: the point is that it does not look
-   like a form. */
-.moment-goal-input {
-  width: 100%;
-  padding: 0.25rem 0.25rem 0.4rem;
-  border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.85);
-  background: none;
+.moment-links a,
+.moment-bookmarks a {
   color: #ffffff;
-  font-size: 1.05rem;
-  text-align: center;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
 }
 
-.moment-goal-input:focus {
-  outline: none;
-  border-bottom-color: #ffffff;
-  border-bottom-width: 2px;
-  padding-bottom: calc(0.4rem - 1px);
+.moment-links a:hover,
+.moment-links a:focus-visible,
+.moment-bookmarks a:hover,
+.moment-bookmarks a:focus-visible {
+  color: #ffffff;
+  text-decoration-thickness: 2px;
 }
 
-.moment-goal-saved {
-  display: block;
-  min-height: 1.2em;
-  margin-top: 0.4rem;
-  font-size: 0.8rem;
-  opacity: 0.85;
+.moment-links a:focus-visible,
+.moment-bookmarks a:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.moment-links-sep {
+  opacity: 0.7;
+}
+
+/* The user's own links, from the vault's links.md, across the top of the
+   panel. They wrap, since how many there are is up to whoever wrote the file;
+   staying in flow keeps them from covering the centred block. */
+.moment-bookmarks {
+  box-sizing: border-box;
+  align-self: stretch;
+  flex: none;
+  order: -1;
+  padding: 1.1rem 1.5rem;
+  color: #ffffff;
+  font-size: clamp(0.85rem, 2.4vw, 1rem);
+  font-weight: 300;
+  line-height: 1.6;
+  text-align: left;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.moment-bookmarks:empty {
+  display: none;
 }
 
 .moment-quote {
@@ -2321,8 +2626,12 @@ a.activity-pill:focus-visible {
     padding: 2rem 1.25rem;
   }
 
-  .moment-goal {
-    margin-top: 1.75rem;
+  .moment-bookmarks {
+    padding: 0.9rem 1.25rem;
+  }
+
+  .moment-date {
+    margin-top: 1.25rem;
   }
 
   .moment-quote {

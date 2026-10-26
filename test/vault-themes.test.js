@@ -34,8 +34,8 @@ afterEach(async () => {
   await fs.rm(vaultDir, { recursive: true, force: true });
 });
 
-async function writeTheme(name, contents) {
-  const themesDir = path.join(vaultDir, 'themes');
+async function writeTheme(name, contents, directory = 'themes') {
+  const themesDir = path.join(vaultDir, directory);
   await fs.mkdir(themesDir, { recursive: true });
   await fs.writeFile(path.join(themesDir, name), contents, 'utf-8');
 }
@@ -52,6 +52,54 @@ test('source never uses the brand fill as text-primary foreground ink', async ()
     if (/\btext-primary\b/.test(withoutComments)) consumers.push(file);
   }
   expect(consumers).toEqual([]);
+});
+
+// The two vocabularies: FAMILY says what a thing is, STATUS says how it went.
+// The rule that keeps them useful is that a family colour is never ink -- it
+// is a stripe and a wash, with body ink on top -- which is also what frees it
+// from any contrast floor. Documented in README.md; asserted here, because a
+// rule that lives only in a comment gets rediscovered instead of followed.
+describe('family and status stay separate', () => {
+  const cssPath = fileURLToPath(new URL('../src/web/public/css/style.css', import.meta.url));
+
+  test('a family colour is never used as ink', async () => {
+    const css = await fs.readFile(cssPath, 'utf8');
+    const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    // Every `color:` / `-webkit-text-fill-color:` declaration, wherever it
+    // sits -- a one-line rule puts it after the brace, not at line start,
+    // which is what an earlier version of this test missed. The leading
+    // boundary is what keeps `background-color` and `border-color` out.
+    // Catch both --today-family-* tokens and the cards' --family alias.
+    const declaration = /(?:^|[\s;{])(?:-webkit-text-fill-)?color\s*:\s*([^;}]*)/g;
+    const inkUses = [];
+    for (const match of withoutComments.matchAll(declaration)) {
+      if (/--(?:today-family-|family\b)/.test(match[1])) inkUses.push(match[0].trim());
+    }
+    expect(inkUses).toEqual([]);
+  });
+
+  test('the two sets share no token', () => {
+    const families = THEME_TOKENS.filter(token => token.startsWith('family-'));
+    const statuses = THEME_TOKENS.filter(token => /^(ok|attn|info|err)-/.test(token));
+    expect(families.length).toBeGreaterThan(0);
+    expect(statuses.length).toBeGreaterThan(0);
+    expect(families.filter(token => statuses.includes(token))).toEqual([]);
+  });
+
+  test('every family and status token has a value in both modes', async () => {
+    const css = await fs.readFile(cssPath, 'utf8');
+    const light = css.slice(css.indexOf(':root {'), css.indexOf('html[data-theme="dark"] {'));
+    const dark = css.slice(css.indexOf('html[data-theme="dark"] {'));
+    const wanted = THEME_TOKENS.filter(
+      token => token.startsWith('family-') || /^(ok|attn|info|err)-/.test(token)
+    );
+    const missing = [];
+    for (const token of wanted) {
+      if (!light.includes(`--today-${token}:`)) missing.push(`light ${token}`);
+      if (!dark.includes(`--today-${token}:`)) missing.push(`dark ${token}`);
+    }
+    expect(missing).toEqual([]);
+  });
 });
 
 describe('reading a colour', () => {
@@ -151,9 +199,11 @@ describe('rendering the stylesheet', () => {
     expect(css).toContain('--mdb-body-color-rgb: 242, 234, 222;');
   });
 
-  // MDB composes .bg-primary — the navbar, the day tiles, the badges — as
+  // MDB composes .bg-primary — the badges, the AI header — as
   // rgba(var(--mdb-primary-rgb), var(--mdb-bg-opacity)), so the brand fill
-  // needs its triple spelled out too, or a palette stops at the navbar.
+  // needs its triple spelled out too, or a palette stops short of them. The
+  // navbar used to be the headline case here; it has its own token now, which
+  // still defaults to this fill.
   test('the brand fill moves MDB\'s primary, in both modes', () => {
     const { theme } = buildTheme('cocoa', {
       name: 'Cocoa',
@@ -175,6 +225,24 @@ describe('rendering the stylesheet', () => {
     const { theme } = buildTheme('cocoa', { light: { 'brand-text': '#ffffff' } });
     const css = renderThemeCss(theme);
     expect(css).toContain('--today-brand-text: rgb(255, 255, 255);');
+    expect(css).not.toContain('--mdb-primary-rgb');
+  });
+
+  test('a header colour is emitted only when the theme asks for one', () => {
+    // The header defaults to the brand fill in style.css, so a palette that
+    // names only the brand must not emit a header token -- emitting one would
+    // pin the header and quietly break that default for every other palette.
+    const brandOnly = buildTheme('cocoa', { light: { 'brand-bg': '#7a4210' } }).theme;
+    expect(renderThemeCss(brandOnly)).not.toContain('--today-header-bg');
+
+    const withHeader = buildTheme('cream', {
+      light: { 'header-bg': '#fff7ec', 'header-text': '#212529' }
+    }).theme;
+    const css = renderThemeCss(withHeader);
+    expect(css).toContain('--today-header-bg: rgb(255, 247, 236);');
+    expect(css).toContain('--today-header-text: rgb(33, 37, 41);');
+    // And it is its own token: naming the header must not move MDB's primary,
+    // which is what the badges and border-primary are drawn from.
     expect(css).not.toContain('--mdb-primary-rgb');
   });
 
@@ -218,6 +286,51 @@ describe('reading the vault', () => {
     const { themes, problems } = await readVaultThemes(vaultDir);
     expect([...themes.keys()]).toEqual(['cocoa']);
     expect(problems.get('broken.toml')[0]).toMatch(/not valid TOML/);
+  });
+
+  // Themes used to live at vault/themes/ and now live under the vault's app
+  // directory. Both have to work: every vault that existed before the
+  // directory did is in the first state, and finding neither would silently
+  // drop the user's palette back to the built-in one.
+  test('a theme under the app directory is found', async () => {
+    await writeTheme('cocoa.toml', 'name = "Cocoa"\n\n[light]\nbg = "#f6f1ea"\n', 'today/themes');
+    expect(await listThemes(vaultDir)).toEqual([
+      { id: BUILT_IN_THEME_ID, name: 'Today' },
+      { id: 'cocoa', name: 'Cocoa' }
+    ]);
+  });
+
+  test('a theme still at the vault root is found too', async () => {
+    await writeTheme('cocoa.toml', 'name = "Cocoa"\n\n[light]\nbg = "#f6f1ea"\n');
+    expect((await listThemes(vaultDir)).map(({ id }) => id)).toEqual([BUILT_IN_THEME_ID, 'cocoa']);
+  });
+
+  test('a vault holding both reads the app directory, not the old place', async () => {
+    await writeTheme('cocoa.toml', 'name = "Old"\n\n[light]\nbg = "#000000"\n');
+    await writeTheme('cocoa.toml', 'name = "New"\n\n[light]\nbg = "#ffffff"\n', 'today/themes');
+    clearVaultThemesCache();
+    const { themes } = await readVaultThemes(vaultDir);
+    expect(themes.get('cocoa').name).toBe('New');
+  });
+
+  test('cache signature notices a palette moving between directories with identical metadata', async () => {
+    const contents = (name, color) => `name = "${name}"\n\n[light]\nbg = "${color}"\n`;
+    const sameTime = new Date('2026-01-01T00:00:00Z');
+    await writeTheme('cocoa.toml', contents('Old Cocoa', '#000000'));
+    const rootCocoa = path.join(vaultDir, 'themes', 'cocoa.toml');
+    await fs.utimes(rootCocoa, sameTime, sameTime);
+
+    const beforeMove = await readVaultThemes(vaultDir);
+    expect(beforeMove.themes.get('cocoa').name).toBe('Old Cocoa');
+
+    await writeTheme('cocoa.toml', contents('New Cocoa', '#ffffff'), 'today/themes');
+    const appCocoa = path.join(vaultDir, 'today', 'themes', 'cocoa.toml');
+    await fs.utimes(appCocoa, sameTime, sameTime);
+    const afterMove = await readVaultThemes(vaultDir);
+
+    expect(afterMove.themes.get('cocoa').name).toBe('New Cocoa');
+    expect((await fs.stat(appCocoa)).size).toBe((await fs.stat(rootCocoa)).size);
+    expect((await fs.stat(appCocoa)).mtimeMs).toBe((await fs.stat(rootCocoa)).mtimeMs);
   });
 
   test('an edit is picked up without a restart', async () => {

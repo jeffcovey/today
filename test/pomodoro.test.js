@@ -493,13 +493,20 @@ describe('opt-in and placement', () => {
     expect(body).toContain('getPomodoroWidget()');
   });
 
-  test('each banner sits directly under the task timer, not above it', () => {
+  test('the pomodoro card comes after the task timer in the row', () => {
     const body = activityBarBody();
     expect(body.indexOf('getPomodoroWidget()'))
       .toBeGreaterThan(body.indexOf('await getTaskTimerWidget()'));
-    // And the order survives placement: whichever list each one lands in, the
-    // task timer is pushed first.
-    expect(body.indexOf('pomodoroHtml)')).toBeGreaterThan(body.indexOf('taskTimerHtml)'));
+    // And the order survives placement: the row lists them in that order, so
+    // the task timer is always the left-hand one of the two. Read as a list
+    // rather than matched as a fixed string, because another card joining the
+    // row is a change of layout, not a change of this order.
+    const row = body.match(/const rowed = \[([^\]]*)\]/);
+    expect(row).not.toBeNull();
+    const members = row[1].split(',').map((member) => member.trim());
+    expect(members).toContain('taskTimerHtml');
+    expect(members.indexOf('pomodoroHtml'))
+      .toBeGreaterThan(members.indexOf('taskTimerHtml'));
   });
 });
 
