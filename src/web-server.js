@@ -7,6 +7,7 @@ import {
   remainingMs, isIntervalOver, nextInterval, intervalDescription,
   phaseLabel, phaseMinutes, PHASE_WORK, NUDGE_INTERVAL_MS, MAX_NUDGES
 } from './pomodoro.js';
+import { loadTimerState, writeTimerState } from './timer-state-store.js';
 import express from 'express';
 import session from 'express-session';
 import Database from 'better-sqlite3';
@@ -994,6 +995,31 @@ let taskTimerState = {
   seenIds: new Set(),      // item IDs already shown this session (prevents repeats)
   itemsSeenCount: 0        // running count of items shown (for accurate "X of Y")
 };
+
+// Both timers live in one file, so one write covers a transition in either and
+// a restart restores a consistent pair. pomodoroState is declared further down,
+// in the Pomodoro section; this runs only from handlers, long after both
+// declarations have been evaluated.
+//
+// Called on every state transition -- start, pause, resume, skip, stop, phase
+// advance -- and never on a tick: the remaining time is always derived from
+// startTime, so there is nothing a tick would add to the file.
+function persistTimers() {
+  return writeTimerState({ taskTimer: taskTimerState, pomodoro: pomodoroState })
+    .catch(error => {
+      // A timer that cannot be saved must still run; the only loss is the
+      // restore, which is where the server was before this existed.
+      console.error('Could not save timer state:', error.message);
+    });
+}
+
+// Everything a restore has to get right about the Task Timer, so a phase
+// advance can be told apart from a render that changed nothing.
+function taskTimerSignature() {
+  const { isRunning, phase, startTime, currentIndex, isPaused, itemsSeenCount } = taskTimerState;
+  return [isRunning, phase, startTime, currentIndex, isPaused, itemsSeenCount].join('|');
+}
+
 let taskTimerSyncedItems = null;
 let taskTimerSyncInProgress = false;
 
@@ -1038,8 +1064,16 @@ function applySyncedItems() {
 }
 
 // Server-side auto-advance: the single source of truth for timer progression.
-// Called before rendering any page so all browsers see consistent state.
+// Called before rendering any page so all browsers see consistent state, and
+// again on boot, where the elapsed time it works through is the time the server
+// spent down.
 function advanceTimerIfNeeded() {
+  const before = taskTimerSignature();
+  advanceTaskTimerPhases();
+  if (taskTimerSignature() !== before) persistTimers();
+}
+
+function advanceTaskTimerPhases() {
   if (!taskTimerState.isRunning || taskTimerState.isPaused) return;
 
   const now = Date.now();
@@ -1080,9 +1114,8 @@ function advanceTimerIfNeeded() {
     taskTimerState.phase = 'work';
     taskTimerSyncedItems = null;
     triggerTaskTimerSync();
-
-    // Recurse in case new work phase also expired (user was away a long time)
-    advanceTimerIfNeeded();
+    // Start the next item fresh rather than burning through the queue during
+    // a long absence; nobody was there to work on those items.
   }
 }
 
@@ -1334,6 +1367,7 @@ function stopPomodoro() {
   clearPomodoroBoundary();
   clearPomodoroNudges();
   pomodoroState = createPomodoroState();
+  return persistTimers();
 }
 
 // Same reason the Task Timer arms a boundary: iPadOS freezes a background tab's
@@ -1368,6 +1402,7 @@ function advancePomodoroIfNeeded() {
   pomodoroState = holdInterval(pomodoroState, config);
   clearPomodoroBoundary();
   clearPomodoroNudges();
+  persistTimers();
   sendPomodoroNudge();
 }
 
@@ -7878,6 +7913,7 @@ app.post('/api/task-timer/start', authMiddleware, express.json(), async (req, re
     triggerTaskTimerSync();
 
     armTaskTimerBoundary();
+    await persistTimers();
     res.json({ success: true, message: 'Task timer started', item: items[0] });
   } catch (error) {
     console.error('Error starting task timer:', error);
@@ -7904,6 +7940,7 @@ app.post('/api/task-timer/stop', authMiddleware, async (req, res) => {
     taskTimerSyncedItems = null;
 
     clearTaskTimerBoundary();
+    await persistTimers();
     res.json({ success: true, message: 'Task timer stopped' });
   } catch (error) {
     console.error('Error stopping task timer:', error);
@@ -7935,6 +7972,7 @@ app.post('/api/task-timer/skip', authMiddleware, async (req, res) => {
       const freshItems = (await getTodayTaskTimerItems()).filter(item => !taskTimerState.seenIds.has(item.id));
       if (freshItems.length === 0) {
         taskTimerState.isRunning = false;
+        await persistTimers();
         return res.json({ success: true, message: 'All tasks completed!' });
       }
       taskTimerState.items = freshItems;
@@ -7950,6 +7988,7 @@ app.post('/api/task-timer/skip', authMiddleware, async (req, res) => {
     taskTimerState.pausedAt = null;
 
     armTaskTimerBoundary();
+    await persistTimers();
     res.json({ success: true, message: 'Skipped to next item', item: taskTimerState.currentItem });
   } catch (error) {
     console.error('Error skipping task timer:', error);
@@ -7964,6 +8003,7 @@ app.post('/api/task-timer/pause', authMiddleware, async (req, res) => {
   taskTimerState.isPaused = true;
   taskTimerState.pausedAt = new Date().toISOString();
   clearTaskTimerBoundary();
+  await persistTimers();
   res.json({ success: true });
 });
 
@@ -7978,6 +8018,7 @@ app.post('/api/task-timer/resume', authMiddleware, async (req, res) => {
   taskTimerState.isPaused = false;
   taskTimerState.pausedAt = null;
   armTaskTimerBoundary();
+  await persistTimers();
   res.json({ success: true });
 });
 
@@ -7990,11 +8031,12 @@ app.post('/api/pomodoro/start', authMiddleware, async (req, res) => {
   clearPomodoroNudges();
   pomodoroState = startPomodoro();
   armPomodoroBoundary();
+  await persistTimers();
   res.json({ success: true, message: 'Pomodoro started' });
 });
 
 app.post('/api/pomodoro/stop', authMiddleware, async (req, res) => {
-  stopPomodoro();
+  await stopPomodoro();
   res.json({ success: true, message: 'Pomodoro stopped' });
 });
 
@@ -8005,6 +8047,7 @@ app.post('/api/pomodoro/next', authMiddleware, async (req, res) => {
   clearPomodoroNudges();
   pomodoroState = startHeldInterval(pomodoroState);
   armPomodoroBoundary();
+  await persistTimers();
   res.json({ success: true, message: 'Next interval started' });
 });
 
@@ -8015,6 +8058,7 @@ app.post('/api/pomodoro/skip', authMiddleware, async (req, res) => {
   clearPomodoroNudges();
   pomodoroState = skipInterval(pomodoroState, getPomodoroConfig());
   armPomodoroBoundary();
+  await persistTimers();
   res.json({ success: true, message: 'Skipped to next interval' });
 });
 
@@ -8024,6 +8068,7 @@ app.post('/api/pomodoro/pause', authMiddleware, async (req, res) => {
   }
   pomodoroState = pausePomodoro(pomodoroState);
   clearPomodoroBoundary();
+  await persistTimers();
   res.json({ success: true });
 });
 
@@ -8033,6 +8078,7 @@ app.post('/api/pomodoro/resume', authMiddleware, async (req, res) => {
   }
   pomodoroState = resumePomodoro(pomodoroState);
   armPomodoroBoundary();
+  await persistTimers();
   res.json({ success: true });
 });
 
@@ -8410,6 +8456,74 @@ app.get('/*path', authMiddleware, async (req, res) => {
     }
   }
 });
+
+/**
+ * Bring back the Task Timer and the Pomodoro that were running when this
+ * process's predecessor exited (#655).
+ *
+ * The saved state is only the starting point: both timers derive their
+ * remaining time from a start time, so the catch-up for the downtime is the
+ * same catch-up as for a tab nobody looked at. advanceTimerIfNeeded() walks
+ * the Task Timer through whatever work and rest phases elapsed (stopping it if
+ * the items ran out), and advancePomodoroIfNeeded() ends an interval that
+ * finished while the server was down, leaving it held for the user exactly as
+ * it would have been. Neither invents a parallel path.
+ *
+ * A paused timer comes back paused, and the time the server spent down does
+ * not count against it: remaining time is frozen at pausedAt, and resuming
+ * shifts startTime forward by the whole pause. That is what pausing already
+ * means here -- a pause buys the time back -- and a restart is not a reason to
+ * change it. The staleness rule in timer-state-store.js is what stops a pause
+ * left overnight from reappearing.
+ */
+async function restoreTimers() {
+  let restored;
+  try {
+    restored = await loadTimerState();
+  } catch (error) {
+    console.error('Could not read saved timer state:', error.message);
+    return;
+  }
+
+  if (restored.discarded) {
+    console.log(`Saved timer state discarded (${restored.discarded}).`);
+    return;
+  }
+
+  // Install both saved states before catch-up: advancing either timer can
+  // persist the pair, so the other must already be restored.
+  let restoreTaskTimer = false;
+  if (restored.taskTimer) {
+    restoreTaskTimer = restored.taskTimer.isRunning;
+    taskTimerState = restored.taskTimer;
+  }
+
+  if (restored.pomodoro?.isRunning) {
+    pomodoroState = restored.pomodoro;
+  }
+
+  if (restoreTaskTimer) {
+    advanceTimerIfNeeded();
+    armTaskTimerBoundary();
+    // advanceTimerIfNeeded() stops a timer whose items all elapsed while the
+    // server was down, so this reads the state after the catch-up.
+    console.log(taskTimerState.isRunning
+      ? 'Task timer restored.'
+      : 'Task timer restored, and finished: no items left.');
+  }
+
+  if (restored.pomodoro?.isRunning) {
+    advancePomodoroIfNeeded();
+    armPomodoroBoundary();
+    console.log('Pomodoro restored.');
+  }
+}
+
+try {
+  await restoreTimers();
+} catch (error) {
+  console.error('Timer restore failed:', error.message);
+}
 
 // Start server with extended timeout
 const server = app.listen(PORT, '127.0.0.1', () => {
