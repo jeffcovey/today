@@ -27,6 +27,7 @@ import {
 import fs from 'fs';
 import path from 'path';
 import Database from 'better-sqlite3';
+import { buildTheme, renderThemeCss } from '../src/web/themes.js';
 
 jest.setTimeout(240_000);
 
@@ -65,6 +66,73 @@ describe('web view layout', () => {
     const overlaps = await findPinnedOverlaps(browser, { baseUrl: server.baseUrl, page, theme, viewport });
     expect(overlaps).toEqual([]);
   });
+});
+
+describe('navbar header surface', () => {
+  const css = fs.readFileSync(new URL('../src/web/public/css/style.css', import.meta.url), 'utf8');
+
+  test.each([true, false])('hover wash with color-mix support enabled: %s', async (supported) => {
+    const page = await browser.newPage();
+    try {
+      await page.setContent(`<style>${css}</style>
+        <nav class="navbar" style="--today-header-text: #000">
+          <a class="nav-link" href="#">Link</a>
+          <button class="navbar-icon-btn">Icon</button>
+          <button class="navbar-icon-btn" aria-expanded="true">Expanded</button>
+        </nav>`);
+      const condition = await page.evaluate((supported) => {
+        const sheet = document.styleSheets[0];
+        const index = [...sheet.cssRules].findIndex(rule =>
+          rule instanceof CSSSupportsRule && [...rule.cssRules].some(child =>
+            child.selectorText?.includes('.navbar .nav-link:hover')));
+        if (index < 0) return null;
+        const condition = sheet.cssRules[index].conditionText;
+        if (!supported) sheet.deleteRule(index);
+        return condition;
+      }, supported);
+      expect(condition).toMatch(/color-mix\(/);
+      expect(condition).not.toContain('var(');
+      const expected = await page.evaluate((supported) => {
+        const probe = document.createElement('div');
+        probe.style.background = supported
+          ? 'color-mix(in srgb, #000 14%, transparent)'
+          : 'rgba(255, 255, 255, 0.16)';
+        document.body.appendChild(probe);
+        return getComputedStyle(probe).backgroundColor;
+      }, supported);
+      for (const selector of ['.nav-link', '.navbar-icon-btn:not([aria-expanded])', '[aria-expanded="true"]']) {
+        if (!selector.startsWith('[aria-expanded')) await page.hover(selector);
+        expect(await page.$eval(selector, el => getComputedStyle(el).backgroundColor)).toBe(expected);
+      }
+    } finally {
+      await page.close();
+    }
+  });
+
+  test.each([{}, { 'header-bg': '#162030' }, { 'header-text': '#fafafa' }])(
+    'omitted dark header tokens default to the dark brand: %j', async (darkHeader) => {
+      const page = await browser.newPage();
+      try {
+        const { theme } = buildTheme('header-test', {
+          light: { 'header-bg': '#fff7ec', 'header-text': '#212529' },
+          dark: { 'brand-bg': '#123456', 'brand-text': '#ffffff', ...darkHeader }
+        });
+        await page.setContent(`<style>${css}</style><style>${renderThemeCss(theme)}</style>
+          <nav class="navbar">Header</nav>`);
+        expect(await page.$eval('.navbar', el => getComputedStyle(el).backgroundColor))
+          .toBe('rgb(255, 247, 236)');
+        await page.evaluate(() => document.documentElement.dataset.theme = 'dark');
+        expect(await page.$eval('.navbar', el => ({
+          background: getComputedStyle(el).backgroundColor,
+          ink: getComputedStyle(el).color
+        }))).toEqual({
+          background: darkHeader['header-bg'] ? 'rgb(22, 32, 48)' : 'rgb(18, 52, 86)',
+          ink: darkHeader['header-text'] ? 'rgb(250, 250, 250)' : 'rgb(255, 255, 255)'
+        });
+      } finally {
+        await page.close();
+      }
+    });
 });
 
 describe('git page diffs', () => {

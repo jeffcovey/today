@@ -101,6 +101,8 @@ html[data-theme="dark"] {
      same stock values in both modes and the built-in palette is unmoved. */
   --today-brand-bg: #3b71ca;
   --today-brand-text: #ffffff;
+  --today-header-bg: var(--today-brand-bg);
+  --today-header-text: var(--today-brand-text);
   --today-control-border: #6b7280;
   --today-button-bg: #2563eb;
   --today-button-hover-bg: #1d4ed8;
@@ -1293,9 +1295,9 @@ html[data-theme="dark"] .editor-toolbar {
 }
 
 /* The navbar is painted from the header surface, so its ink is the header's.
-   The hover wash is mixed from that ink, which means it darkens a pale header
-   and lightens a dark one without either naming a colour. The translucent
-   white before it is the fallback where color-mix is unavailable. */
+   The hover wash defaults to translucent white. Where the literal @supports
+   check passes, it is mixed from the header ink instead, so it darkens a pale
+   header and lightens a dark one without either naming a colour. */
 .navbar .nav-link,
 .navbar .navbar-icon-btn {
   display: inline-flex;
@@ -1317,7 +1319,14 @@ html[data-theme="dark"] .editor-toolbar {
 .navbar .navbar-icon-btn[aria-expanded="true"] {
   color: var(--today-header-text);
   background: rgba(255, 255, 255, 0.16);
-  background: color-mix(in srgb, var(--today-header-text) 14%, transparent);
+}
+
+@supports (background: color-mix(in srgb, #fff 14%, transparent)) {
+  .navbar .nav-link:hover,
+  .navbar .navbar-icon-btn:hover,
+  .navbar .navbar-icon-btn[aria-expanded="true"] {
+    background: color-mix(in srgb, var(--today-header-text) 14%, transparent);
+  }
 }
 
 .navbar .navbar-icon-btn:focus-visible,
