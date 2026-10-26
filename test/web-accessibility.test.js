@@ -478,12 +478,12 @@ describe('a palette from the vault', () => {
   // var() — a var() colour cannot feed an rgba(). Both halves are checked
   // here: the fill at full opacity, and a tint of it, which is the case that
   // would silently come out transparent if the triple were ever a var().
-  // The navbar is the thing a palette most visibly has to reach, and it is
-  // MDB's .bg-primary: rgba(var(--mdb-primary-rgb), var(--mdb-bg-opacity)).
-  // That composition is why the triple is emitted as digits rather than as a
-  // var() — a var() colour cannot feed an rgba(). Both halves are checked
-  // here: the fill at full opacity, and a tint of it, which is the case that
-  // would silently come out transparent if the triple were ever a var().
+  //
+  // The navbar is no longer a .bg-primary: it paints itself from --today-
+  // header-bg, which defaults to the brand fill. So this now covers two
+  // things at once -- that the triple still reaches everything MDB tints,
+  // and that a palette setting only brand-bg, as cocoa does, still moves the
+  // header exactly as it did before the header token existed.
   const BRAND_FILL = { light: 'rgb(122, 66, 16)', dark: 'rgb(161, 85, 26)' };
 
   test.each(THEMES)('%s theme: the vault\'s brand fill reaches the navbar', async (theme) => {
@@ -500,7 +500,7 @@ describe('a palette from the vault', () => {
         tint.className = 'bg-primary bg-opacity-10';
         document.body.appendChild(tint);
         const colours = {
-          navbar: getComputedStyle(document.querySelector('.navbar.bg-primary')).backgroundColor,
+          navbar: getComputedStyle(document.querySelector('.navbar')).backgroundColor,
           tint: getComputedStyle(tint).backgroundColor
         };
         tint.remove();

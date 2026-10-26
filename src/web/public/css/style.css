@@ -22,6 +22,14 @@
      palette renders exactly as it did before the bridge below existed. */
   --today-brand-bg: #3b71ca;
   --today-brand-text: #ffffff;
+  /* The header is its own surface, not a second duty for the brand fill. The
+     brand fill is also the badges, the AI card header and border-primary on a
+     blockquote, so a palette that wants a pale header -- which is a common
+     thing to want -- cannot say so through that token without erasing the
+     borders. These default to the brand pair, so a palette that sets only the
+     brand still moves the header exactly as it did before. */
+  --today-header-bg: var(--today-brand-bg);
+  --today-header-text: var(--today-brand-text);
   /* Controls and filled buttons carry their own contrast duties, so they are
      palette entries in their own right rather than shades of the two above.
      --today-border separates surfaces that already differ, but on an input
@@ -46,7 +54,7 @@
   /* The same bridge for the brand fill. MDB 7.1.0 never reads --mdb-primary
      itself — Today's own rules do, here and in web-server.js — and what MDB
      reads is the triple, which it composes as rgba(var(--mdb-primary-rgb), a)
-     for .bg-primary (the navbar, the day tiles), .text-primary and
+     for .bg-primary (the AI card header, the badges), .text-primary and
      .border-primary. So the triple is spelled out here and re-emitted by a
      vault theme (see src/web/themes.js). Both lines hold MDB's own primary,
      #3b71ca, so the built-in palette is unmoved. */
@@ -1254,6 +1262,12 @@ html[data-theme="dark"] .editor-toolbar {
   z-index: 1020;
   font-size: 16px;
   padding: 0;
+  /* Painted here rather than by .bg-primary, which is !important and would
+     win over any token. The border is what separates a pale header from a
+     pale page; on a dark one it simply disappears into the surround. */
+  background-color: var(--today-header-bg);
+  color: var(--today-header-text);
+  border-bottom: 1px solid var(--today-border);
 }
 
 .navbar > .container-fluid {
@@ -1266,7 +1280,7 @@ html[data-theme="dark"] .editor-toolbar {
 .navbar .navbar-brand {
   display: inline-flex;
   align-items: center;
-  color: var(--today-brand-text);
+  color: var(--today-header-text);
   min-height: 44px;
   margin: 0 8px 0 0;
   padding: 0 4px;
@@ -1278,9 +1292,10 @@ html[data-theme="dark"] .editor-toolbar {
   font-size: 22px;
 }
 
-/* The navbar is painted from the brand fill, so its ink is the brand's.
-   The hover wash stays a translucent white: it lightens whatever it sits
-   on rather than naming a colour of its own. */
+/* The navbar is painted from the header surface, so its ink is the header's.
+   The hover wash is mixed from that ink, which means it darkens a pale header
+   and lightens a dark one without either naming a colour. The translucent
+   white before it is the fallback where color-mix is unavailable. */
 .navbar .nav-link,
 .navbar .navbar-icon-btn {
   display: inline-flex;
@@ -1291,7 +1306,7 @@ html[data-theme="dark"] .editor-toolbar {
   padding: 0 6px;
   font-size: 18px;
   line-height: 1;
-  color: var(--today-brand-text);
+  color: var(--today-header-text);
   background: none;
   border: 0;
   border-radius: 6px;
@@ -1300,13 +1315,14 @@ html[data-theme="dark"] .editor-toolbar {
 .navbar .nav-link:hover,
 .navbar .navbar-icon-btn:hover,
 .navbar .navbar-icon-btn[aria-expanded="true"] {
-  color: var(--today-brand-text);
+  color: var(--today-header-text);
   background: rgba(255, 255, 255, 0.16);
+  background: color-mix(in srgb, var(--today-header-text) 14%, transparent);
 }
 
 .navbar .navbar-icon-btn:focus-visible,
 .navbar .nav-link:focus-visible {
-  outline: 2px solid var(--today-brand-text);
+  outline: 2px solid var(--today-header-text);
   outline-offset: 2px;
 }
 
