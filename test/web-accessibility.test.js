@@ -65,6 +65,41 @@ describe('web view layout', () => {
     const overlaps = await findPinnedOverlaps(browser, { baseUrl: server.baseUrl, page, theme, viewport });
     expect(overlaps).toEqual([]);
   });
+
+  test('a wrapped bookmark list stays above the centred block on a phone', async () => {
+    const bookmarksServer = await startServer();
+    const page = await browser.newPage();
+    const linksPath = path.join(bookmarksServer.vaultDir, 'today', 'links.md');
+    try {
+      fs.mkdirSync(path.dirname(linksPath), { recursive: true });
+      fs.writeFileSync(linksPath, Array.from(
+        { length: 24 },
+        (_, index) => `- [Bookmark number ${index + 1}](notes/kitchen-sink.md)`
+      ).join('\n'));
+
+      await page.setViewport(VIEWPORTS.phone);
+      await page.setExtraHTTPHeaders({ Authorization: 'Bearer ' + PASSWORD });
+      await page.goto(bookmarksServer.baseUrl, { waitUntil: 'networkidle0' });
+      await page.waitForFunction(() => document.querySelectorAll('#momentBookmarks a').length === 24);
+
+      const layout = await page.evaluate(() => {
+        const bookmarks = document.querySelector('#momentBookmarks');
+        const content = document.querySelector('.moment-inner');
+        return {
+          bookmarkBottom: bookmarks.getBoundingClientRect().bottom,
+          bookmarkHeight: bookmarks.getBoundingClientRect().height,
+          lineHeight: parseFloat(getComputedStyle(bookmarks).lineHeight),
+          contentTop: content.getBoundingClientRect().top
+        };
+      });
+
+      expect(layout.bookmarkHeight).toBeGreaterThan(layout.lineHeight * 3);
+      expect(layout.contentTop).toBeGreaterThanOrEqual(layout.bookmarkBottom);
+    } finally {
+      await page.close();
+      await bookmarksServer.stop();
+    }
+  });
 });
 
 describe('git page diffs', () => {
