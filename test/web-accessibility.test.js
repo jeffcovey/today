@@ -117,6 +117,45 @@ describe('web view layout', () => {
       await bookmarksServer.stop();
     }
   });
+
+  // Geometry alone does not prove a link can be seen. Every other child of
+  // .moment is positioned, so the row — the one child in flow — was painted
+  // underneath them, and the photograph is opaque: the links were laid out
+  // exactly where they belonged and covered completely.
+  test('a bookmark is painted above the photograph, not under it', async () => {
+    const bookmarksServer = await startServer();
+    const page = await browser.newPage();
+    const linksPath = path.join(bookmarksServer.vaultDir, 'today', 'links.md');
+    try {
+      await page.setViewport(VIEWPORTS.desktop);
+      await page.setExtraHTTPHeaders({ Authorization: 'Bearer ' + PASSWORD });
+
+      fs.mkdirSync(path.dirname(linksPath), { recursive: true });
+      fs.writeFileSync(linksPath, [
+        '- [First](notes/kitchen-sink.md)',
+        '- [Second](notes/kitchen-sink.md)',
+        '- [Third](notes/kitchen-sink.md)'
+      ].join('\n'));
+
+      await page.goto(bookmarksServer.baseUrl, { waitUntil: 'networkidle0' });
+      await page.waitForFunction(() => document.querySelectorAll('#momentBookmarks a').length === 3);
+
+      const hits = await page.evaluate(() => {
+        const row = document.querySelector('#momentBookmarks');
+        return [...row.querySelectorAll('a')].map((anchor) => {
+          const box = anchor.getBoundingClientRect();
+          const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+          return { label: anchor.textContent, covered: !row.contains(top), by: top ? top.className : null };
+        });
+      });
+
+      expect(hits).toHaveLength(3);
+      expect(hits.filter((hit) => hit.covered)).toEqual([]);
+    } finally {
+      await page.close();
+      await bookmarksServer.stop();
+    }
+  });
 });
 
 describe('navbar header surface', () => {

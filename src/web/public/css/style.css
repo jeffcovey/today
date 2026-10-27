@@ -2591,8 +2591,18 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
 
 /* The user's own links, from the vault's links.md, across the top of the
    panel. They wrap, since how many there are is up to whoever wrote the file;
-   staying in flow keeps them from covering the centred block. */
+   staying in flow keeps them from covering the centred block.
+
+   The stacking pair below is what makes them visible at all. Every other
+   child of .moment is positioned, so each paints in the positioned layer,
+   above the in-flow content this row is painted with — and the photograph is
+   opaque, so it covered the row completely. `position` alone does not lift
+   it: the row is a flex item and `order: -1` puts it first in the
+   order-modified painting order, so it needs a stacking context of its own
+   to come out above the photograph and the scrim. */
 .moment-bookmarks {
+  position: relative;
+  z-index: 1;
   box-sizing: border-box;
   align-self: stretch;
   flex: none;
