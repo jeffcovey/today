@@ -20,10 +20,17 @@
     selectionBackground: 'rgba(96, 165, 250, 0.35)'
   });
 
+  // The pages set the root font size from the Text Size setting; the terminal
+  // follows it, at the ratio that makes the default (17px) a 14px terminal.
+  const fontSizeFromPage = () => {
+    const root = parseFloat(getComputedStyle(document.documentElement).fontSize);
+    return root > 0 ? Math.max(10, Math.round(root * 14 / 17)) : 14;
+  };
+
   const term = new Terminal({
     cursorBlink: true,
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
-    fontSize: 14,
+    fontSize: fontSizeFromPage(),
     scrollback: 5000,
     theme: themeFromPage()
   });
@@ -31,9 +38,6 @@
   term.loadAddon(fit);
   if (typeof WebLinksAddon !== 'undefined') term.loadAddon(new WebLinksAddon.WebLinksAddon());
   term.open(container);
-
-  new MutationObserver(() => { term.options.theme = themeFromPage(); })
-    .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
   let socket = null;
   let exited = false;
@@ -52,6 +56,19 @@
       try { fit.fit(); } catch (error) { /* container not laid out yet */ }
     }, 50);
   };
+
+  new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.attributeName === 'data-theme') term.options.theme = themeFromPage();
+      if (mutation.attributeName === 'style') {
+        const size = fontSizeFromPage();
+        if (size !== term.options.fontSize) {
+          term.options.fontSize = size;
+          refit();
+        }
+      }
+    }
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style'] });
 
   const connect = () => {
     exited = false;

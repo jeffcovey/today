@@ -40,6 +40,13 @@ describe('getConsoleConfig', () => {
     expect(getConsoleConfig({ idle_minutes: '45' }).idleMinutes).toBe(45);
   });
 
+  test('a startup command is optional and trimmed to one line', () => {
+    expect(getConsoleConfig({}).command).toBe('');
+    expect(getConsoleConfig({ command: 42 }).command).toBe('');
+    expect(getConsoleConfig({ command: '  tmux attach \n' }).command).toBe('tmux attach');
+    expect(getConsoleConfig({ command: 'cd vault\nls' }).command).toBe('cd vault ls');
+  });
+
   test('the shell defaults to one that exists and accepts an override', () => {
     expect(getConsoleConfig({}).shell).toMatch(/sh$/);
     expect(getConsoleConfig({ shell: ' /bin/sh ' }).shell).toBe('/bin/sh');
@@ -234,7 +241,10 @@ describe('with [console] enabled', () => {
 
   beforeAll(async () => {
     // Three seconds idle, so the timeout can be watched.
-    server = await startServer({ configLines: ['[console]', 'enabled = true', 'idle_minutes = 0.05'] });
+    server = await startServer({ configLines: [
+      '[console]', 'enabled = true', 'idle_minutes = 0.05',
+      "command = 'printf \"startup=%s\\n\" ok'"
+    ] });
   });
 
   afterAll(async () => {
@@ -352,6 +362,16 @@ describe('with [console] enabled', () => {
       input(ws, 'printf "cwd=%s size=%s\\n" "$PWD" "$(stty size)"\n');
       await waitFor(() => state.text.includes(`cwd=${PROJECT_ROOT} size=40 120`), 'the shell to answer');
       expect(state.closeCode).toBeNull();
+    } finally {
+      ws.close();
+    }
+  });
+
+  test('the startup command runs without any typing', async () => {
+    const ws = await openSocket(socketUrl(server.baseUrl), authHeaders);
+    const state = collect(ws);
+    try {
+      await waitFor(() => state.text.includes('startup=ok'), 'the startup command output');
     } finally {
       ws.close();
     }

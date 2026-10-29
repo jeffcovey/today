@@ -265,12 +265,16 @@ without opening a separate SSH session. It stays hidden until you add a
 enabled = true
 idle_minutes = 30     # close a shell nothing has been typed into; 0 means never
 # shell = "/bin/zsh"  # defaults to $SHELL, then bash
+# command = "tmux attach"  # typed into the shell once it is up
 ```
 
 A terminal icon then appears in the navbar, and `/_console` opens the login
 shell in a full terminal (xterm.js). Each browser tab gets its own shell, which
 ends when the tab closes, the shell exits, or the idle time passes. Switching
-the section on or off takes effect without a restart.
+the section on or off takes effect without a restart. A `command` is typed into
+the shell as soon as it is up — `tmux attach` keeps one session across tabs —
+and does not count as typing for the idle time. The terminal's font follows the
+Text Size setting in the display menu.
 
 This is a shell for anyone who can log in to the web view, so switch it on only
 on a deployment served over HTTPS. Every shell opened is logged with the
