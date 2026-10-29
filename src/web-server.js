@@ -294,14 +294,16 @@ function getDiskCachePaths(urlPath) {
   return { html: htmlPath, meta: metaPath };
 }
 
-async function readFromDiskCache(urlPath, sourceMtime) {
+async function readFromDiskCache(urlPath, sourceMtime, consoleEnabled = false) {
   const paths = getDiskCachePaths(urlPath);
   if (!paths) return null;
   const { html: htmlPath, meta: metaPath } = paths;
   try {
     const metaRaw = await fs.readFile(metaPath, 'utf-8');
     const meta = JSON.parse(metaRaw);
-    if (meta.mtime !== sourceMtime || meta.renderVersion !== HTML_CACHE_RENDER_VERSION) return null;
+    if (meta.mtime !== sourceMtime ||
+        meta.renderVersion !== HTML_CACHE_RENDER_VERSION ||
+        meta.consoleEnabled !== consoleEnabled) return null;
     const html = await fs.readFile(htmlPath, 'utf-8');
     return html;
   } catch {
@@ -309,7 +311,7 @@ async function readFromDiskCache(urlPath, sourceMtime) {
   }
 }
 
-async function writeToDiskCache(urlPath, html, sourceMtime) {
+async function writeToDiskCache(urlPath, html, sourceMtime, consoleEnabled = false) {
   const paths = getDiskCachePaths(urlPath);
   if (!paths) return;
   const { html: htmlPath, meta: metaPath } = paths;
@@ -319,6 +321,7 @@ async function writeToDiskCache(urlPath, html, sourceMtime) {
     await fs.writeFile(metaPath, JSON.stringify({
       mtime: sourceMtime,
       renderVersion: HTML_CACHE_RENDER_VERSION,
+      consoleEnabled,
       timestamp: Date.now()
     }), 'utf-8');
   } catch (err) {
@@ -3101,15 +3104,24 @@ function cleanupCache() {
 }
 
 // Get cached render or generate new one
+function consoleEnabledForCache() {
+  try {
+    return getConsoleConfig().enabled;
+  } catch {
+    return false;
+  }
+}
+
 async function getCachedRender(filePath, urlPath) {
   let fileMtime = null;
+  const consoleEnabled = consoleEnabledForCache();
   try {
     const stats = await fs.stat(filePath);
     const mtime = fileMtime = stats.mtime.getTime();
     const size = stats.size;
 
     // Create cache key from filepath + urlPath (urlPath is baked into rendered HTML for chat paths)
-    const cacheKey = `${filePath}::${urlPath}`;
+    const cacheKey = `${filePath}::${urlPath}::console=${consoleEnabled}`;
 
     // Check if we have a cached version
     const cached = renderCache.get(cacheKey);
@@ -3133,7 +3145,7 @@ async function getCachedRender(filePath, urlPath) {
     }
 
     // On memory-cache miss, check disk cache before doing a full render
-    const diskHtml = await readFromDiskCache(urlPath, mtime);
+    const diskHtml = await readFromDiskCache(urlPath, mtime, consoleEnabled);
     if (diskHtml) {
       debug(`[DISK CACHE HIT] ${urlPath}`);
       const hasDynamicContent = containsDynamicContent(diskHtml);
@@ -3164,7 +3176,7 @@ async function getCachedRender(filePath, urlPath) {
 
     // Persist to disk cache for non-dynamic files (survives server restarts)
     if (!hasDynamicContent) {
-      writeToDiskCache(urlPath, rendered, mtime).catch(err => {
+      writeToDiskCache(urlPath, rendered, mtime, consoleEnabled).catch(err => {
         debug('Disk cache write error:', err.message);
       });
     }
@@ -6036,7 +6048,7 @@ app.post('/_cache/warm', async (req, res) => {
             // share cache keys and bake identical (correct) /edit/ links.
             const urlPath = normalizeUrlPath(path.relative(VAULT_PATH, fullPath));
 
-            const diskHtml = await readFromDiskCache(urlPath, mtime);
+            const diskHtml = await readFromDiskCache(urlPath, mtime, consoleEnabledForCache());
             if (diskHtml) {
               skipped++;
               continue; // disk cache is fresh — nothing to do
@@ -8839,8 +8851,14 @@ const server = app.listen(PORT, '127.0.0.1', () => {
 });
 
 attachConsole(server, {
-  authenticate: (req) => new Promise((resolve) => {
-    sessionParser(req, {}, () => resolve(isAuthenticatedRequest(req)));
+  authenticate: (req, { bearerOnly = false } = {}) => new Promise((resolve) => {
+    sessionParser(req, {}, () => resolve(
+      bearerOnly
+        ? Boolean(req.headers.authorization &&
+          req.headers.authorization.startsWith('Bearer ') &&
+          req.headers.authorization.slice(7) === validPassword)
+        : isAuthenticatedRequest(req)
+    ));
   })
 });
 

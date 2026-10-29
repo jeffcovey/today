@@ -17,7 +17,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
-import { getConfig } from './config.js';
+import { clearConfigCache, getConfig } from './config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -30,6 +30,10 @@ const MAX_IDLE_MINUTES = 24 * 60;
 const MAX_COLS = 500;
 const MAX_ROWS = 300;
 const PING_INTERVAL_MS = 30_000;
+const OUTPUT_HIGH_WATER_MARK = 1 * 1024 * 1024;
+const OUTPUT_LOW_WATER_MARK = 256 * 1024;
+const OUTPUT_HARD_LIMIT = 8 * 1024 * 1024;
+const OUTPUT_DRAIN_INTERVAL_MS = 50;
 
 // WebSocket close codes in the application range (4000-4999).
 export const CLOSE_IDLE = 4000;
@@ -52,7 +56,11 @@ function boundedNumber(value, fallback, max) {
   return n;
 }
 
-export function getConsoleConfig(raw = getConfig('console')) {
+export function getConsoleConfig(raw) {
+  if (arguments.length === 0) {
+    clearConfigCache();
+    raw = getConfig('console');
+  }
   const section = raw && typeof raw === 'object' ? raw : {};
   const shell = typeof section.shell === 'string' && section.shell.trim()
     ? section.shell.trim()
@@ -68,10 +76,23 @@ export function getConsoleConfig(raw = getConfig('console')) {
 // The shell gets the server's environment minus dotenvx's markers, so that
 // bin/* scripts started from it load .env afresh instead of inheriting
 // whatever secrets were current when the web server started.
-export function shellEnvironment(base = process.env) {
+export function shellEnvironment(base = process.env, appRoot = APP_ROOT) {
+  const envFileKeys = new Set();
+  try {
+    const envFile = fs.readFileSync(path.join(appRoot, '.env'), 'utf8');
+    for (const match of envFile.matchAll(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/gm)) {
+      envFileKeys.add(match[1]);
+    }
+  } catch {
+    // A checkout without .env has no names to refresh.
+  }
+
   const env = {};
   for (const [key, value] of Object.entries(base)) {
-    if (key.startsWith('DOTENV')) continue;
+    if (key.startsWith('DOTENVX_')) continue;
+    if (envFileKeys.has(key) &&
+        key !== 'DOTENV_PRIVATE_KEY' &&
+        !key.startsWith('DOTENV_PRIVATE_KEY_')) continue;
     env[key] = value;
   }
   env.TERM = 'xterm-256color';
@@ -96,6 +117,27 @@ function rejectUpgrade(socket, status, reason) {
   socket.destroy();
 }
 
+function originMatchesHost(req) {
+  const origin = req.headers.origin;
+  if (typeof origin !== 'string') return false;
+  const host = req.headers.host;
+  if (typeof host !== 'string' || !host) return false;
+  try {
+    const originUrl = new URL(origin);
+    const hostUrl = new URL(`http://${host}`);
+    return ['http:', 'https:'].includes(originUrl.protocol) &&
+      !originUrl.username && !originUrl.password &&
+      originUrl.host.toLowerCase() === hostUrl.host.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
+function hasBearerHeader(req) {
+  const authorization = req.headers.authorization;
+  return typeof authorization === 'string' && authorization.startsWith('Bearer ');
+}
+
 function send(ws, message) {
   if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(message));
 }
@@ -108,10 +150,9 @@ async function loadPty() {
 /**
  * Attach the console's WebSocket endpoint to an http.Server.
  *
- * `authenticate(req)` resolves to true when the upgrade request belongs to a
- * logged-in session (the caller runs its session parser and checks whatever
- * it accepts for pages). `getConfigFn` is read on every upgrade so that
- * switching the console on or off in config.toml needs no restart.
+ * `authenticate(req, { bearerOnly })` resolves to true when the upgrade request
+ * is authenticated. `getConfigFn` is read on every upgrade so that switching
+ * the console on or off in config.toml needs no restart.
  */
 export function attachConsole(server, {
   authenticate,
@@ -127,59 +168,81 @@ export function attachConsole(server, {
   const wss = new WebSocketServer({ noServer: true });
 
   server.on('upgrade', async (req, socket, head) => {
-    const { pathname } = new URL(req.url, 'http://localhost');
-    if (pathname !== CONSOLE_SOCKET_PATH) {
-      socket.destroy();
-      return;
-    }
-
-    let config;
     try {
-      config = getConfigFn();
-    } catch (error) {
-      log(`[console] could not read config: ${error.message}`);
-      rejectUpgrade(socket, 500, 'Internal Server Error');
-      return;
-    }
-    if (!config.enabled) {
-      rejectUpgrade(socket, 404, 'Not Found');
-      return;
-    }
+      let pathname;
+      try {
+        pathname = new URL(req.url, 'http://localhost').pathname;
+      } catch {
+        rejectUpgrade(socket, 400, 'Bad Request');
+        return;
+      }
+      if (pathname !== CONSOLE_SOCKET_PATH) {
+        socket.destroy();
+        return;
+      }
 
-    let authenticated = false;
-    try {
-      authenticated = await authenticate(req);
-    } catch (error) {
-      log(`[console] authentication failed: ${error.message}`);
-    }
-    if (!authenticated) {
-      rejectUpgrade(socket, 401, 'Unauthorized');
-      return;
-    }
+      const hasOrigin = req.headers.origin !== undefined;
+      if (hasOrigin ? !originMatchesHost(req) : !hasBearerHeader(req)) {
+        rejectUpgrade(socket, 403, 'Forbidden');
+        return;
+      }
 
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      openShell(ws, req, config).catch((error) => {
-        log(`[console] could not start a shell: ${error.message}`);
-        send(ws, { type: 'output', data: `\r\n[console] could not start a shell: ${error.message}\r\n` });
-        ws.close(1011, 'shell failed');
+      let config;
+      try {
+        config = getConfigFn();
+      } catch (error) {
+        log(`[console] could not read config: ${error.message}`);
+        rejectUpgrade(socket, 500, 'Internal Server Error');
+        return;
+      }
+      if (!config.enabled) {
+        rejectUpgrade(socket, 404, 'Not Found');
+        return;
+      }
+
+      let authenticated = false;
+      try {
+        authenticated = await authenticate(req, { bearerOnly: !hasOrigin });
+      } catch (error) {
+        log(`[console] authentication failed: ${error.message}`);
+      }
+      if (!authenticated) {
+        rejectUpgrade(socket, 401, 'Unauthorized');
+        return;
+      }
+
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        openShell(ws, req, config).catch((error) => {
+          log(`[console] could not start a shell: ${error.message}`);
+          send(ws, { type: 'output', data: `\r\n[console] could not start a shell: ${error.message}\r\n` });
+          ws.close(1011, 'shell failed');
+        });
       });
-    });
+    } catch (error) {
+      log(`[console] upgrade failed: ${error.message}`);
+      if (!socket.destroyed) socket.destroy();
+    }
   });
 
   async function openShell(ws, req, config) {
     const pty = await loadPtyFn();
     const address = clientAddress(req);
+    if (ws.readyState !== ws.OPEN) {
+      log(`[console] socket closed before shell start for ${address}`);
+      return;
+    }
     const term = pty.spawn(config.shell, ['-l'], {
       name: 'xterm-256color',
       cols: 80,
       rows: 24,
       cwd: appRoot,
-      env: shellEnvironment()
+      env: shellEnvironment(process.env, appRoot)
     });
     log(`[console] shell opened for ${address} (pid ${term.pid}, ${config.shell}, cwd ${appRoot})`);
 
     let closed = false;
     let idleTimer = null;
+    let outputPaused = false;
     const idleMs = config.idleMinutes * 60_000;
 
     const finish = (code, reason) => {
@@ -187,6 +250,7 @@ export function attachConsole(server, {
       closed = true;
       if (idleTimer) clearTimeout(idleTimer);
       clearInterval(pingTimer);
+      clearInterval(outputDrainTimer);
       try { term.kill(); } catch { /* already gone */ }
       if (ws.readyState === ws.OPEN || ws.readyState === ws.CONNECTING) ws.close(code, reason);
       log(`[console] shell closed for ${address} (pid ${term.pid}, ${reason})`);
@@ -216,7 +280,28 @@ export function attachConsole(server, {
     if (typeof pingTimer.unref === 'function') pingTimer.unref();
     ws.on('pong', () => { alive = true; });
 
-    term.onData((data) => send(ws, { type: 'output', data }));
+    const updateOutputBackpressure = () => {
+      if (closed) return;
+      if (!outputPaused && ws.bufferedAmount > OUTPUT_HIGH_WATER_MARK) {
+        outputPaused = true;
+        try { term.pause(); } catch { /* exited */ }
+      } else if (outputPaused && ws.bufferedAmount < OUTPUT_LOW_WATER_MARK) {
+        outputPaused = false;
+        try { term.resume(); } catch { /* exited */ }
+      }
+    };
+    const outputDrainTimer = setInterval(updateOutputBackpressure, OUTPUT_DRAIN_INTERVAL_MS);
+    if (typeof outputDrainTimer.unref === 'function') outputDrainTimer.unref();
+    term.onData((data) => {
+      if (ws.readyState !== ws.OPEN) return;
+      const payload = JSON.stringify({ type: 'output', data });
+      if (ws.bufferedAmount + Buffer.byteLength(payload) > OUTPUT_HARD_LIMIT) {
+        finish(1013, 'output buffer limit');
+        return;
+      }
+      ws.send(payload);
+      updateOutputBackpressure();
+    });
     term.onExit(({ exitCode, signal }) => {
       send(ws, { type: 'exit', code: exitCode, signal });
       finish(CLOSE_SHELL_EXITED, 'shell exited');
