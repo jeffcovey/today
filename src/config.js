@@ -1,5 +1,5 @@
 // Configuration helper for JavaScript modules
-import { readFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
+import { readFileSync, existsSync, mkdirSync, statSync, unlinkSync } from 'fs';
 import { writeFileAtomic } from './fs-atomic.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -12,6 +12,8 @@ const PROJECT_ROOT = join(__dirname, '..');
 
 let configCache = null;
 let lastReadTime = 0;
+let cachedConfigPath = null;
+let cachedConfigMtime = null;
 const CACHE_TTL = 60000; // Cache for 1 minute
 
 const CONFIG_PATH_FILE = join(PROJECT_ROOT, '.data', 'config-path');
@@ -176,12 +178,22 @@ function parseConfigWithRecovery(content) {
 
 function readConfig() {
   const now = Date.now();
-  if (configCache && (now - lastReadTime) < CACHE_TTL) {
+  const configPath = getConfigPath();
+  let configMtime = null;
+  try {
+    configMtime = statSync(configPath).mtimeMs;
+  } catch {
+    // The TTL remains the fallback when the config file cannot be statted.
+  }
+  if (configCache &&
+      cachedConfigPath === configPath &&
+      (configMtime === null || cachedConfigMtime === configMtime) &&
+      (now - lastReadTime) < CACHE_TTL) {
     return configCache;
   }
 
   try {
-    const configContent = readFileSync(getConfigPath(), 'utf8');
+    const configContent = readFileSync(configPath, 'utf8');
     const { config } = parseConfigWithRecovery(configContent);
 
     // Apply deployment-specific AI overrides at runtime
@@ -200,8 +212,13 @@ function readConfig() {
 
     configCache = config;
     lastReadTime = now;
+    cachedConfigPath = configPath;
+    cachedConfigMtime = configMtime;
     return configCache;
   } catch {
+    configCache = null;
+    cachedConfigPath = null;
+    cachedConfigMtime = null;
     // Return defaults if config can't be read (file missing, permissions, etc.)
     return {
       timezone: 'America/New_York'
@@ -216,6 +233,8 @@ function readConfig() {
 export function clearConfigCache() {
   configCache = null;
   lastReadTime = 0;
+  cachedConfigPath = null;
+  cachedConfigMtime = null;
 }
 
 export function getTimezone() {

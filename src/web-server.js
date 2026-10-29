@@ -65,7 +65,8 @@ import {
   buildFileContext,
   buildMessages,
 } from './ai-chat/index.js';
-import { getNavbar, getThemeBootstrapScript, getDisplayMenuHtml, getSearchToggleHtml, getSearchFormHtml, getSearchRowHtml, THEME_COOKIE_NAME } from './web/navbar.js';
+import { getNavbar, getThemeBootstrapScript, getDisplayMenuHtml, getToolLinksHtml, getSearchToggleHtml, getSearchFormHtml, getSearchRowHtml, THEME_COOKIE_NAME } from './web/navbar.js';
+import { attachConsole, getConsoleConfig, CONSOLE_PATH, CONSOLE_SOCKET_PATH } from './web-console.js';
 import { getStoredThemeMode, setStoredThemeMode, isThemeMode, THEME_MODES,
   getStoredThemeName, setStoredThemeName, isThemeName, readWebPreferences } from './web-preferences.js';
 import { listThemes, getThemeStylesheet, BUILT_IN_THEME_ID } from './web/themes.js';
@@ -189,8 +190,7 @@ async function loadTemplate(name) {
 function renderTemplate(template, data = {}) {
   const templateData = {
     displayMenu: getDisplayMenuHtml(),
-    navbarSearch: `<a class="nav-link navbar-icon-link px-2 ms-auto" href="/_summaries" title="Plan Summaries" aria-label="Plan Summaries"><i class="fas fa-pen-to-square" aria-hidden="true"></i></a>
-      <a class="nav-link navbar-icon-link px-2" href="/_git" title="Git Changes" aria-label="Git Changes"><i class="fas fa-code-branch" aria-hidden="true"></i></a>
+    navbarSearch: `${getToolLinksHtml()}
       ${getSearchToggleHtml()}
       ${getSearchFormHtml()}`,
     navbarSearchRow: getSearchRowHtml(),
@@ -294,14 +294,16 @@ function getDiskCachePaths(urlPath) {
   return { html: htmlPath, meta: metaPath };
 }
 
-async function readFromDiskCache(urlPath, sourceMtime) {
+async function readFromDiskCache(urlPath, sourceMtime, consoleEnabled = false) {
   const paths = getDiskCachePaths(urlPath);
   if (!paths) return null;
   const { html: htmlPath, meta: metaPath } = paths;
   try {
     const metaRaw = await fs.readFile(metaPath, 'utf-8');
     const meta = JSON.parse(metaRaw);
-    if (meta.mtime !== sourceMtime || meta.renderVersion !== HTML_CACHE_RENDER_VERSION) return null;
+    if (meta.mtime !== sourceMtime ||
+        meta.renderVersion !== HTML_CACHE_RENDER_VERSION ||
+        meta.consoleEnabled !== consoleEnabled) return null;
     const html = await fs.readFile(htmlPath, 'utf-8');
     return html;
   } catch {
@@ -309,7 +311,7 @@ async function readFromDiskCache(urlPath, sourceMtime) {
   }
 }
 
-async function writeToDiskCache(urlPath, html, sourceMtime) {
+async function writeToDiskCache(urlPath, html, sourceMtime, consoleEnabled = false) {
   const paths = getDiskCachePaths(urlPath);
   if (!paths) return;
   const { html: htmlPath, meta: metaPath } = paths;
@@ -319,6 +321,7 @@ async function writeToDiskCache(urlPath, html, sourceMtime) {
     await fs.writeFile(metaPath, JSON.stringify({
       mtime: sourceMtime,
       renderVersion: HTML_CACHE_RENDER_VERSION,
+      consoleEnabled,
       timestamp: Date.now()
     }), 'utf-8');
   } catch (err) {
@@ -357,8 +360,9 @@ const sessionDb = new Database(path.join(__dirname, '..', '.data', 'sessions.db'
   }
 }
 
-// Session middleware - must come before auth
-app.use(session({
+// Session middleware - must come before auth. Kept as a value so the console's
+// WebSocket upgrade can run it on its request too.
+const sessionParser = session({
   store: new SQLiteStore({
     client: sessionDb,
     expired: {
@@ -374,7 +378,8 @@ app.use(session({
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production'
   }
-}));
+});
+app.use(sessionParser);
 
 // Authentication credentials
 const validUser = process.env.WEB_USER || "admin";
@@ -404,12 +409,17 @@ function getOrCreatePassword() {
 
 const validPassword = getOrCreatePassword();
 
+// A logged-in session, or a Bearer token for devices that can only set HTTP
+// headers. Shared with the console's WebSocket upgrade.
+function isAuthenticatedRequest(req) {
+  if (req.session && req.session.authenticated) return true;
+  const authHeader = req.headers.authorization;
+  return Boolean(authHeader && authHeader.startsWith('Bearer ') && authHeader.slice(7) === validPassword);
+}
+
 function sessionAuth(req, res, next) {
   if (req.path === "/auth/login" || req.path === "/auth/logout") return next();
-  if (req.session && req.session.authenticated) return next();
-  // Allow Bearer token authentication (e.g. for devices that can only set HTTP headers)
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ') && authHeader.slice(7) === validPassword) return next();
+  if (isAuthenticatedRequest(req)) return next();
   // Don't save static asset requests as return URL
   if (!req.path.match(/\.(ico|png|jpg|jpeg|gif|css|js|woff|woff2|ttf|svg)$/)) {
     req.session.returnTo = req.originalUrl;
@@ -3094,15 +3104,24 @@ function cleanupCache() {
 }
 
 // Get cached render or generate new one
+function consoleEnabledForCache() {
+  try {
+    return getConsoleConfig().enabled;
+  } catch {
+    return false;
+  }
+}
+
 async function getCachedRender(filePath, urlPath) {
   let fileMtime = null;
+  const consoleEnabled = consoleEnabledForCache();
   try {
     const stats = await fs.stat(filePath);
     const mtime = fileMtime = stats.mtime.getTime();
     const size = stats.size;
 
     // Create cache key from filepath + urlPath (urlPath is baked into rendered HTML for chat paths)
-    const cacheKey = `${filePath}::${urlPath}`;
+    const cacheKey = `${filePath}::${urlPath}::console=${consoleEnabled}`;
 
     // Check if we have a cached version
     const cached = renderCache.get(cacheKey);
@@ -3126,7 +3145,7 @@ async function getCachedRender(filePath, urlPath) {
     }
 
     // On memory-cache miss, check disk cache before doing a full render
-    const diskHtml = await readFromDiskCache(urlPath, mtime);
+    const diskHtml = await readFromDiskCache(urlPath, mtime, consoleEnabled);
     if (diskHtml) {
       debug(`[DISK CACHE HIT] ${urlPath}`);
       const hasDynamicContent = containsDynamicContent(diskHtml);
@@ -3157,7 +3176,7 @@ async function getCachedRender(filePath, urlPath) {
 
     // Persist to disk cache for non-dynamic files (survives server restarts)
     if (!hasDynamicContent) {
-      writeToDiskCache(urlPath, rendered, mtime).catch(err => {
+      writeToDiskCache(urlPath, rendered, mtime, consoleEnabled).catch(err => {
         debug('Disk cache write error:', err.message);
       });
     }
@@ -6029,7 +6048,7 @@ app.post('/_cache/warm', async (req, res) => {
             // share cache keys and bake identical (correct) /edit/ links.
             const urlPath = normalizeUrlPath(path.relative(VAULT_PATH, fullPath));
 
-            const diskHtml = await readFromDiskCache(urlPath, mtime);
+            const diskHtml = await readFromDiskCache(urlPath, mtime, consoleEnabledForCache());
             if (diskHtml) {
               skipped++;
               continue; // disk cache is fresh — nothing to do
@@ -6075,6 +6094,50 @@ function gitExec(args, options = {}) {
 }
 
 // ── Git page & API routes ────────────────────────────────────────────────────
+
+// The console: a shell on the server, inside the web view (src/web-console.js).
+// Off unless [console] enabled = true, and read on every request so a config
+// change needs no restart. xterm.js is served out of node_modules.
+const consoleVendor = express.Router();
+for (const [name, pkg] of Object.entries({
+  xterm: '@xterm/xterm',
+  'addon-fit': '@xterm/addon-fit',
+  'addon-web-links': '@xterm/addon-web-links'
+})) {
+  consoleVendor.use(`/${name}`, express.static(path.join(__dirname, '..', 'node_modules', pkg), { maxAge: '1d' }));
+}
+app.use(`${CONSOLE_PATH}/vendor`, (req, res, next) => (getConsoleConfig().enabled ? next() : res.status(404).end()), consoleVendor);
+
+app.get(CONSOLE_PATH, authMiddleware, async (req, res) => {
+  if (!getConsoleConfig().enabled) {
+    res.status(404).send(await renderError(404,
+      'The console is switched off. Add a [console] section with enabled = true to config.toml to turn it on.'));
+    return;
+  }
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Console</title>
+  ${pageStyle}
+  <link href="${CONSOLE_PATH}/vendor/xterm/css/xterm.css" rel="stylesheet"/>
+</head>
+<body class="console-page">
+  ${getNavbar('Console', 'fa-terminal', { showSearch: false })}
+  <main class="console-main">
+    <div id="terminal" class="console-terminal" role="region" aria-label="Terminal"></div>
+    <div class="console-status">
+      <span id="consoleStatus" aria-live="polite">Connecting…</span>
+      <button id="consoleReconnect" class="btn btn-sm btn-outline-secondary py-0 px-2 d-none" type="button">Reconnect</button>
+    </div>
+  </main>
+  <script src="${CONSOLE_PATH}/vendor/xterm/lib/xterm.js"></script>
+  <script src="${CONSOLE_PATH}/vendor/addon-fit/lib/addon-fit.js"></script>
+  <script src="${CONSOLE_PATH}/vendor/addon-web-links/lib/addon-web-links.js"></script>
+  <script src="/static/js/console.js?v=${STATIC_VERSION}" data-socket-path="${CONSOLE_SOCKET_PATH}"></script>
+  ${pageScripts}
+</body>
+</html>`);
+});
 
 app.get('/_git', authMiddleware, async (req, res) => {
   try {
@@ -8785,6 +8848,18 @@ const server = app.listen(PORT, '127.0.0.1', () => {
   DataviewAPI.getCachedAllFiles(VAULT_PATH).catch((error) => {
     console.error('Initial vault file index build failed:', error.message);
   });
+});
+
+attachConsole(server, {
+  authenticate: (req, { bearerOnly = false } = {}) => new Promise((resolve) => {
+    sessionParser(req, {}, () => resolve(
+      bearerOnly
+        ? Boolean(req.headers.authorization &&
+          req.headers.authorization.startsWith('Bearer ') &&
+          req.headers.authorization.slice(7) === validPassword)
+        : isAuthenticatedRequest(req)
+    ));
+  })
 });
 
 // Set server timeout to 5 minutes to match AI processing time

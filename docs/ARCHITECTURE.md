@@ -365,6 +365,7 @@ The primary user interface is the CLI in `bin/`. Important entry points include:
 | Auth | `GET/POST /auth/login`, `GET /auth/logout` | Session-based login |
 | Cache admin | `GET /_cache/status`, `POST /_cache/clear`, `POST /_cache/warm` | Cache inspection and warming |
 | Git UI | `GET /_git`, `GET /_git/diff`, `POST /_git/*` | Browser workflows for staging, commit, pull, push, discard |
+| Console | `GET /_console`, `WS /_console/socket`, `GET /_console/vendor/*` | Browser shell on the server (xterm.js over a node-pty PTY, cwd = the checkout); opt-in via `[console] enabled = true` |
 | AI editing/chat | `POST /ai-edit/*path`, `POST /ai-chat/*path`, `POST /ai-chat-stream/*path`, `POST /ai-chat-directory/*path` | AI-assisted file and directory workflows |
 | Conversation storage | `GET/PUT/DELETE /api/ai-chat/conversations/*path` | Persist browser chat threads |
 | Search and editing | `GET /search`, `GET /edit/*path`, `POST /toggle-checkbox/*path` | Vault navigation and editing |

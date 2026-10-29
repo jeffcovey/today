@@ -212,6 +212,7 @@ For remote access, deploy Today to a server using `bin/today configure` and `bin
 - **Table of contents**: Auto-generated TOC for long documents
 - **Responsive design**: Works on desktop and mobile devices
 - **Pomodoro timer**: Optional fixed-interval work/rest timer with repeating reminders
+- **Web console**: Optional shell on the server, with the Today checkout as its working directory
 
 ### Pomodoro Timer
 
@@ -251,6 +252,29 @@ Timers answer "what am I doing right now", so a saved one is thrown away rather
 than resumed once more than four hours have passed since you last touched it.
 One left running over lunch, overnight, or until the next day does not come
 back.
+
+### Web Console
+
+A shell on the server, inside the web view, with the Today checkout as its
+working directory — `bin/tasks`, `bin/plugins sync`, `git` and the rest
+without opening a separate SSH session. It stays hidden until you add a
+`[console]` section to your configuration file:
+
+```toml
+[console]
+enabled = true
+idle_minutes = 30     # close a shell nothing has been typed into; 0 means never
+# shell = "/bin/zsh"  # defaults to $SHELL, then bash
+```
+
+A terminal icon then appears in the navbar, and `/_console` opens the login
+shell in a full terminal (xterm.js). Each browser tab gets its own shell, which
+ends when the tab closes, the shell exits, or the idle time passes. Switching
+the section on or off takes effect without a restart.
+
+This is a shell for anyone who can log in to the web view, so switch it on only
+on a deployment served over HTTPS. Every shell opened is logged with the
+client address.
 
 ### Themes
 

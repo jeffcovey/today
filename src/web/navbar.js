@@ -1,3 +1,4 @@
+import { getConsoleConfig } from '../web-console.js';
 function escapeSearchValue(value) {
   return String(value).replace(/"/g, '&quot;');
 }
@@ -183,15 +184,33 @@ export function getNavbar(title = 'Today', icon = 'fa-folder-open', options = {}
             <i class="fas ${icon}" aria-hidden="true"></i><span class="navbar-brand-text d-none d-sm-inline ms-2">${title}</span>
           </a>
           ${getDisplayMenuHtml()}
-          <a class="nav-link navbar-icon-link px-2 ms-auto" href="/_summaries" title="Plan Summaries" aria-label="Plan Summaries">
-            <i class="fas fa-pen-to-square" aria-hidden="true"></i>
-          </a>
-          <a class="nav-link navbar-icon-link px-2" href="/_git" title="Git Changes" aria-label="Git Changes">
-            <i class="fas fa-code-branch" aria-hidden="true"></i>
-          </a>
+          ${getToolLinksHtml()}
           ${showSearch ? getSearchToggleHtml() : ''}
           ${showSearch ? getSearchFormHtml(searchValue) : ''}
         </div>
         ${showSearch ? getSearchRowHtml(searchValue) : ''}
       </nav>`;
+}
+
+/**
+ * The tool links at the right of the navbar: summaries, git, and the console
+ * when config switches it on. Read on every render so a config change needs
+ * no restart; a config that cannot be read simply has no console.
+ */
+export function getToolLinksHtml() {
+  let consoleEnabled = false;
+  try {
+    consoleEnabled = getConsoleConfig().enabled;
+  } catch {
+    consoleEnabled = false;
+  }
+  return `<a class="nav-link navbar-icon-link px-2 ms-auto" href="/_summaries" title="Plan Summaries" aria-label="Plan Summaries">
+            <i class="fas fa-pen-to-square" aria-hidden="true"></i>
+          </a>
+          <a class="nav-link navbar-icon-link px-2" href="/_git" title="Git Changes" aria-label="Git Changes">
+            <i class="fas fa-code-branch" aria-hidden="true"></i>
+          </a>${consoleEnabled ? `
+          <a class="nav-link navbar-icon-link px-2" href="/_console" title="Console" aria-label="Console">
+            <i class="fas fa-terminal" aria-hidden="true"></i>
+          </a>` : ''}`;
 }
