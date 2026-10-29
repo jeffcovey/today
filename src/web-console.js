@@ -255,11 +255,13 @@ export function attachConsole(server, {
     // submits it first so the two never share a line. Only real input holds
     // off the idle timeout.
     let startupTimer = null;
+    let startupDeadlineTimer = null;
     let startupDone = !config.command;
     const runStartupCommand = () => {
       if (startupDone || closed) return;
       startupDone = true;
       clearTimeout(startupTimer);
+      clearTimeout(startupDeadlineTimer);
       term.write(`${config.command}\n`);
     };
     const scheduleStartupCommand = (quietMs) => {
@@ -273,6 +275,7 @@ export function attachConsole(server, {
       closed = true;
       if (idleTimer) clearTimeout(idleTimer);
       clearTimeout(startupTimer);
+      clearTimeout(startupDeadlineTimer);
       clearInterval(pingTimer);
       clearInterval(outputDrainTimer);
       try { term.kill(); } catch { /* already gone */ }
@@ -358,7 +361,7 @@ export function attachConsole(server, {
 
     send(ws, { type: 'hello', cwd: appRoot, shell: config.shell, idleMinutes: config.idleMinutes });
     touch();
-    scheduleStartupCommand(STARTUP_FALLBACK_MS);
+    if (!startupDone) startupDeadlineTimer = setTimeout(runStartupCommand, STARTUP_FALLBACK_MS);
   }
 
   return {

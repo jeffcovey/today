@@ -150,6 +150,49 @@ async function waitFor(check, what, timeoutMs = 30_000) {
 const input = (ws, data) => ws.send(JSON.stringify({ type: 'input', data }));
 
 describe('PTY startup', () => {
+  test('runs the startup command by 1.5 seconds despite output every 100 ms', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+    const httpServer = createServer();
+    let emitOutput;
+    const term = {
+      pid: 123,
+      onData: (handler) => { emitOutput = handler; },
+      onExit: () => {},
+      write: jest.fn(),
+      resize: () => {},
+      kill: jest.fn()
+    };
+    const attached = attachConsole(httpServer, {
+      authenticate: async () => true,
+      getConfigFn: () => ({
+        enabled: true, idleMinutes: 0, shell: '/bin/sh', command: 'tmux attach'
+      }),
+      appRoot: PROJECT_ROOT,
+      log: () => {},
+      loadPtyFn: async () => ({ spawn: () => term })
+    });
+    try {
+      await new Promise((resolve) => httpServer.listen(0, '127.0.0.1', resolve));
+      const address = httpServer.address();
+      await openSocket(`ws://127.0.0.1:${address.port}/_console/socket`, {
+        Origin: `http://127.0.0.1:${address.port}`
+      });
+      for (let elapsed = 0; elapsed < 1500; elapsed += 100) {
+        expect(term.write).not.toHaveBeenCalled();
+        emitOutput('background output\r\n');
+        jest.advanceTimersByTime(100);
+      }
+      expect(term.write).toHaveBeenCalledTimes(1);
+      expect(term.write).toHaveBeenCalledWith('tmux attach\n');
+      jest.advanceTimersByTime(1500);
+      expect(term.write).toHaveBeenCalledTimes(1);
+    } finally {
+      attached.close();
+      await new Promise((resolve) => httpServer.close(resolve));
+      jest.useRealTimers();
+    }
+  });
+
   test('does not spawn a shell if the socket closes while the PTY module loads', async () => {
     const httpServer = createServer();
     const spawn = jest.fn();
