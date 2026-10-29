@@ -2656,3 +2656,40 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
     transition: none;
   }
 }
+
+/* Console page: the terminal takes whatever height the navbar leaves. */
+body.console-page {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.console-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+.console-terminal {
+  flex: 1;
+  min-height: 0;
+  padding: 0.5rem;
+  border: 1px solid var(--today-border);
+  border-radius: 0.5rem;
+  background: var(--today-code-block-bg);
+}
+.console-terminal .xterm {
+  height: 100%;
+}
+.console-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 1.5rem;
+  font-size: 0.85rem;
+  color: var(--today-muted-text);
+}
