@@ -34,6 +34,8 @@ const OUTPUT_HIGH_WATER_MARK = 1 * 1024 * 1024;
 const OUTPUT_LOW_WATER_MARK = 256 * 1024;
 const OUTPUT_HARD_LIMIT = 8 * 1024 * 1024;
 const OUTPUT_DRAIN_INTERVAL_MS = 50;
+const STARTUP_QUIET_MS = 150;
+const STARTUP_FALLBACK_MS = 1500;
 
 // WebSocket close codes in the application range (4000-4999).
 export const CLOSE_IDLE = 4000;
@@ -68,7 +70,10 @@ export function getConsoleConfig(raw) {
     // Opt-in: an absent section leaves every existing deployment without a shell.
     enabled: section.enabled === true,
     idleMinutes: boundedNumber(section.idle_minutes, DEFAULT_IDLE_MINUTES, MAX_IDLE_MINUTES),
-    shell
+    shell,
+    // Typed into the shell once it is up, so its startup files still load and
+    // the prompt comes back when the command ends.
+    command: typeof section.command === 'string' ? section.command.replace(/[\r\n]+/g, ' ').trim() : ''
   };
 }
 
@@ -244,10 +249,33 @@ export function attachConsole(server, {
     let outputPaused = false;
     const idleMs = config.idleMinutes * 60_000;
 
+    // The startup command is typed once the shell has drawn its prompt (its
+    // output has gone quiet), not the instant the PTY opens, or the tty echoes
+    // the keystrokes raw before the shell takes over. Early client input
+    // submits it first so the two never share a line. Only real input holds
+    // off the idle timeout.
+    let startupTimer = null;
+    let startupDeadlineTimer = null;
+    let startupDone = !config.command;
+    const runStartupCommand = () => {
+      if (startupDone || closed) return;
+      startupDone = true;
+      clearTimeout(startupTimer);
+      clearTimeout(startupDeadlineTimer);
+      term.write(`${config.command}\n`);
+    };
+    const scheduleStartupCommand = (quietMs) => {
+      if (startupDone) return;
+      clearTimeout(startupTimer);
+      startupTimer = setTimeout(runStartupCommand, quietMs);
+    };
+
     const finish = (code, reason) => {
       if (closed) return;
       closed = true;
       if (idleTimer) clearTimeout(idleTimer);
+      clearTimeout(startupTimer);
+      clearTimeout(startupDeadlineTimer);
       clearInterval(pingTimer);
       clearInterval(outputDrainTimer);
       try { term.kill(); } catch { /* already gone */ }
@@ -292,6 +320,7 @@ export function attachConsole(server, {
     const outputDrainTimer = setInterval(updateOutputBackpressure, OUTPUT_DRAIN_INTERVAL_MS);
     if (typeof outputDrainTimer.unref === 'function') outputDrainTimer.unref();
     term.onData((data) => {
+      scheduleStartupCommand(STARTUP_QUIET_MS);
       if (ws.readyState !== ws.OPEN) return;
       const payload = JSON.stringify({ type: 'output', data });
       if (ws.bufferedAmount + Buffer.byteLength(payload) > OUTPUT_HARD_LIMIT) {
@@ -316,6 +345,7 @@ export function attachConsole(server, {
       if (!message || typeof message !== 'object') return;
       if (message.type === 'input' && typeof message.data === 'string') {
         touch();
+        runStartupCommand();
         term.write(message.data);
       } else if (message.type === 'resize') {
         const cols = dimension(message.cols, 80, MAX_COLS);
@@ -331,6 +361,7 @@ export function attachConsole(server, {
 
     send(ws, { type: 'hello', cwd: appRoot, shell: config.shell, idleMinutes: config.idleMinutes });
     touch();
+    if (!startupDone) startupDeadlineTimer = setTimeout(runStartupCommand, STARTUP_FALLBACK_MS);
   }
 
   return {

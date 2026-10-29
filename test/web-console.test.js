@@ -40,6 +40,13 @@ describe('getConsoleConfig', () => {
     expect(getConsoleConfig({ idle_minutes: '45' }).idleMinutes).toBe(45);
   });
 
+  test('a startup command is optional and trimmed to one line', () => {
+    expect(getConsoleConfig({}).command).toBe('');
+    expect(getConsoleConfig({ command: 42 }).command).toBe('');
+    expect(getConsoleConfig({ command: '  tmux attach \n' }).command).toBe('tmux attach');
+    expect(getConsoleConfig({ command: 'cd vault\nls' }).command).toBe('cd vault ls');
+  });
+
   test('the shell defaults to one that exists and accepts an override', () => {
     expect(getConsoleConfig({}).shell).toMatch(/sh$/);
     expect(getConsoleConfig({ shell: ' /bin/sh ' }).shell).toBe('/bin/sh');
@@ -143,6 +150,49 @@ async function waitFor(check, what, timeoutMs = 30_000) {
 const input = (ws, data) => ws.send(JSON.stringify({ type: 'input', data }));
 
 describe('PTY startup', () => {
+  test('runs the startup command by 1.5 seconds despite output every 100 ms', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+    const httpServer = createServer();
+    let emitOutput;
+    const term = {
+      pid: 123,
+      onData: (handler) => { emitOutput = handler; },
+      onExit: () => {},
+      write: jest.fn(),
+      resize: () => {},
+      kill: jest.fn()
+    };
+    const attached = attachConsole(httpServer, {
+      authenticate: async () => true,
+      getConfigFn: () => ({
+        enabled: true, idleMinutes: 0, shell: '/bin/sh', command: 'tmux attach'
+      }),
+      appRoot: PROJECT_ROOT,
+      log: () => {},
+      loadPtyFn: async () => ({ spawn: () => term })
+    });
+    try {
+      await new Promise((resolve) => httpServer.listen(0, '127.0.0.1', resolve));
+      const address = httpServer.address();
+      await openSocket(`ws://127.0.0.1:${address.port}/_console/socket`, {
+        Origin: `http://127.0.0.1:${address.port}`
+      });
+      for (let elapsed = 0; elapsed < 1500; elapsed += 100) {
+        expect(term.write).not.toHaveBeenCalled();
+        emitOutput('background output\r\n');
+        jest.advanceTimersByTime(100);
+      }
+      expect(term.write).toHaveBeenCalledTimes(1);
+      expect(term.write).toHaveBeenCalledWith('tmux attach\n');
+      jest.advanceTimersByTime(1500);
+      expect(term.write).toHaveBeenCalledTimes(1);
+    } finally {
+      attached.close();
+      await new Promise((resolve) => httpServer.close(resolve));
+      jest.useRealTimers();
+    }
+  });
+
   test('does not spawn a shell if the socket closes while the PTY module loads', async () => {
     const httpServer = createServer();
     const spawn = jest.fn();
@@ -234,7 +284,10 @@ describe('with [console] enabled', () => {
 
   beforeAll(async () => {
     // Three seconds idle, so the timeout can be watched.
-    server = await startServer({ configLines: ['[console]', 'enabled = true', 'idle_minutes = 0.05'] });
+    server = await startServer({ configLines: [
+      '[console]', 'enabled = true', 'idle_minutes = 0.05',
+      "command = 'printf \"startup=%s\\n\" ok'"
+    ] });
   });
 
   afterAll(async () => {
@@ -352,6 +405,30 @@ describe('with [console] enabled', () => {
       input(ws, 'printf "cwd=%s size=%s\\n" "$PWD" "$(stty size)"\n');
       await waitFor(() => state.text.includes(`cwd=${PROJECT_ROOT} size=40 120`), 'the shell to answer');
       expect(state.closeCode).toBeNull();
+    } finally {
+      ws.close();
+    }
+  });
+
+  test('the startup command runs without any typing', async () => {
+    const ws = await openSocket(socketUrl(server.baseUrl), authHeaders);
+    const state = collect(ws);
+    try {
+      await waitFor(() => state.text.includes('startup=ok'), 'the startup command output');
+    } finally {
+      ws.close();
+    }
+  });
+
+  test('early input submits the startup command before the typed command', async () => {
+    const ws = await openSocket(socketUrl(server.baseUrl), authHeaders);
+    const state = collect(ws);
+    try {
+      input(ws, 'printf "typed=%s\\n" ');
+      await waitFor(() => state.text.includes('startup=ok'), 'the startup command output');
+      input(ws, 'ok\n');
+      await waitFor(() => state.text.includes('typed=ok'), 'the typed command output');
+      expect(state.text.indexOf('startup=ok')).toBeLessThan(state.text.indexOf('typed=ok'));
     } finally {
       ws.close();
     }
