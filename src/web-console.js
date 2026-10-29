@@ -251,14 +251,15 @@ export function attachConsole(server, {
 
     // The startup command is typed once the shell has drawn its prompt (its
     // output has gone quiet), not the instant the PTY opens, or the tty echoes
-    // the keystrokes raw before the shell takes over. It does not go through
-    // the input handler: it is not typing, so it must not hold off the idle
-    // timeout.
+    // the keystrokes raw before the shell takes over. Early client input
+    // submits it first so the two never share a line. Only real input holds
+    // off the idle timeout.
     let startupTimer = null;
     let startupDone = !config.command;
     const runStartupCommand = () => {
       if (startupDone || closed) return;
       startupDone = true;
+      clearTimeout(startupTimer);
       term.write(`${config.command}\n`);
     };
     const scheduleStartupCommand = (quietMs) => {
@@ -341,6 +342,7 @@ export function attachConsole(server, {
       if (!message || typeof message !== 'object') return;
       if (message.type === 'input' && typeof message.data === 'string') {
         touch();
+        runStartupCommand();
         term.write(message.data);
       } else if (message.type === 'resize') {
         const cols = dimension(message.cols, 80, MAX_COLS);

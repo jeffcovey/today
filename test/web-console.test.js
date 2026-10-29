@@ -377,6 +377,20 @@ describe('with [console] enabled', () => {
     }
   });
 
+  test('early input submits the startup command before the typed command', async () => {
+    const ws = await openSocket(socketUrl(server.baseUrl), authHeaders);
+    const state = collect(ws);
+    try {
+      input(ws, 'printf "typed=%s\\n" ');
+      await waitFor(() => state.text.includes('startup=ok'), 'the startup command output');
+      input(ws, 'ok\n');
+      await waitFor(() => state.text.includes('typed=ok'), 'the typed command output');
+      expect(state.text.indexOf('startup=ok')).toBeLessThan(state.text.indexOf('typed=ok'));
+    } finally {
+      ws.close();
+    }
+  });
+
   test('exiting the shell closes the socket', async () => {
     const ws = await openSocket(socketUrl(server.baseUrl), authHeaders);
     const state = collect(ws);
