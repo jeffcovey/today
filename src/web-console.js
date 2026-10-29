@@ -17,7 +17,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
-import { clearConfigCache, getConfig } from './config.js';
+import { getConfig } from './config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -58,7 +58,6 @@ function boundedNumber(value, fallback, max) {
 
 export function getConsoleConfig(raw) {
   if (arguments.length === 0) {
-    clearConfigCache();
     raw = getConfig('console');
   }
   const section = raw && typeof raw === 'object' ? raw : {};
