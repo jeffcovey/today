@@ -397,6 +397,14 @@ Tools are built into `src/mcp-server.js` or defined in modules under `src/mcp-to
 
 Tools that take a task, event or contact ID require the item's `title` and refuse when it doesn't match. Batch tools take `dry_run`, on by default. Every `write` and `destructive` call, including refused ones, is appended to `<vault>/logs/mcp-writes/YYYY-MM-DD.md`; `[mcp] write_log = "other/dir"` moves it and `write_log = false` turns it off.
 
+Day-to-day write tools (issue #686):
+
+- `src/mcp-tools/diary-writes.js`: `add_diary_entry` (write), like `bin/diary add`, through `src/diary-add.js`.
+- `src/mcp-tools/timer-writes.js`: `restart_timer` and `add_time_entry` (write), like `bin/track restart` and `bin/track add`.
+- `src/mcp-tools/role-replies.js`: `reply_to_role` (write), the web plan's role reply form; takes only the user's own words.
+- `src/mcp-tools/calendar-writes.js`: `update_event` and `delete_event` (destructive), like `bin/calendar update` and `delete`; writable calendars only.
+- `src/mcp-tools/finance-writes.js`: `categorize_transaction` (destructive), like `bin/finance categorize`; writes to YNAB.
+
 Callers get the same guidance `bin/today` gives its own AI (`src/mcp-guidance.js`):
 
 - Each tool's description carries its plugin type's description, the enabled sources, and the user's `ai_instructions` for each source. Types without a tool of their own go on `query_database`.
