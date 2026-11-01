@@ -40,6 +40,7 @@ import {
   ensureSyncForType,
   syncPluginSource,
   syncAllPlugins,
+  getAIInstructionsByType,
 } from './plugin-loader.js';
 import { schemas, getTableName } from './plugin-schemas.js';
 import { getTodayDate, sqlLocalDate } from './date-utils.js';
@@ -53,13 +54,45 @@ import {
   LIST_TASKS_MAX_LIMIT,
 } from './mcp-reads.js';
 import { getAbsoluteVaultPath } from './config.js';
-import { execSync } from 'child_process';
+import { addGuidanceToTools, buildServerInstructions, buildContextText } from './mcp-guidance.js';
+import { execSync, execFile } from 'child_process';
+import { promisify } from 'util';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
+const execFileAsync = promisify(execFile);
+const LIVE_CONTEXT_TIMEOUT_MS = 30 * 1000;
+
+async function aiInstructionsByType() {
+  try {
+    return await getAIInstructionsByType();
+  } catch {
+    return null;
+  }
+}
+
+/** bin/context show, without colour, or null if it fails or runs long. */
+async function readLiveContext() {
+  try {
+    const { stdout } = await execFileAsync(path.join(PROJECT_ROOT, 'bin/context'), ['show'], {
+      cwd: PROJECT_ROOT,
+      encoding: 'utf8',
+      timeout: LIVE_CONTEXT_TIMEOUT_MS,
+      maxBuffer: 8 * 1024 * 1024,
+      env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0' },
+    });
+    return stdout
+      .replace(/\x1b\[[0-9;]*m/g, '')
+      .split('\n')
+      .filter(line => !line.includes('[dotenvx'))
+      .join('\n');
+  } catch {
+    return null;
+  }
+}
 
 // Tools that change something: hidden and refused on a read-only connection.
 export const WRITE_TOOLS = new Set([
@@ -81,6 +114,7 @@ export function createMCPServer({ readOnly = false } = {}) {
         resources: {},
         prompts: {},
       },
+      instructions: buildServerInstructions(),
     }
   );
 
@@ -240,6 +274,19 @@ export function createMCPServer({ readOnly = false } = {}) {
         required: ['sql'],
       },
     });
+
+    tools.push({
+      name: 'get_context',
+      description: "The user's context, as Today's own AI sees it: the current time and time zone, the user's profile, their instructions overall and for every data source, and live context (today's stage, plan, weather, vault changes). Call it at the start of a conversation.",
+      inputSchema: {
+        type: 'object',
+        properties: {
+          include_live: { type: 'boolean', description: 'Include live context-plugin output (default: true; slower)' },
+        },
+      },
+    });
+
+    addGuidanceToTools(tools, await aiInstructionsByType());
 
     return { tools: readOnly ? tools.filter(tool => !WRITE_TOOLS.has(tool.name)) : tools };
   });
@@ -470,6 +517,16 @@ export function createMCPServer({ readOnly = false } = {}) {
               isError: true,
             };
           }
+        }
+
+        case 'get_context': {
+          const [instructionsByType, liveContext] = await Promise.all([
+            aiInstructionsByType(),
+            args?.include_live === false ? Promise.resolve(null) : readLiveContext(),
+          ]);
+          return {
+            content: [{ type: 'text', text: buildContextText({ instructionsByType, liveContext }) }],
+          };
         }
 
         case 'query_database': {
