@@ -10,19 +10,14 @@
  *     instructions, and a pointer to get_context;
  *   - the get_context tool: all of it plus live context-plugin output.
  *
- * Profile fields go out only as `[mcp] profile_fields` allows. Without that
- * setting, DEFAULT_PROFILE_FIELDS is used, which leaves out email and
- * birthdate.
+ * The whole profile goes out: every key in [profile], plus the top-level
+ * `location`. `[mcp] profile_fields`, when set, narrows it to the fields it
+ * lists.
  */
 
 import { schemas } from './plugin-schemas.js';
 import { getFullConfig } from './config.js';
 import { getConfiguredTimezone, getCurrentTimeISO, getTodayDate } from './date-utils.js';
-
-// Conservative default: what a caller needs to plan a day, nothing that
-// identifies or contacts the user. Add "email" or "birthdate" to
-// [mcp] profile_fields to share them.
-export const DEFAULT_PROFILE_FIELDS = ['name', 'location', 'home_location', 'vocation', 'wake_time', 'bed_time'];
 
 const PROFILE_LABELS = {
   name: 'Name',
@@ -59,17 +54,41 @@ function readConfig(config) {
   }
 }
 
-/** Which profile fields may go out, from [mcp] profile_fields or the default. */
+/**
+ * Which profile fields go out: the list in [mcp] profile_fields if it is set,
+ * otherwise all of them, which is `name` first, then `location` (the
+ * top-level key, where the user is now), then every other [profile] key in
+ * the order the config lists them.
+ */
 export function getProfileFields(config) {
-  const fields = readConfig(config).mcp?.profile_fields;
+  const cfg = readConfig(config);
+  const fields = cfg.mcp?.profile_fields;
   if (Array.isArray(fields)) {
     return fields.filter(f => typeof f === 'string' && f.trim()).map(f => f.trim());
   }
-  return DEFAULT_PROFILE_FIELDS;
+  const profile = cfg.profile && typeof cfg.profile === 'object' ? cfg.profile : {};
+  const rest = Object.keys(profile).filter(k => k !== 'name' && k !== 'location');
+  return ['name', 'location', ...rest];
+}
+
+// "favorite_foods" -> "Favorite foods", for keys without a label above.
+function labelFor(key) {
+  if (Object.hasOwn(PROFILE_LABELS, key)) return PROFILE_LABELS[key];
+  const words = key.replace(/[_-]+/g, ' ').trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+// TOML values as text: dates as written (smol-toml's dates print their
+// original form through toISOString), lists joined, tables as JSON.
+function formatValue(raw) {
+  if (raw instanceof Date) return raw.toISOString();
+  if (Array.isArray(raw)) return raw.map(formatValue).join(', ');
+  if (raw && typeof raw === 'object') return JSON.stringify(raw);
+  return String(raw).trim();
 }
 
 /**
- * The allowed profile fields that have values. `location` is the top-level
+ * The shared profile fields that have values. `location` is the top-level
  * key (where the user is now); the rest come from [profile]. Home is left
  * out when it is the same as the current location, as bin/today does.
  * @returns {Array<{key: string, label: string, value: string}>}
@@ -77,13 +96,16 @@ export function getProfileFields(config) {
 export function getSharedProfile(config) {
   const cfg = readConfig(config);
   const profile = cfg.profile || {};
+  const fields = getProfileFields(cfg);
   const out = [];
-  for (const key of getProfileFields(cfg)) {
+  for (const key of fields) {
     const raw = key === 'location' ? cfg.location : profile[key];
-    if (raw === undefined || raw === null || String(raw).trim() === '') continue;
-    if (key === 'home_location' && cfg.location && String(raw).trim() === String(cfg.location).trim()
-        && getProfileFields(cfg).includes('location')) continue;
-    out.push({ key, label: PROFILE_LABELS[key] || key, value: String(raw).trim() });
+    if (raw === undefined || raw === null) continue;
+    const value = formatValue(raw);
+    if (value === '') continue;
+    if (key === 'home_location' && cfg.location && value === String(cfg.location).trim()
+        && fields.includes('location')) continue;
+    out.push({ key, label: labelFor(key), value });
   }
   return out;
 }

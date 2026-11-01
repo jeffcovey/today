@@ -1,10 +1,10 @@
 /**
- * MCP callers get the profile fields the user allows, the top-level and
+ * MCP callers get the whole profile (narrowed by [mcp] profile_fields if set), the top-level and
  * per-source ai_instructions, and plugin guidance on each tool.
  */
 
+import { parse } from 'smol-toml';
 import {
-  DEFAULT_PROFILE_FIELDS,
   getProfileFields,
   getSharedProfile,
   typeGuidance,
@@ -44,13 +44,28 @@ function instructions() {
 }
 
 describe('profile fields', () => {
-  test('by default email and birthdate stay out', () => {
-    expect(DEFAULT_PROFILE_FIELDS).not.toContain('email');
-    expect(DEFAULT_PROFILE_FIELDS).not.toContain('birthdate');
+  test('by default the whole profile goes out, every [profile] key included', () => {
     const shared = getSharedProfile(config);
-    expect(shared.map(p => p.key)).toEqual(['name', 'location', 'home_location', 'vocation', 'wake_time', 'bed_time']);
-    expect(JSON.stringify(shared)).not.toContain('pat@example.com');
-    expect(JSON.stringify(shared)).not.toContain('1970-01-01');
+    expect(shared.map(p => p.key)).toEqual(['name', 'location', 'email', 'home_location', 'vocation', 'wake_time', 'bed_time', 'birthdate']);
+    expect(shared).toContainEqual({ key: 'email', label: 'Email', value: 'pat@example.com' });
+    expect(shared).toContainEqual({ key: 'birthdate', label: 'Birthdate', value: '1970-01-01' });
+  });
+
+  test('keys Today has no label for still go out, with readable labels and values', () => {
+    const cfg = { ...config, profile: { ...config.profile, wind_down_hours: 2, favorite_foods: ['figs', 'rye'] } };
+    const shared = getSharedProfile(cfg);
+    expect(shared).toContainEqual({ key: 'wind_down_hours', label: 'Wind-down hours before bed', value: '2' });
+    expect(shared).toContainEqual({ key: 'favorite_foods', label: 'Favorite foods', value: 'figs, rye' });
+  });
+
+  test('a key named like an Object property keeps its own label', () => {
+    const cfg = { ...config, profile: { name: 'Pat Example', constructor: 'Builder' } };
+    expect(getSharedProfile(cfg)).toContainEqual({ key: 'constructor', label: 'Constructor', value: 'Builder' });
+  });
+
+  test('a TOML date comes out as written', () => {
+    const cfg = { ...config, profile: { name: 'Pat Example', birthdate: parse('d = 1970-01-01').d } };
+    expect(getSharedProfile(cfg)).toContainEqual({ key: 'birthdate', label: 'Birthdate', value: '1970-01-01' });
   });
 
   test('[mcp] profile_fields chooses exactly what goes out', () => {
@@ -144,14 +159,15 @@ describe('addGuidanceToTools', () => {
 });
 
 describe('server instructions and get_context', () => {
-  test('server instructions carry the zone, the allowed profile and the top-level instructions', () => {
+  test('server instructions carry the zone, the whole profile and the top-level instructions', () => {
     const text = buildServerInstructions(config);
     expect(text).toContain('call get_context');
     expect(text).toContain('America/New_York');
     expect(text).toContain('- Name: Pat Example');
     expect(text).toContain('- Current location: Lisbon, Portugal');
     expect(text).toContain("The user's instructions:\nStart each day with a project.");
-    expect(text).not.toContain('pat@example.com');
+    expect(text).toContain('- Email: pat@example.com');
+    expect(text).toContain('- Birthdate: 1970-01-01');
   });
 
   test('get_context has time, profile, instructions, every source and live context', () => {
@@ -165,6 +181,7 @@ describe('server instructions and get_context', () => {
     expect(text).toContain('### Health Metrics');
     expect(text).toContain("Respect the day's stage.");
     expect(text).toContain('## Live context\n\nToday is a Back Stage day.');
-    expect(text).not.toContain('1970-01-01');
+    expect(text).toContain('- Birthdate: 1970-01-01');
+    expect(text).toContain('- Email: pat@example.com');
   });
 });
