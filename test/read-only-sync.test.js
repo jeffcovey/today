@@ -34,6 +34,13 @@ console.log(JSON.stringify({ archived: 0, files_modified: [] }));
 fs.writeFileSync(path.join(pluginDir, 'read.js'), `#!/usr/bin/env node
 import fs from 'fs';
 fs.appendFileSync(${JSON.stringify(marker)}, 'read READ_ONLY=' + (process.env.READ_ONLY ?? '') + '\\n');
+// Like markdown-tasks once the source has a cursor: an incremental read
+// reports only files changed since the vault-changes baseline, and f.md
+// already matches it.
+if (process.env.LAST_SYNC_TIME) {
+  console.log(JSON.stringify({ entries: [], files_processed: [], incremental: true }));
+  process.exit(0);
+}
 console.log(JSON.stringify({ entries: [{ id: 'f.md:1', title: 'A task', status: 'open' }], files_processed: ['f.md'] }));
 `);
 fs.chmodSync(path.join(pluginDir, 'write.js'), 0o755);
@@ -105,6 +112,56 @@ describe('ensureSyncForType skipWriteHooks', () => {
     expect(log[0]).toBe('read READ_ONLY=');
     expect(log.filter(l => l === 'write').length).toBeGreaterThan(0);
     expect(log.some(l => l === 'read READ_ONLY=true')).toBe(false);
+  });
+
+  test('write hooks a read-only sync skipped run on the next writable sync, though it reads no changes', async () => {
+    // Same database throughout. The read-only sync does the full first read,
+    // stores the task and takes the cursor; the writable sync after it reads
+    // incrementally and finds nothing new. The hooks act on the whole source,
+    // so they still have to run once for what the read-only sync stored.
+    const db = createDb();
+    const pending = () => JSON.parse(
+      db.prepare('SELECT extra_data FROM sync_metadata WHERE source = ?').get('read-only-sync-stub/default').extra_data || '{}'
+    ).write_hooks_pending;
+
+    await ensureSyncForType(db, 'tasks', { force: true, skipWriteHooks: true });
+    expect(calls()).toEqual(['read READ_ONLY=true']);
+    expect(db.prepare('SELECT count(*) AS n FROM tasks').get().n).toBe(1);
+    expect(pending()).toBe(true);
+
+    // Another read-only sync with no changes keeps them owed.
+    fs.rmSync(marker, { force: true });
+    await ensureSyncForType(db, 'tasks', { force: true, skipWriteHooks: true });
+    expect(calls()).toEqual(['read READ_ONLY=true']);
+    expect(pending()).toBe(true);
+
+    fs.rmSync(marker, { force: true });
+    await ensureSyncForType(db, 'tasks', { force: true });
+    const log = calls();
+    expect(log[0]).toBe('read READ_ONLY=');
+    expect(log.filter(l => l === 'write').length).toBeGreaterThan(0);
+    expect(pending()).toBeUndefined();
+    expect(db.prepare('SELECT count(*) AS n FROM tasks').get().n).toBe(1);
+
+    // Once they've run, a writable sync with no changes runs none again.
+    fs.rmSync(marker, { force: true });
+    await ensureSyncForType(db, 'tasks', { force: true });
+    expect(calls()).toEqual(['read READ_ONLY=']);
+  });
+
+  test('a read-only sync of a source with no write hooks enabled leaves none owed', async () => {
+    const saved = { ...sourceConfig };
+    delete sourceConfig.auto_archive_completed;
+    delete sourceConfig.auto_add_date_created;
+    try {
+      const db = createDb();
+      await ensureSyncForType(db, 'tasks', { force: true, skipWriteHooks: true });
+      const extra = JSON.parse(db.prepare('SELECT extra_data FROM sync_metadata WHERE source = ?').get('read-only-sync-stub/default').extra_data);
+      expect(extra.write_hooks_pending).toBeUndefined();
+      expect(extra.config_fingerprint).toBeTruthy();
+    } finally {
+      Object.assign(sourceConfig, saved);
+    }
   });
 });
 
