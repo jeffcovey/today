@@ -384,7 +384,10 @@ The primary user interface is the CLI in `bin/`. Important entry points include:
 
 ### MCP server
 
-`src/mcp-server.js` exposes tools for Model Context Protocol clients so IDE or agent workflows can interact with Today using the same underlying runtime.
+`src/mcp-server.js` exposes tools, resources and prompts for Model Context Protocol clients so IDE or agent workflows can interact with Today using the same underlying runtime. It is served two ways:
+
+- `bin/mcp-server` — stdio, for a client on the same machine (Claude Desktop, Claude Code).
+- `POST/GET/DELETE /mcp` on the web server (`src/web-mcp.js`) — Streamable HTTP, for remote clients such as claude.ai custom connectors. Off unless `config.toml` has `[mcp] enabled = true`. Every request needs `Authorization: Bearer <MCP_TOKEN>`; the token is generated into `.env` the first time the web server starts with the section enabled (`npx dotenvx get MCP_TOKEN` prints it). `read_only = true` hides and refuses the writing tools (`create_task`, `complete_task`, `create_event`, `start_timer`, `stop_timer`, `sync_data`). Sessions are held in memory and dropped after an hour idle.
 
 ## Contributor workflow notes
 

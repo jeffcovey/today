@@ -5,7 +5,9 @@
  * Provides tools for actions, resources for data access, and prompts for workflows.
  *
  * Usage:
- *   bin/mcp-server
+ *   bin/mcp-server          stdio, for a client on the same machine
+ *   [mcp] enabled = true    in config.toml serves it over HTTP at /mcp
+ *                           inside the web server (see src/web-mcp.js)
  *
  * Configure in Claude Desktop:
  *   {
@@ -50,10 +52,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 
+// Tools that change something: hidden and refused on a read-only connection.
+export const WRITE_TOOLS = new Set([
+  'create_task', 'complete_task', 'create_event', 'start_timer', 'stop_timer', 'sync_data',
+]);
+
 /**
  * Create and configure the MCP server
  */
-export function createMCPServer() {
+export function createMCPServer({ readOnly = false } = {}) {
   const server = new Server(
     {
       name: 'today',
@@ -224,11 +231,17 @@ export function createMCPServer() {
       },
     });
 
-    return { tools };
+    return { tools: readOnly ? tools.filter(tool => !WRITE_TOOLS.has(tool.name)) : tools };
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
+    if (readOnly && WRITE_TOOLS.has(name)) {
+      return {
+        content: [{ type: 'text', text: `Error: ${name} is not available on this read-only connection` }],
+        isError: true,
+      };
+    }
     const db = getDatabase();
 
     try {
