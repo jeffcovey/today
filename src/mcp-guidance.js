@@ -73,7 +73,7 @@ export function getProfileFields(config) {
 
 // "favorite_foods" -> "Favorite foods", for keys without a label above.
 function labelFor(key) {
-  if (PROFILE_LABELS[key]) return PROFILE_LABELS[key];
+  if (Object.hasOwn(PROFILE_LABELS, key)) return PROFILE_LABELS[key];
   const words = key.replace(/[_-]+/g, ' ').trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
 }

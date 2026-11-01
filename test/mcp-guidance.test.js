@@ -58,6 +58,11 @@ describe('profile fields', () => {
     expect(shared).toContainEqual({ key: 'favorite_foods', label: 'Favorite foods', value: 'figs, rye' });
   });
 
+  test('a key named like an Object property keeps its own label', () => {
+    const cfg = { ...config, profile: { name: 'Pat Example', constructor: 'Builder' } };
+    expect(getSharedProfile(cfg)).toContainEqual({ key: 'constructor', label: 'Constructor', value: 'Builder' });
+  });
+
   test('a TOML date comes out as written', () => {
     const cfg = { ...config, profile: { name: 'Pat Example', birthdate: parse('d = 1970-01-01').d } };
     expect(getSharedProfile(cfg)).toContainEqual({ key: 'birthdate', label: 'Birthdate', value: '1970-01-01' });
