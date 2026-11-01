@@ -58,21 +58,59 @@ export function tokenMatches(presented, expected) {
 }
 
 /**
- * The token from the environment, generated and stored in .env the first
- * time the endpoint is enabled, the same way the web password is.
+ * Read the token straight from the encrypted .env file.
+ *
+ * `process.env` is not enough on its own: a `bin/today web restart` run from
+ * a shell that already carries DOTENVX_RUNNING inherits that shell's secrets
+ * as they were when it started, so a token generated since is invisible to
+ * the new server even though it is in .env. Generating again at that point
+ * would silently rotate the token and lock out every connector (#701).
  */
-export function getOrCreateMcpToken() {
-  if (process.env[MCP_TOKEN_ENV]) return process.env[MCP_TOKEN_ENV];
+export function readStoredMcpToken() {
+  try {
+    const out = execSync(`npx dotenvx get ${MCP_TOKEN_ENV}`, {
+      cwd: path.join(__dirname, '..'),
+      stdio: ['pipe', 'pipe', 'pipe'],
+      encoding: 'utf8'
+    }).trim();
+    return out || null;
+  } catch {
+    return null;
+  }
+}
+
+function storeMcpToken(token) {
+  execSync(`npx dotenvx set ${MCP_TOKEN_ENV} "${token}"`, {
+    cwd: path.join(__dirname, '..'),
+    stdio: ['pipe', 'pipe', 'pipe']
+  });
+}
+
+/**
+ * The token for the endpoint: from the environment, else from .env, and only
+ * when neither has one is a new one generated and stored, the same way the
+ * web password is. The dependencies are injectable for tests.
+ */
+export function getOrCreateMcpToken({
+  env = process.env,
+  readStored = readStoredMcpToken,
+  store = storeMcpToken,
+  log = console
+} = {}) {
+  if (env[MCP_TOKEN_ENV]) return env[MCP_TOKEN_ENV];
+  const stored = readStored();
+  if (stored) {
+    env[MCP_TOKEN_ENV] = stored;
+    log.log(`MCP token loaded from .env (read it with: npx dotenvx get ${MCP_TOKEN_ENV})`);
+    return stored;
+  }
   const token = crypto.randomBytes(32).toString('base64url');
   try {
-    execSync(`npx dotenvx set ${MCP_TOKEN_ENV} "${token}"`, {
-      cwd: path.join(__dirname, '..'),
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-    process.env[MCP_TOKEN_ENV] = token;
-    console.log(`Generated new MCP token (encrypted in .env; read it with: npx dotenvx get ${MCP_TOKEN_ENV})`);
+    store(token);
+    env[MCP_TOKEN_ENV] = token;
+    log.log(`Generated new MCP token (encrypted in .env; read it with: npx dotenvx get ${MCP_TOKEN_ENV})`);
   } catch (error) {
-    console.error('Warning: Could not save MCP token to .env:', error.message);
+    log.error('Warning: Could not save MCP token to .env:', error.message);
   }
   return token;
 }

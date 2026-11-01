@@ -14,7 +14,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { clearConfigCache } from '../src/config.js';
-import { attachMcp, bearerToken, getMcpConfig, tokenMatches, MCP_PATH, SESSION_IDLE_MS } from '../src/web-mcp.js';
+import { attachMcp, bearerToken, getMcpConfig, getOrCreateMcpToken, tokenMatches, MCP_PATH, MCP_TOKEN_ENV, SESSION_IDLE_MS } from '../src/web-mcp.js';
 import { createMCPServer, WRITE_TOOLS } from '../src/mcp-server.js';
 import { startServer } from './helpers/a11y-harness.js';
 
@@ -66,6 +66,46 @@ function stubServer({ readOnly }) {
   }));
   return server;
 }
+
+describe('getOrCreateMcpToken', () => {
+  const quiet = { log: () => {}, error: () => {} };
+
+  test('uses the token already in the environment without touching .env', () => {
+    const env = { [MCP_TOKEN_ENV]: 'from-env' };
+    const readStored = jest.fn();
+    const store = jest.fn();
+    expect(getOrCreateMcpToken({ env, readStored, store, log: quiet })).toBe('from-env');
+    expect(readStored).not.toHaveBeenCalled();
+    expect(store).not.toHaveBeenCalled();
+  });
+
+  test('reuses the token stored in .env when the environment lacks it (#701)', () => {
+    const env = {};
+    const store = jest.fn();
+    const token = getOrCreateMcpToken({ env, readStored: () => 'stored-token', store, log: quiet });
+    expect(token).toBe('stored-token');
+    expect(env[MCP_TOKEN_ENV]).toBe('stored-token');
+    expect(store).not.toHaveBeenCalled();
+  });
+
+  test('generates and stores a token only when neither has one', () => {
+    const env = {};
+    const store = jest.fn();
+    const token = getOrCreateMcpToken({ env, readStored: () => null, store, log: quiet });
+    expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(store).toHaveBeenCalledWith(token);
+    expect(env[MCP_TOKEN_ENV]).toBe(token);
+  });
+
+  test('a second start after generation reuses the generated token', () => {
+    const vault = {};
+    const store = jest.fn((t) => { vault.token = t; });
+    const first = getOrCreateMcpToken({ env: {}, readStored: () => vault.token || null, store, log: quiet });
+    const second = getOrCreateMcpToken({ env: {}, readStored: () => vault.token || null, store, log: quiet });
+    expect(second).toBe(first);
+    expect(store).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('the /mcp endpoint', () => {
   let httpServer;
