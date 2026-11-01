@@ -40,6 +40,7 @@ import {
   ensureSyncForType,
   syncPluginSource,
   syncAllPlugins,
+  getAIInstructionsByType,
 } from './plugin-loader.js';
 import { schemas, getTableName } from './plugin-schemas.js';
 import { getTodayDate, sqlLocalDate } from './date-utils.js';
@@ -64,6 +65,8 @@ import {
   LIST_EVENTS_MAX_DAYS,
 } from './mcp-events.js';
 import { getAbsoluteVaultPath } from './config.js';
+import { addGuidanceToTools, buildServerInstructions, buildContextText } from './mcp-guidance.js';
+import { readLiveContext } from './mcp-live-context.js';
 import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -71,6 +74,14 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
+
+async function aiInstructionsByType() {
+  try {
+    return await getAIInstructionsByType();
+  } catch {
+    return null;
+  }
+}
 
 // Tools that change something: hidden and refused on a read-only connection.
 export const WRITE_TOOLS = new Set([
@@ -92,6 +103,7 @@ export function createMCPServer({ readOnly = false } = {}) {
         resources: {},
         prompts: {},
       },
+      instructions: buildServerInstructions(),
     }
   );
 
@@ -253,7 +265,23 @@ export function createMCPServer({ readOnly = false } = {}) {
       },
     });
 
-    return { tools: readOnly ? tools.filter(tool => !WRITE_TOOLS.has(tool.name)) : tools };
+    tools.push({
+      name: 'get_context',
+      description: "The user's context, as Today's own AI sees it: the current time and time zone, the user's profile, their instructions overall and for every data source, and live context (today's stage, plan, weather, vault changes). Call it at the start of a conversation.",
+      inputSchema: {
+        type: 'object',
+        properties: {
+          include_live: { type: 'boolean', description: 'Include live context-plugin output (default: true; slower)' },
+        },
+      },
+    });
+
+    // Filter first, so guidance for a type whose tools are hidden here goes
+    // on query_database instead.
+    const visible = readOnly ? tools.filter(tool => !WRITE_TOOLS.has(tool.name)) : tools;
+    addGuidanceToTools(visible, await aiInstructionsByType());
+
+    return { tools: visible };
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -464,6 +492,16 @@ export function createMCPServer({ readOnly = false } = {}) {
               isError: true,
             };
           }
+        }
+
+        case 'get_context': {
+          const [instructionsByType, liveContext] = await Promise.all([
+            aiInstructionsByType(),
+            args?.include_live === false ? Promise.resolve(null) : readLiveContext({ readOnly }),
+          ]);
+          return {
+            content: [{ type: 'text', text: buildContextText({ instructionsByType, liveContext }) }],
+          };
         }
 
         case 'query_database': {
