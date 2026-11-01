@@ -405,6 +405,14 @@ Day-to-day write tools (issue #686):
 - `src/mcp-tools/calendar-writes.js`: `update_event` and `delete_event` (destructive), like `bin/calendar update` and `delete`; writable calendars only.
 - `src/mcp-tools/finance-writes.js`: `categorize_transaction` (destructive), like `bin/finance categorize`; writes to YNAB.
 
+Callers get the same guidance `bin/today` gives its own AI (`src/mcp-guidance.js`):
+
+- Each tool's description carries its plugin type's description, the enabled sources, and the user's `ai_instructions` for each source. Types without a tool of their own go on `query_database`.
+- The server's `instructions`, sent at initialize, carry the configured time zone, the user's top-level `[ai] ai_instructions`, and the allowed profile fields.
+- The `get_context` tool returns all of that plus the current time and live context-plugin output, the same plugins `bin/context show` runs. Each plugin runs in its own process group in the user's configured time zone. The weather plugin is left out unless `profile_fields` shares `location`, and nothing runs on a read-only connection, because the plans plugin writes plan files even in context-only mode.
+
+Profile fields go out only as `[mcp] profile_fields` allows, for example `profile_fields = ["name", "location", "home_location", "vocation", "wake_time", "bed_time", "email", "birthdate"]`. Without the setting, `email` and `birthdate` stay out. Tool descriptions and server instructions are built when a client connects or lists tools, so config edits apply on the next connection; `get_context` always reads the current config.
+
 ## Contributor workflow notes
 
 - Prefer editing `src/plugin-schemas.js` when changing plugin-backed data fields.

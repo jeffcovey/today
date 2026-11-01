@@ -448,7 +448,28 @@ export function sqlLocalDate(column) {
  */
 export function getLocalDayUTCRange(localDateStr, timezone) {
   const tz = timezone || getConfiguredTimezone();
-  const dayStart = new TZDate(`${localDateStr}T00:00:00`, tz);
-  const dayEnd = new TZDate(`${localDateStr}T23:59:59.999`, tz);
+  const dayStart = wallTimeInZone(`${localDateStr}T00:00:00`, tz);
+  const dayEnd = wallTimeInZone(`${localDateStr}T23:59:59.999`, tz);
   return { start: dayStart.toISOString(), end: dayEnd.toISOString() };
+}
+
+/**
+ * The instant a local wall-clock time names in a timezone.
+ *
+ * `new TZDate("2026-11-01T18:30:00", tz)` parses the string in the host's
+ * zone and only then switches to `tz`, so on a UTC server it lands five
+ * hours off for New York. Building from the components reads the wall time
+ * in `tz` itself.
+ *
+ * @param {string} wallTime - "YYYY-MM-DDTHH:MM[:SS[.mmm]]" with no offset
+ * @param {string} [timezone] - IANA timezone (defaults to configured timezone)
+ * @returns {Date} A plain Date (toISOString() gives UTC with Z)
+ */
+export function wallTimeInZone(wallTime, timezone) {
+  const tz = timezone || getConfiguredTimezone();
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?)?$/.exec(wallTime);
+  if (!m) return new Date(NaN);
+  const [, y, mo, d, h = '0', mi = '0', sec = '0', ms = '0'] = m;
+  const local = new TZDate(+y, +mo - 1, +d, +h, +mi, +sec, +ms.padEnd(3, '0'), tz);
+  return new Date(local.getTime());
 }
