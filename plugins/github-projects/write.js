@@ -368,8 +368,14 @@ function getProjectRepository(owner, number, ownerType) {
     }
   }
 
-  // Default fallback - use project owner (works for org projects)
-  return { owner, name: owner === 'OlderGay-Men' ? 'OlderGay.Men' : 'today' };
+  // No item carries a repository yet: the plugin's configured one, if any.
+  let configured = null;
+  try {
+    configured = JSON.parse(process.env.PLUGIN_CONFIG || '{}').repository || null;
+  } catch {
+    configured = null;
+  }
+  return configured ? { owner, name: configured } : null;
 }
 
 // Create metadata issue for review scheduling
@@ -798,6 +804,9 @@ async function handleSetReviewDate() {
     } else {
       // Create new metadata issue
       const repo = getProjectRepository(owner, number, type);
+      if (!repo) {
+        return output({ success: false, error: 'The project has no issues yet, so there is no repository to hold its review metadata issue; set repository in the plugin config' });
+      }
       metadataIssue = createMetadataIssue(repo.owner, repo.name, details.title, reviewDate, finalFrequency);
       if (!metadataIssue) {
         return output({ success: false, error: 'Failed to create metadata issue' });

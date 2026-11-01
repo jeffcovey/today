@@ -65,9 +65,9 @@ Priority emojis and bracketed markers appear in task text:
 - Markdown links like [the docs](https://example.com/docs)
 """
 
-[plugins.github-issues.ogm]
+[plugins.github-issues.work]
 enabled = true
-repository = "OlderGay-Men/OlderGay.Men"
+repository = "example-org/example-app"
 limit = 500
 
 [profile]

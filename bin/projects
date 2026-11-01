@@ -125,7 +125,7 @@ program
   .command('list', { isDefault: true })
   .description('List projects from database')
   .option('-a, --all', 'Include completed and archived projects')
-  .option('-s, --source <source>', 'Filter by source (e.g., github-projects/ogm)')
+  .option('-s, --source <source>', 'Filter by source (e.g., github-projects/work)')
   .option('--status <status>', 'Filter by status (planning, active, on_hold, completed, archived)')
   .option('-t, --topic <topic>', 'Filter by topic')
   .option('-p, --priority <priority>', 'Filter by priority')
