@@ -142,6 +142,38 @@ function maskProtected(body) {
   return { masked, saved };
 }
 
+const FIELD_MARKERS = {
+  priority: { test: /[🔺⏫🔼🔽⏬]/u, name: 'priority' },
+  stage: { test: /#stage\//, name: 'stage tag' },
+  topics: { test: /#topic\//, name: 'topic tag' },
+  due_date: { test: /📅/u, name: 'due date' },
+  scheduled_date: { test: /⏳/u, name: 'scheduled date' },
+};
+
+/**
+ * The markdown-tasks reader reads priorities, tags and dates wherever they
+ * sit, links and inline code included; these edits leave those spans alone.
+ * So when a field to change has a marker inside a link or code span, the two
+ * would disagree: say which, so the caller can refuse.
+ * @param {string} line
+ * @param {string[]} fields keys of FIELD_MARKERS
+ * @returns {string|null} The kind of marker found, or null.
+ */
+export function protectedMetadataIn(line, fields) {
+  const parts = splitTaskLine(line);
+  if (!parts) return null;
+  const spans = parts.body.match(PROTECTED) || [];
+  for (const field of fields) {
+    const marker = FIELD_MARKERS[field];
+    if (marker && spans.some(span => marker.test.test(span))) return marker.name;
+  }
+  return null;
+}
+
+function protectedRefusal(kind) {
+  return `The task's line has a ${kind} inside a link or inline code, which the task reader also counts, so it can't be changed safely here. Edit the line by hand. Nothing was changed.`;
+}
+
 function unmask(body, saved) {
   return body.replace(MASKED, (_, n) => saved[Number(n)]);
 }
@@ -149,6 +181,8 @@ function unmask(body, saved) {
 export function updateTaskLine(line, changes) {
   const parts = splitTaskLine(line);
   if (!parts) return null;
+  const clash = protectedMetadataIn(line, Object.keys(changes).filter(k => changes[k] !== undefined));
+  if (clash) throw new Error(protectedRefusal(clash));
   // The original line has no private-use mask characters of its own to
   // confuse with ours; if it does, leave links unprotected rather than guess.
   const hasMaskChars = /[\uE000\uE001]/u.test(parts.body);
@@ -166,6 +200,8 @@ export function updateTaskLine(line, changes) {
       ...(title.match(/[🔺⏫🔼🔽⏬]️?/gu) || []),
       ...[...title.matchAll(/(?:^|\s)(#[\p{L}\p{N}_/-]+)/gu)].map(m => m[1]),
       ...(title.match(/[📅⏳🛫➕✅❌]️?\s*\d{4}-\d{2}-\d{2}/gu) || []),
+      // Obsidian ids and other notes kept in HTML comments.
+      ...(title.match(/<!--[\s\S]*?-->/g) || []),
     ];
     // The new title goes in as written; protect its own links too.
     const newTitle = changes.title.trim().replace(/[\uE000\uE001]/gu, '');
@@ -209,6 +245,8 @@ export function updateTaskLine(line, changes) {
  */
 export function moveTaskLineTo(line, toDate) {
   if (!isOpenTaskLine(line)) return { error: 'Not an open task' };
+  const clash = protectedMetadataIn(line, ['due_date', 'scheduled_date']);
+  if (clash) return { error: protectedRefusal(clash).replace(/ Nothing was changed\.$/, '') };
   const { scheduled, due } = taskDatesOf(line);
   if (!scheduled && !due) {
     return { error: 'The task has no scheduled or due date to move; use update_task to give it one' };

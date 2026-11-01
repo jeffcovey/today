@@ -110,7 +110,10 @@ function atomicReplace(filePath, content, encoding) {
   }
 
   try {
-    const fd = fs.openSync(tmpPath, 'w');
+    // Create it with the target's mode (the umask can only narrow that), so
+    // it is never more readable than the target; then chmod restores any bits
+    // the umask took off.
+    const fd = fs.openSync(tmpPath, 'w', mode ?? 0o666);
     try {
       if (mode !== null) fs.fchmodSync(fd, mode);
       fs.writeFileSync(fd, content, { encoding });
@@ -154,7 +157,7 @@ async function atomicReplaceAsync(filePath, content, encoding) {
   }
 
   try {
-    const fileHandle = await fsp.open(tmpPath, 'w');
+    const fileHandle = await fsp.open(tmpPath, 'w', mode ?? 0o666);
     try {
       if (mode !== null) await fileHandle.chmod(mode);
       await fileHandle.writeFile(content, { encoding });
