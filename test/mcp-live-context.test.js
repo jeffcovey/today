@@ -38,7 +38,7 @@ describe('readLiveContext', () => {
     expect(text).toContain('vault-changes/default failed or ran too long.');
   });
 
-  test('weather runs when location is shared (the default fields)', () => {
+  test('weather runs when location is shared (it is by default)', () => {
     const { run, skipped } = selectContextSources(sources, {});
     expect(run.map(s => s.sourceId)).toContain('weather-context/default');
     expect(skipped).toEqual([]);
