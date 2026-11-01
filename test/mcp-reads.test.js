@@ -142,10 +142,12 @@ describe('syncForRead', () => {
     let finish;
     const sync = jest.fn(() => new Promise(resolve => { finish = resolve; }));
     const old = new Date('2025-11-01T12:00:00Z');
+    // Synced by this run: a second after the one it started in.
+    const later = () => new Date(Date.now() + 1000);
     const alwaysStale = () => [
-      { sourceId: 'markdown-time-tracking/a', lastSync: new Date() },
-      { sourceId: 'markdown-time-tracking/b', lastSync: new Date() },
-      { sourceId: 'markdown-time-tracking/c', lastSync: new Date() },
+      { sourceId: 'markdown-time-tracking/a', lastSync: later() },
+      { sourceId: 'markdown-time-tracking/b', lastSync: later() },
+      { sourceId: 'markdown-time-tracking/c', lastSync: later() },
       { sourceId: 'markdown-time-tracking/d', lastSync: old },
       { sourceId: 'markdown-time-tracking/e', lastSync: null },
     ];
@@ -165,6 +167,47 @@ describe('syncForRead', () => {
     );
     finish(true);
     await waitForReadSyncs('time-logs-slow');
+  });
+
+  test('a run in the same second as the previous one counts none of its sync times as its own', async () => {
+    // Two reads of an always-stale type within one second: the first run
+    // syncs every source and finishes, the second starts and stalls on its
+    // worker. sync_metadata keeps whole seconds, so the first run's times
+    // equal the second run's start second. None of them is the second run's,
+    // so every source is still due; one synced in a later second is not.
+    const now = jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-11-01T12:00:00.200Z'));
+    try {
+      const sameSecond = new Date('2026-11-01T12:00:00Z');
+      const sources = () => [
+        { sourceId: 'markdown-time-tracking/a', lastSync: sameSecond },
+        { sourceId: 'markdown-time-tracking/b', lastSync: sameSecond },
+      ];
+      const first = await syncForRead({}, 'time-logs-twice', {
+        sync: async () => true, needed, budgetMs: 1000, staleSources: sources,
+      });
+      expect(first).toEqual({ complete: true, due: [] });
+
+      now.mockReturnValue(Date.parse('2026-11-01T12:00:00.700Z'));
+      let finish;
+      const sync = jest.fn(() => new Promise(resolve => { finish = resolve; }));
+      const second = await syncForRead({}, 'time-logs-twice', { sync, needed, budgetMs: 30, staleSources: sources });
+      expect(sync).toHaveBeenCalledTimes(1);
+      expect(second).toEqual({ complete: false, due: sources() });
+
+      const nextSecond = new Date('2026-11-01T12:00:01Z');
+      const third = await syncForRead({}, 'time-logs-twice', {
+        sync, needed, budgetMs: 20,
+        staleSources: () => [
+          { sourceId: 'markdown-time-tracking/a', lastSync: nextSecond },
+          { sourceId: 'markdown-time-tracking/b', lastSync: sameSecond },
+        ],
+      });
+      expect(third).toEqual({ complete: false, due: [{ sourceId: 'markdown-time-tracking/b', lastSync: sameSecond }] });
+      finish(true);
+      await waitForReadSyncs('time-logs-twice');
+    } finally {
+      now.mockRestore();
+    }
   });
 
   test('the note names at most three sources, and says how many more', () => {

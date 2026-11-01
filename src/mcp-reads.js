@@ -128,15 +128,19 @@ export async function syncForRead(db, pluginType, options = {}) {
   clearTimeout(timer);
 
   if (outcome === 'done') return { complete: true, due: [] };
-  // Sources sync one at a time. A source this run already synced has a sync
-  // time at or after the run's start; it may still count as stale (a type
-  // with staleMinutes 0 is always stale), so leave it out by that time.
-  // sync_metadata keeps whole seconds, so compare from the start's second.
-  const runStart = Math.floor(run.startedAt / 1000) * 1000;
+  // Sources sync one at a time. A source this run already synced may still
+  // count as stale (a type with staleMinutes 0 is always stale), so leave it
+  // out by its sync time. sync_metadata keeps whole seconds, and a run that
+  // finished earlier in the second this one started leaves the same second
+  // behind, so only a sync time in a later second counts as this run's. A
+  // source this run synced within its first second is then still listed,
+  // which only names one more source to refresh.
+  const runStartSecond = Math.floor(run.startedAt / 1000);
+  const syncedThisRun = lastSync => Math.floor(lastSync.getTime() / 1000) > runStartSecond;
   let due = [];
   try {
     due = staleSources(db, pluginType)
-      .filter(({ lastSync }) => !lastSync || lastSync.getTime() < runStart)
+      .filter(({ lastSync }) => !lastSync || !syncedThisRun(lastSync))
       .map(({ sourceId, lastSync }) => ({ sourceId, lastSync: lastSync || null }));
   } catch {
     // The note just names no sources
