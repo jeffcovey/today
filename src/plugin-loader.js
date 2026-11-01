@@ -714,7 +714,14 @@ export function getSyncStatusMessage(db, pluginType) {
  *   file written while the sync was running would otherwise look older than
  *   the watermark and never be re-read, leaving the cache stale for good (#508).
  */
-function updateSyncMetadata(db, sourceId, filesProcessed, entriesCount, extraData = null, syncStartedAt = null) {
+function updateSyncMetadata(db, sourceId, filesProcessed, entriesCount, extraData = null, syncStartedAt = null, { keepWatermark = false } = {}) {
+  if (keepWatermark) {
+    // A re-read of some files only: the source's sync time, file list and
+    // plugin state still describe its last full sync.
+    db.prepare(`INSERT OR IGNORE INTO sync_metadata (source) VALUES (?)`).run(sourceId);
+    db.prepare(`UPDATE sync_metadata SET entries_count = ? WHERE source = ?`).run(entriesCount, sourceId);
+    return;
+  }
   const stamp = syncStartedAt || db.prepare(`SELECT datetime('now') AS t`).get().t;
   db.prepare(`
     INSERT INTO sync_metadata (source, last_synced_at, last_sync_files, entries_count, extra_data)
@@ -831,7 +838,12 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   const { db } = context;
   // Taken before the plugin reads anything — see updateSyncMetadata.
   const syncStartedAt = db.prepare(`SELECT datetime('now') AS t`).get().t;
-  const { fileFilter, skipAutoTag = false } = options;
+  // skipWriteHooks: only read, without the auto-archive, auto-date, stage and
+  // priority hooks below (they act on the whole source, not just fileFilter).
+  const { fileFilter, skipAutoTag = false, skipWriteHooks = false } = options;
+  // keepSyncWatermark: a filtered re-read leaves last_synced_at alone, so
+  // readSyncNeeded doesn't take the whole source as fresh.
+  const keepWatermark = Boolean(fileFilter && options.keepSyncWatermark);
 
   // Get last sync time to enable incremental sync
   const syncMeta = getSyncMetadata(db, sourceId);
@@ -1025,7 +1037,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
     db.transaction(reconcileFiles)();
     if (reconciledDeletions > 0 || pluginPurgedRows > 0) {
       const count = db.prepare(`SELECT COUNT(*) as count FROM ${tableName} WHERE source = ?`).get(sourceId).count;
-      updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData, syncStartedAt);
+      updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData, syncStartedAt, { keepWatermark });
       const messages = [];
       if (reconciledDeletions > 0) messages.push(`Removed ${reconciledDeletions} row(s) for deleted, moved, or excluded file(s)`);
       if (pluginPurgedRows > 0) messages.push(`Removed ${pluginPurgedRows} row(s) for plugin-managed deletions`);
@@ -1054,7 +1066,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   reconcileMsg = buildReconcileMsg(reconcileReport);
 
   // Update sync metadata (including plugin-specific state like folder_state for IMAP)
-  updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData, syncStartedAt);
+  updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData, syncStartedAt, { keepWatermark });
 
   // Run auto-tagger if enabled (never fails the sync)
   let taggingResult = null;
@@ -1097,7 +1109,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
 
   // Run auto-archive first if enabled (removes completed tasks, rebalances files)
   let archiveResult = null;
-  if (sourceConfig.auto_archive_completed && getPluginAccess(plugin) === 'read-write') {
+  if (!skipWriteHooks && sourceConfig.auto_archive_completed && getPluginAccess(plugin) === 'read-write') {
     try {
       archiveResult = await runAutoArchive({
         plugin,
@@ -1129,7 +1141,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
 
   // Run auto date-created if enabled (never fails the sync)
   let dateCreatedResult = null;
-  if (sourceConfig.auto_add_date_created && getPluginAccess(plugin) === 'read-write') {
+  if (!skipWriteHooks && sourceConfig.auto_add_date_created && getPluginAccess(plugin) === 'read-write') {
     try {
       dateCreatedResult = await runAutoDateCreated({
         db,
@@ -1164,7 +1176,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   // Run auto-classification if enabled (never fails the sync)
   let classificationResult = null;
   const supportsStageClassification = plugin.settings?.supports_stage_classification?.default !== false;
-  if (sourceConfig.auto_classify_stages && supportsStageClassification && getPluginAccess(plugin) === 'read-write') {
+  if (!skipWriteHooks && sourceConfig.auto_classify_stages && supportsStageClassification && getPluginAccess(plugin) === 'read-write') {
     try {
       classificationResult = await runAutoStageClassification({
         db,
@@ -1199,7 +1211,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   // Run auto-priority if enabled (never fails the sync)
   let priorityResult = null;
   const supportsPriorityClassification = plugin.settings?.supports_priority_classification?.default !== false;
-  if (sourceConfig.auto_add_priority && supportsPriorityClassification && getPluginAccess(plugin) === 'read-write') {
+  if (!skipWriteHooks && sourceConfig.auto_add_priority && supportsPriorityClassification && getPluginAccess(plugin) === 'read-write') {
     try {
       priorityResult = await runAutoPriority({
         db,

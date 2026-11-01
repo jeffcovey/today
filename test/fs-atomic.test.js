@@ -20,6 +20,35 @@ describe('writeFileAtomic', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
+  test('a replaced file keeps its permissions, sync and async', async () => {
+    const file = path.join(dir, 'private.md');
+    fs.writeFileSync(file, 'one');
+    fs.chmodSync(file, 0o600);
+    writeFileAtomic(file, 'two');
+    expect(fs.statSync(file).mode & 0o777).toBe(0o600);
+    await writeFileAtomicAsync(file, 'three');
+    expect(fs.statSync(file).mode & 0o777).toBe(0o600);
+    expect(fs.readFileSync(file, 'utf-8')).toBe('three');
+  });
+
+  test('the temporary file is never more readable than the target', () => {
+    const file = path.join(dir, 'private.md');
+    fs.writeFileSync(file, 'one');
+    fs.chmodSync(file, 0o600);
+    const realOpen = fs.openSync;
+    const modes = [];
+    const spy = jest.spyOn(fs, 'openSync').mockImplementation((p, flags, mode) => {
+      if (String(p).includes('.tmp-')) modes.push(mode);
+      return realOpen(p, flags, mode);
+    });
+    try {
+      writeFileAtomic(file, 'two');
+    } finally {
+      spy.mockRestore();
+    }
+    expect(modes).toEqual([0o600]);
+  });
+
   test('writes content when the target does not exist and reports true', () => {
     const file = path.join(dir, 'plan.md');
     const wrote = writeFileAtomic(file, 'hello');
