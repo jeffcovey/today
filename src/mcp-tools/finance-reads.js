@@ -13,7 +13,7 @@ import { getAccountList } from '../account-balances.js';
 import {
   getConfiguredTimezone, clampInt, todayIn, addDays, parseJson, likeTerm,
   isMissingTable, freshen, lead, money, toLocal,
-} from './_common.js';
+} from './_medium-reads-helpers.js';
 
 export const VIEWS = ['accounts', 'upcoming', 'recent', 'budget'];
 export const RECENT_DEFAULT_LIMIT = 20;

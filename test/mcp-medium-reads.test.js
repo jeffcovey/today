@@ -18,7 +18,7 @@ import { upcomingBirthdays, searchContacts } from '../src/mcp-tools/contacts.js'
 import { listDiary } from '../src/mcp-tools/diary.js';
 import { healthToday, healthSummary, habitStreaks, habitHistory } from '../src/mcp-tools/health-habits.js';
 import { financeOverview, uncategorizedTransactions } from '../src/mcp-tools/finance-reads.js';
-import { toLocal, addDays, isDay, clampInt, likeTerm } from '../src/mcp-tools/_common.js';
+import { toLocal, addDays, isDay, clampInt, likeTerm } from '../src/mcp-tools/_medium-reads-helpers.js';
 
 const NOW = new Date('2026-11-02T02:00:00Z'); // 2026-11-01 21:00 EST
 const TZ = 'America/New_York';

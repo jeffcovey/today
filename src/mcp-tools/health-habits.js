@@ -12,7 +12,7 @@ import { METRIC_DISPLAY } from '../health-metrics.js';
 import {
   getConfiguredTimezone, clampInt, todayIn, isDay, addDays, parseJson,
   likeTerm, isMissingTable, freshen, lead,
-} from './_common.js';
+} from './_medium-reads-helpers.js';
 
 // The metrics bin/health today and summary lead with.
 export const KEY_METRICS = [

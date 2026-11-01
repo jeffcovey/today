@@ -13,7 +13,7 @@ import { jsonResult, errorResult } from '../mcp-safeguards.js';
 import {
   getConfiguredTimezone, clampInt, todayIn, isDay, addDays, toLocal, cap,
   parseJson, likeTerm, isMissingTable, freshen, lead,
-} from './_common.js';
+} from './_medium-reads-helpers.js';
 
 export const RANGES = ['today', 'week', 'recent', 'on_this_day'];
 export const DEFAULT_LIMIT = 20;
