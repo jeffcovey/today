@@ -400,6 +400,14 @@ Tools that take a task, event or contact ID require the item's `title` and refus
 - `src/mcp-tools/day-reads.js` (read): `get_plan` (a day, week, month, quarter or year plan file), `timer_status`, `list_time_entries`, `habits_today`, `list_issues` and `search_tasks`, mirroring `bin/track`, `bin/habits`, `bin/issues` and `bin/tasks`.
 - `src/mcp-tools/task-writes.js` (write): `postpone_task` and `update_task`. Each rewrites one line of a markdown task file (`src/task-postpone.js`, `src/task-line-edit.js`), checked against the task's title, then re-syncs that file.
 
+Callers get the same guidance `bin/today` gives its own AI (`src/mcp-guidance.js`):
+
+- Each tool's description carries its plugin type's description, the enabled sources, and the user's `ai_instructions` for each source. Types without a tool of their own go on `query_database`.
+- The server's `instructions`, sent at initialize, carry the configured time zone, the user's top-level `[ai] ai_instructions`, and the allowed profile fields.
+- The `get_context` tool returns all of that plus the current time and live context-plugin output, the same plugins `bin/context show` runs. Each plugin runs in its own process group in the user's configured time zone. The weather plugin is left out unless `profile_fields` shares `location`, and nothing runs on a read-only connection, because the plans plugin writes plan files even in context-only mode.
+
+Profile fields go out only as `[mcp] profile_fields` allows, for example `profile_fields = ["name", "location", "home_location", "vocation", "wake_time", "bed_time", "email", "birthdate"]`. Without the setting, `email` and `birthdate` stay out. Tool descriptions and server instructions are built when a client connects or lists tools, so config edits apply on the next connection; `get_context` always reads the current config.
+
 ## Contributor workflow notes
 
 - Prefer editing `src/plugin-schemas.js` when changing plugin-backed data fields.

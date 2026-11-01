@@ -70,7 +70,9 @@ function normalizeTitle(text) {
     .toLowerCase()
     // Obsidian Tasks markers: checkbox, dates, priority and recurrence emoji.
     .replace(/^\s*(?:>\s*)*-\s*\[[ xX-]\]\s*/, '')
-    .replace(/[📅⏳🛫➕✅❌🔁⏫🔼🔽⏬🔺]️?\s*\S*/gu, ' ')
+    // Recurrence runs to the next #tag or the end, as markdown-tasks reads it.
+    .replace(/🔁️?[^#]*/gu, ' ')
+    .replace(/[📅⏳🛫➕✅❌⏫🔼🔽⏬🔺]️?\s*\S*/gu, ' ')
     .replace(/[*_`~[\]()#]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -130,8 +132,12 @@ export function logWrite({ tool, kind, args, result, policy, vaultPath, now = ne
     const folder = path.isAbsolute(dir) ? dir : path.join(root, dir);
     fs.mkdirSync(folder, { recursive: true });
     const file = path.join(folder, `${day}.md`);
-    if (!fs.existsSync(file)) {
-      fs.writeFileSync(file, `# MCP writes, ${day}\n\nChanges made through Today's MCP server.\n\n`);
+    // 'wx' creates the file only if it is missing, so two servers writing
+    // their first entry of the day at once can't truncate each other's.
+    try {
+      fs.writeFileSync(file, `# MCP writes, ${day}\n\nChanges made through Today's MCP server.\n\n`, { flag: 'wx' });
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
     }
     const outcome = result?.isError ? 'refused or failed' : 'ok';
     const line = `- ${time} \`${tool}\` (${kind}) ${outcome}: ${resultSummary(result)}\n` +

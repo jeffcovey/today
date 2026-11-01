@@ -7,7 +7,7 @@ import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { clearConfigCache } from '../src/config.js';
+import { clearConfigCache, getAbsoluteVaultPath } from '../src/config.js';
 import {
   getMcpPolicy,
   isKindAllowed,
@@ -50,6 +50,12 @@ describe('verifyTitle', () => {
   test('matches the whole title or a distinctive part, ignoring case and markers', () => {
     expect(verifyTitle('contact donald schmoll', line)).toEqual({ ok: true });
     expect(verifyTitle('Donald Schmoll', line)).toEqual({ ok: true });
+  });
+
+  test('a recurrence of several words is ignored like the reader ignores it', () => {
+    // markdown-tasks stores the title without its recurrence.
+    expect(verifyTitle('Contact Donald Schmoll 🔁 every 6 weeks', 'Contact Donald Schmoll')).toEqual({ ok: true });
+    expect(verifyTitle('Contact Donald Schmoll', 'Contact Donald Schmoll 🔁 every 6 weeks #topic/people')).toEqual({ ok: true });
   });
 
   test('refuses a missing, too-short or different title', () => {
@@ -189,5 +195,24 @@ describe('server enforcement', () => {
     const text = await fs.readFile(path.join(logDir, file), 'utf8');
     expect(text).toContain('`jot` (write) ok: jotted');
     expect(text).not.toContain('peek');
+  });
+
+  test('refused calls are logged too, and handlers get the vault path', async () => {
+    const logDir = path.join(workDir, 'log3');
+    await withConfig(`vault_path = "${path.join(workDir, 'vault')}"\n[mcp]\nwrite_log = "${logDir}"\n`);
+    let seen = null;
+    setRegisteredToolsForTesting([...sample, {
+      name: 'where', kind: 'read', description: 'Where', inputSchema: { type: 'object', properties: {} },
+      handler: async (args, ctx) => { seen = ctx.vaultPath; return { content: [{ type: 'text', text: 'here' }] }; },
+    }]);
+    const client = await openPair();
+    await client.callTool({ name: 'shred', arguments: { id: 'x' } });
+    await client.callTool({ name: 'where', arguments: {} });
+    await client.close();
+    setRegisteredToolsForTesting(sample);
+    const [file] = await fs.readdir(logDir);
+    const text = await fs.readFile(path.join(logDir, file), 'utf8');
+    expect(text).toContain('`shred` (destructive) refused or failed');
+    expect(seen).toBe(getAbsoluteVaultPath());
   });
 });
