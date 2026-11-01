@@ -5,14 +5,81 @@
  * database without standing up the whole server.
  */
 
-import { ensureSyncForType, getLatestSyncTimeForType } from './plugin-loader.js';
+import { spawn } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { readSyncNeeded, getLatestSyncTimeForType, envFreshnessForChild } from './plugin-loader.js';
 import { getTodayDate } from './date-utils.js';
+
+const READ_SYNC_WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'read-sync-worker.js');
 
 // How long a read waits for its pre-read sync before answering from the
 // cache. MCP clients give a tool call a few minutes at most (claude.ai gave
 // list_events 240s), while one stale read can sync every source of a type in
 // turn, each bounded only by the 8-minute plugin command timeout.
 export const READ_SYNC_BUDGET_MS = 20 * 1000;
+
+// A worker that outlives this is killed. Each plugin command inside it is
+// already bounded at 8 minutes; this stops a type with many slow sources from
+// holding its locks indefinitely.
+export const READ_SYNC_WORKER_MAX_MS = 30 * 60 * 1000;
+
+// SIGTERM gives the worker this long to stop its plugin commands and exit.
+// A worker stuck in a synchronous call can't run its SIGTERM handler, so it
+// is then sent SIGKILL.
+export const READ_SYNC_WORKER_KILL_GRACE_MS = 10 * 1000;
+
+/**
+ * Run ensureSyncForType for one type in a child process (#690).
+ *
+ * Much of a sync is synchronous: better-sqlite3 writes and lock updates that
+ * can wait out the 30-second busy timeout, and the first dotenvx secret
+ * lookup. In-process, those stop the read budget's timer and every other
+ * request the server is handling. In a child they can't; the database is in
+ * WAL mode, so this process keeps reading while the child writes.
+ *
+ * The child runs from this process's working directory so it opens the same
+ * database, and its stdout goes to stderr so it can never write into a stdio
+ * MCP transport.
+ *
+ * @returns {Promise<boolean>} true if the worker exited 0 (see
+ *   read-sync-worker.js for what that does and doesn't mean)
+ */
+export function runReadSyncInChild(pluginType, {
+  workerPath = READ_SYNC_WORKER,
+  maxMs = READ_SYNC_WORKER_MAX_MS,
+  killGraceMs = READ_SYNC_WORKER_KILL_GRACE_MS,
+} = {}) {
+  return new Promise(resolve => {
+    let child;
+    try {
+      child = spawn(process.execPath, [workerPath, pluginType], {
+        cwd: process.cwd(),
+        // The decrypted secrets this process holds, and which .env they came
+        // from, so the worker reloads them if .env has changed since.
+        env: { ...process.env, ...envFreshnessForChild() },
+        stdio: ['ignore', 2, 2],
+      });
+    } catch {
+      resolve(false);
+      return;
+    }
+    let escalate;
+    const killer = setTimeout(() => {
+      child.kill('SIGTERM');
+      escalate = setTimeout(() => child.kill('SIGKILL'), killGraceMs);
+      if (typeof escalate.unref === 'function') escalate.unref();
+    }, maxMs);
+    if (typeof killer.unref === 'function') killer.unref();
+    const done = ok => {
+      clearTimeout(killer);
+      clearTimeout(escalate);
+      resolve(ok);
+    };
+    child.on('error', () => done(false));
+    child.on('exit', code => done(code === 0));
+  });
+}
 
 // One sync per type at a time in this process: a read that arrives while an
 // earlier read's sync is still running waits on that one, not a second sync.
@@ -29,11 +96,16 @@ const inflight = new Map();
 export async function syncForRead(db, pluginType, options = {}) {
   const {
     budgetMs = READ_SYNC_BUDGET_MS,
-    sync = ensureSyncForType,
+    sync = (_db, type) => runReadSyncInChild(type),
+    needed = readSyncNeeded,
     lastSyncTime = getLatestSyncTimeForType,
   } = options;
 
   let pending = inflight.get(pluginType);
+  // Fresh data needs no worker; this is the common case and costs one query.
+  if (!pending && !needed(db, pluginType)) {
+    return { complete: true, lastSync: null };
+  }
   if (!pending) {
     pending = Promise.resolve()
       .then(() => sync(db, pluginType))
