@@ -283,3 +283,71 @@ describe('trusted-housesitters', () => {
     expect(snapshot(root)).toEqual(before);
   });
 });
+
+describe('apple-health-auto-export', () => {
+  function setup() {
+    const root = tempRoot();
+    const data = JSON.stringify({ data: { metrics: [] } });
+    write(root, 'vault/logs/HealthAutoExport-2026-01-01-2026-01-07.json', data);
+    write(root, 'vault/logs/HealthAutoExport-2026-01-08-2026-01-14.json', data);
+    return root;
+  }
+
+  test('READ_ONLY leaves older exports in place', () => {
+    const root = setup();
+    const before = snapshot(root);
+    expect(runReader('apple-health-auto-export', root, { readOnly: true }).status).toBe(0);
+    expect(snapshot(root)).toEqual(before);
+  });
+
+  test('without READ_ONLY, older exports are deleted', () => {
+    const root = setup();
+    expect(runReader('apple-health-auto-export', root).status).toBe(0);
+    expect(fs.readdirSync(path.join(root, 'vault/logs'))).toEqual(['HealthAutoExport-2026-01-08-2026-01-14.json']);
+  });
+});
+
+describe('ynab-finance', () => {
+  const register = 'Account,Flag,Date,Payee,Category Group/Category,Category Group,Category,Memo,Outflow,Inflow,Cleared\n'
+    + '"Checking","","12/01/2026","Grocer","Food: Groceries","Food","Groceries","","$10.00","$0.00","Cleared"\n';
+  const plan = 'Month,Category Group/Category,Category Group,Category,Assigned,Activity,Available\n'
+    + '"Dec 2026","Food: Groceries","Food","Groceries","$100.00","-$10.00","$90.00"\n';
+
+  async function setup() {
+    const root = tempRoot();
+    write(root, 'vault/logs/Budget as of 2026-11-01 09-00 - Register.csv', register);
+    write(root, 'vault/logs/Budget as of 2026-11-01 09-00 - Plan.csv', plan);
+    // A newer export, still zipped.
+    const AdmZip = (await import('adm-zip')).default;
+    const zip = new AdmZip();
+    zip.addFile('Budget as of 2026-12-01 09-00 - Register.csv', Buffer.from(register));
+    zip.addFile('Budget as of 2026-12-01 09-00 - Plan.csv', Buffer.from(plan));
+    fs.mkdirSync(path.join(root, '.data'));
+    zip.writeZip(path.join(root, 'vault/logs/Budget as of 2026-12-01 09-00.zip'));
+    return root;
+  }
+  const config = { logs_directory: 'vault/logs' };
+
+  test('READ_ONLY reads the extracted CSVs and leaves the ZIP and older files alone', async () => {
+    const root = await setup();
+    // The vault only: the reader also caches budget allocations in .data/today.db.
+    const vault = path.join(root, 'vault');
+    const before = snapshot(vault);
+    const { status, output } = runReader('ynab-finance', root, { config, readOnly: true });
+    expect(status).toBe(0);
+    expect(output.entries.length).toBe(1);
+    expect(output.metadata.latest_register_file).toBe('Budget as of 2026-11-01 09-00 - Register.csv');
+    expect(snapshot(vault)).toEqual(before);
+  });
+
+  test('without READ_ONLY, the newest ZIP is extracted and older files are removed', async () => {
+    const root = await setup();
+    const { status } = runReader('ynab-finance', root, { config });
+    expect(status).toBe(0);
+    expect(fs.readdirSync(path.join(root, 'vault/logs')).sort()).toEqual([
+      'Budget as of 2026-12-01 09-00 - Plan.csv',
+      'Budget as of 2026-12-01 09-00 - Register.csv',
+      'Budget as of 2026-12-01 09-00.zip',
+    ]);
+  });
+});
