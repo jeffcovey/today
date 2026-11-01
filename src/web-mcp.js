@@ -66,17 +66,13 @@ export function tokenMatches(presented, expected) {
  * the new server even though it is in .env. Generating again at that point
  * would silently rotate the token and lock out every connector (#701).
  */
-export function readStoredMcpToken() {
-  try {
-    const out = execSync(`npx dotenvx get ${MCP_TOKEN_ENV}`, {
-      cwd: path.join(__dirname, '..'),
-      stdio: ['pipe', 'pipe', 'pipe'],
-      encoding: 'utf8'
-    }).trim();
-    return out || null;
-  } catch {
-    return null;
-  }
+export function readStoredMcpToken({ exec = execSync } = {}) {
+  const out = exec(`npx dotenvx get ${MCP_TOKEN_ENV}`, {
+    cwd: path.join(__dirname, '..'),
+    stdio: ['pipe', 'pipe', 'pipe'],
+    encoding: 'utf8'
+  }).trim();
+  return out || null;
 }
 
 function storeMcpToken(token) {
@@ -98,7 +94,13 @@ export function getOrCreateMcpToken({
   log = console
 } = {}) {
   if (env[MCP_TOKEN_ENV]) return env[MCP_TOKEN_ENV];
-  const stored = readStored();
+  let stored;
+  try {
+    stored = readStored();
+  } catch (error) {
+    log.error('Warning: Could not read MCP token from .env:', error.message);
+    return null;
+  }
   if (stored) {
     env[MCP_TOKEN_ENV] = stored;
     log.log(`MCP token loaded from .env (read it with: npx dotenvx get ${MCP_TOKEN_ENV})`);
