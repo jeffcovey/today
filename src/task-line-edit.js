@@ -17,8 +17,9 @@ const STAGES = ['front-stage', 'back-stage', 'off-stage'];
 const STAGE_TAG = /\s*#stage\/(?:front|back|off)-stage\b/g;
 const TOPIC_TAG = /\s*#topic\/[a-z_-]+/g;
 const DATE_MARK = { due: '📅', scheduled: '⏳' };
-// New markers go before these, so recurrence and created/done dates stay last.
-const TAIL_MARKERS = /\s(?=(?:🔁|➕|✅|❌))/u;
+// New markers go before these, so recurrence, created/done dates and a
+// trailing block id (which Obsidian needs at the very end) stay last.
+const TAIL_MARKERS = /\s(?=(?:🔁|➕|✅|❌|\^[A-Za-z0-9-]+\s*$))/u;
 
 export const TASK_PRIORITIES = Object.keys(PRIORITY_EMOJI);
 export const TASK_STAGES = STAGES;
@@ -38,17 +39,22 @@ export function isOpenTaskLine(line) {
 }
 
 /**
- * A task's title as the markdown-tasks plugin reads it: the body without its
- * priority, stage and topic tags, dates and recurrence.
+ * A task's title as the markdown-tasks plugin reads it (parseTask in
+ * plugins/markdown-tasks/read.js): the body without its priority, stage and
+ * topic tags, due, scheduled, created and done dates, and recurrence. Start
+ * (🛫) and cancelled (❌) dates stay in the title there, so they stay here.
  */
 export function taskTitleOf(line) {
   const parts = splitTaskLine(line);
   if (!parts) return null;
   return parts.body
-    .replace(/[🔺⏫🔼🔽⏬]️?/u, '')
+    .replace(/[🔺⏫🔼🔽⏬]/u, '')
     .replace(/#stage\/(front-stage|back-stage|off-stage)/, '')
     .replace(/#topic\/[a-z_-]+/g, '')
-    .replace(/[📅⏳🛫➕✅❌]️?\s*\d{4}-\d{2}-\d{2}/gu, '')
+    .replace(/📅 \d{4}-\d{2}-\d{2}/u, '')
+    .replace(/⏳ \d{4}-\d{2}-\d{2}/u, '')
+    .replace(/➕ \d{4}-\d{2}-\d{2}/u, '')
+    .replace(/✅ \d{4}-\d{2}-\d{2}/u, '')
     .replace(/🔁 [^\s#]+(?:\s+[^\s#]+)*/u, '')
     .replace(/\s+/g, ' ')
     .trim();
@@ -129,11 +135,11 @@ export function updateTaskLine(line, changes) {
     if (/🔁/u.test(title)) {
       throw new Error('The task\'s recurrence sits in the middle of its line, so its title can\'t be told apart safely. Nothing was changed.');
     }
-    // Keep the priority, tags and dates the old title held inside it.
+    // Keep the priority, tags (any tag, not only stage and topic) and dates
+    // the old title held inside it.
     const kept = [
       ...(title.match(/[🔺⏫🔼🔽⏬]️?/gu) || []),
-      ...(title.match(/#stage\/(?:front|back|off)-stage\b/g) || []),
-      ...(title.match(/#topic\/[a-z_-]+/g) || []),
+      ...[...title.matchAll(/(?:^|\s)(#[\p{L}\p{N}_/-]+)/gu)].map(m => m[1]),
       ...(title.match(/[📅⏳🛫➕✅❌]️?\s*\d{4}-\d{2}-\d{2}/gu) || []),
     ];
     body = [changes.title.trim(), ...kept].join(' ') + tail;
@@ -157,7 +163,9 @@ export function updateTaskLine(line, changes) {
   if (changes.scheduled_date !== undefined) body = setDate(body, 'scheduled', changes.scheduled_date);
   if (changes.due_date !== undefined) body = setDate(body, 'due', changes.due_date);
 
-  body = body.replace(/[ \t]{2,}/g, ' ').trim();
+  // Each edit above cleans up its own spacing; the rest of the line, links
+  // and inline code included, stays exactly as written.
+  body = body.trim();
   return `${parts.prefix}- [${parts.box}] ${body}`;
 }
 

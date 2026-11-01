@@ -9,7 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import { getAbsoluteVaultPath, getFullConfig } from '../config.js';
 import { getConfiguredTimezone, getTodayDate } from '../date-utils.js';
-import { formatDurationMinutes, formatDuration, calculateDurationMinutes } from '../duration-utils.js';
+import { formatDurationMinutes, formatDuration } from '../duration-utils.js';
 import { jsonResult, textResult, errorResult } from '../mcp-safeguards.js';
 import { PLAN_LEVELS, planFileName } from '../plan-files.js';
 import { rolePlanDirectory } from '../../plugins/roles/plan-file.js';
@@ -20,6 +20,7 @@ import {
   escapeLike,
   formatInstant,
   localDateOf,
+  parseInstant,
   freshen,
   withNote,
   topicTags,
@@ -111,6 +112,17 @@ const getPlan = {
 // timer_status and list_time_entries
 // ---------------------------------------------------------------------------
 
+/**
+ * Whole minutes from start to end, reading timestamps without an offset as
+ * wall time in `tz` (as they are displayed), never in the host's zone.
+ */
+export function minutesBetween(start, end, tz) {
+  const from = parseInstant(start, tz);
+  const to = end instanceof Date ? end : parseInstant(end, tz);
+  if (!from || !to) return 0;
+  return Math.max(0, Math.floor((to.getTime() - from.getTime()) / 60000));
+}
+
 function sourceClause(source, column = 'source') {
   if (!source) return { sql: '', params: [] };
   return { sql: ` AND ${column} LIKE ? ESCAPE '\\'`, params: [`%${escapeLike(source)}%`] };
@@ -126,7 +138,7 @@ export function runningTimers(db, { source, tz, now = new Date() } = {}) {
     ORDER BY start_time DESC
   `).all(...src.params);
   return rows.map(row => {
-    const minutes = Math.max(0, calculateDurationMinutes(row.start_time, now));
+    const minutes = minutesBetween(row.start_time, now, tz);
     return {
       description: row.description,
       start: formatInstant(row.start_time, tz),
@@ -189,8 +201,8 @@ export function listTimeEntries(db, { startDate, endDate, source, tz, today, now
     if (!inRange && !(isRunning && includesToday)) continue;
     seen.add(row.id);
     const minutes = isRunning
-      ? Math.max(0, calculateDurationMinutes(row.start_time, now))
-      : (row.duration_minutes || Math.max(0, calculateDurationMinutes(row.start_time, row.end_time)));
+      ? minutesBetween(row.start_time, now, tz)
+      : (row.duration_minutes || minutesBetween(row.start_time, row.end_time, tz));
     entries.push({
       date: day,
       start: formatInstant(row.start_time, tz),

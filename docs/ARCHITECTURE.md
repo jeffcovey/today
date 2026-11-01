@@ -398,7 +398,7 @@ Tools are built into `src/mcp-server.js` or defined in modules under `src/mcp-to
 Tools that take a task, event or contact ID require the item's `title` and refuse when it doesn't match. Batch tools take `dry_run`, on by default. Every `write` and `destructive` call, including refused ones, is appended to `<vault>/logs/mcp-writes/YYYY-MM-DD.md`; `[mcp] write_log = "other/dir"` moves it and `write_log = false` turns it off.
 
 - `src/mcp-tools/day-reads.js` (read): `get_plan` (a day, week, month, quarter or year plan file), `timer_status`, `list_time_entries`, `habits_today`, `list_issues` and `search_tasks`, mirroring `bin/track`, `bin/habits`, `bin/issues` and `bin/tasks`.
-- `src/mcp-tools/task-writes.js` (write): `postpone_task` and `update_task`. Each rewrites one line of a markdown task file (`src/task-postpone.js`, `src/task-line-edit.js`), checked against the task's title, then re-syncs that file.
+- `src/mcp-tools/task-writes.js` (write): `postpone_task` and `update_task`. Each rewrites one line of a markdown task file (`src/task-postpone.js`, `src/task-line-edit.js`), checked against the task's title and the synced line, under the file's lock (`src/file-lock.js`), then re-reads that file with `syncPluginSource`'s `skipWriteHooks`, so no auto-archive, dating, stage or priority hook runs.
 
 Callers get the same guidance `bin/today` gives its own AI (`src/mcp-guidance.js`):
 

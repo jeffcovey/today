@@ -15,6 +15,7 @@ import { getAbsoluteVaultPath } from '../config.js';
 import { getConfiguredTimezone, getTodayDate } from '../date-utils.js';
 import { verifyTitle, jsonResult, errorResult } from '../mcp-safeguards.js';
 import { writeFileAtomicCAS } from '../fs-atomic.js';
+import { withFileLocks } from '../file-lock.js';
 import { getSourcesForType, syncPluginSource } from '../plugin-loader.js';
 import { postponeTaskLine } from '../task-postpone.js';
 import {
@@ -89,22 +90,26 @@ export function locateTask(db, args, { projectRoot = PROJECT_ROOT, vaultPath = g
   let index = lineNumber - 1;
   let shifted = false;
   const atLine = lines[index];
-  const lineOk = atLine !== undefined && ((meta.raw_line && atLine === meta.raw_line) || matches(atLine));
+  // With the synced line on record, only that exact line counts at the old
+  // position: a same-titled task may have moved into it.
+  // Without it, the title must be unique in the file wherever it sits.
+  const lineOk = atLine !== undefined && meta.raw_line && atLine === meta.raw_line;
   if (!lineOk) {
-    // The file changed since the last sync: accept the task only if exactly
-    // one line in it is this task.
+    // The file changed since the last sync. With the synced line on record,
+    // accept only that exact line, found once: a title alone could be another
+    // task's. Without it, accept the one line that has the task's title.
     const found = [];
     lines.forEach((line, i) => {
-      if ((meta.raw_line && line === meta.raw_line) || matches(line)) found.push(i);
+      if (meta.raw_line ? line === meta.raw_line : matches(line)) found.push(i);
     });
     if (found.length !== 1) {
       return {
         ok: false,
-        error: `Line ${lineNumber} of ${file} is no longer this task${found.length > 1 ? ', and the file has more than one task with its title' : ''}. Call sync_data with plugin_type "tasks" and look the task up again. Nothing was changed.`,
+        error: `Line ${lineNumber} of ${file} is no longer this task${found.length > 1 ? ', and the file has more than one task that could be it' : ''}. Call sync_data with plugin_type "tasks" and look the task up again. Nothing was changed.`,
       };
     }
     index = found[0];
-    shifted = true;
+    shifted = index !== lineNumber - 1;
   }
 
   return { ok: true, task, source: task.source, file, abs: real, content, lines, index, shifted };
@@ -115,22 +120,56 @@ async function defaultRefresh(db, { source, file }) {
   const { sources } = await getSourcesForType('tasks');
   const match = sources.find(s => s.sourceId === source);
   if (!match) return { success: false, message: `source ${source} is not enabled` };
+  // Only re-read the file: no auto-archive, dating, stage or priority hooks,
+  // which could move or rewrite other tasks (or this one) behind the reply.
   return syncPluginSource(match.plugin, match.sourceName, match.config, { db, vaultPath: getAbsoluteVaultPath() }, {
-    fileFilter: file, skipAutoTag: true, _caller: 'mcp-write',
+    fileFilter: file, skipAutoTag: true, skipWriteHooks: true, _caller: 'mcp-write',
   });
 }
 
 /**
- * Write the new line, update the task's row right away, and re-sync the file.
- * @returns {{ok: true, taskId, dbNote}|{ok: false, error}}
+ * Locate the task, work out its new line and write it, all under the task
+ * file's lock (src/file-lock.js), so two MCP writes to one file can't
+ * interleave. `edit(located, line)` returns {newLine, ...} or {error}.
+ * @returns {{ok: true, located, newLine, result}|{ok: false, error}|{ok: true, unchanged: true, located}}
  */
-async function writeTaskLine(ctx, located, newLine, dbFields) {
-  const { lines, index, abs, content, source, file } = located;
-  const updated = [...lines];
-  updated[index] = newLine;
-  const { conflict } = writeFileAtomicCAS(abs, updated.join('\n'), content);
-  if (conflict) return { ok: false, error: 'The task file changed while writing; nothing was changed. Try again.' };
+export function editTaskLine(db, args, edit, opts = {}) {
+  const first = locateTask(db, args, opts);
+  if (!first.ok) return first;
+  try {
+    return lockedEdit(db, args, edit, opts, first.abs);
+  } catch (error) {
+    if (/Timed out acquiring file lock/.test(error.message)) {
+      return { ok: false, error: 'Another write to the task file is in progress. Nothing was changed; try again.' };
+    }
+    throw error;
+  }
+}
 
+function lockedEdit(db, args, edit, opts, abs) {
+  return withFileLocks([abs], () => {
+    // Read again under the lock: the file may have changed meanwhile.
+    const located = locateTask(db, args, opts);
+    if (!located.ok) return located;
+    const line = located.lines[located.index];
+    const result = edit(located, line);
+    if (result.error) return { ok: false, error: result.error };
+    if (result.newLine === line) return { ok: true, unchanged: true, located };
+    const updated = [...located.lines];
+    updated[located.index] = result.newLine;
+    const { conflict } = writeFileAtomicCAS(located.abs, updated.join('\n'), located.content);
+    if (conflict) return { ok: false, error: 'The task file changed while writing; nothing was changed. Try again.' };
+    return { ok: true, located, newLine: result.newLine, result };
+  });
+}
+
+/**
+ * After the line is written: update the task's row right away and re-sync
+ * the file.
+ * @returns {{taskId, dbNote}}
+ */
+async function afterTaskWrite(ctx, located, newLine, dbFields) {
+  const { index, source, file } = located;
   const taskId = `${source}:${file}:${index + 1}`;
   // Date-based reads see the change at once; the re-sync below then rewrites
   // the row from the file.
@@ -162,11 +201,14 @@ async function writeTaskLine(ctx, located, newLine, dbFields) {
     const result = await refresh(ctx.db, { source, file });
     if (result && result.success === false) {
       dbNote = `The file was written, but re-reading it into the database failed (${result.message || result.error || 'unknown error'}); the next sync will catch up.`;
+    } else if (result && result.count === 0 && /^Skipped\b/.test(String(result.message || ''))) {
+      // syncPluginSource reports success when another sync holds the source.
+      dbNote = 'The file was written, but another sync of the task source was running, so the database may not show the change yet. Call sync_data with plugin_type "tasks" before relying on task ids or dates.';
     }
   } catch (error) {
     dbNote = `The file was written, but re-reading it into the database failed (${error.message}); the next sync will catch up.`;
   }
-  return { ok: true, taskId, dbNote };
+  return { taskId, dbNote };
 }
 
 function replyFor(located, newLine, writeResult, extra, lead) {
@@ -215,25 +257,25 @@ const postponeTask = {
       if (toDate < today) return errorResult(`to_date ${toDate} is before today (${today}). Nothing was changed.`);
     }
 
-    const located = locateTask(ctx.db, args, { projectRoot: ctx.projectRoot, vaultPath: ctx.vaultPath || getAbsoluteVaultPath() });
-    if (!located.ok) return errorResult(located.error);
-    const line = located.lines[located.index];
-    if (!isOpenTaskLine(line)) return errorResult('The task is not open, so there is nothing to postpone. Nothing was changed.');
+    const edited = editTaskLine(ctx.db, args, (located, line) => {
+      if (!isOpenTaskLine(line)) return { error: 'The task is not open, so there is nothing to postpone. Nothing was changed.' };
+      if (toDate) {
+        const moved = moveTaskLineTo(line, toDate);
+        if (moved.error) return { error: `${moved.error}. Nothing was changed.` };
+        return { newLine: moved.line, ...moved };
+      }
+      const postponed = postponeTaskLine(line, today);
+      if (!postponed) return { error: 'The task has no scheduled or due date to move; use update_task to give it one. Nothing was changed.' };
+      return { newLine: postponed.line, ...postponed };
+    }, { projectRoot: ctx.projectRoot, vaultPath: ctx.vaultPath || getAbsoluteVaultPath() });
+    if (!edited.ok) return errorResult(edited.error);
+    if (edited.unchanged) return errorResult('Postponing would not change the task. Nothing was changed.');
+    const { located, result } = edited;
 
-    let result;
-    if (toDate) {
-      result = moveTaskLineTo(line, toDate);
-      if (result.error) return errorResult(`${result.error}. Nothing was changed.`);
-    } else {
-      result = postponeTaskLine(line, today);
-      if (!result) return errorResult('The task has no scheduled or due date to move; use update_task to give it one. Nothing was changed.');
-    }
-
-    const written = await writeTaskLine(ctx, located, result.line, {
+    const written = await afterTaskWrite(ctx, located, result.line, {
       due_date: result.dueDate,
       scheduled_date: result.scheduledDate,
     });
-    if (!written.ok) return errorResult(written.error);
     const dates = [result.scheduledDate && `scheduled ${result.scheduledDate}`, result.dueDate && `due ${result.dueDate}`].filter(Boolean).join(', ');
     return replyFor(located, result.line, written, {
       scheduled_date: result.scheduledDate,
@@ -266,20 +308,22 @@ const updateTask = {
     if (valid.error) return errorResult(valid.error);
     const { changes } = valid;
 
-    const located = locateTask(ctx.db, args, { projectRoot: ctx.projectRoot, vaultPath: ctx.vaultPath || getAbsoluteVaultPath() });
-    if (!located.ok) return errorResult(located.error);
-    const line = located.lines[located.index];
-
-    let newLine;
-    try {
-      newLine = updateTaskLine(line, changes);
-    } catch (error) {
-      return errorResult(error.message);
+    const edited = editTaskLine(ctx.db, args, (located, line) => {
+      let next;
+      try {
+        next = updateTaskLine(line, changes);
+      } catch (error) {
+        return { error: error.message };
+      }
+      if (next === null) return { error: 'That line is not a task. Nothing was changed.' };
+      return { newLine: next };
+    }, { projectRoot: ctx.projectRoot, vaultPath: ctx.vaultPath || getAbsoluteVaultPath() });
+    if (!edited.ok) return errorResult(edited.error);
+    if (edited.unchanged) {
+      const { located } = edited;
+      return jsonResult({ user_timezone: getConfiguredTimezone(), task_id: located.task.id, line: located.lines[located.index], changed: false }, 'The task already reads that way; nothing was changed.');
     }
-    if (newLine === null) return errorResult('That line is not a task. Nothing was changed.');
-    if (newLine === line) {
-      return jsonResult({ user_timezone: getConfiguredTimezone(), task_id: located.task.id, line, changed: false }, 'The task already reads that way; nothing was changed.');
-    }
+    const { located, newLine } = edited;
 
     const dates = taskDatesOf(newLine);
     const dbFields = {};
@@ -290,8 +334,7 @@ const updateTask = {
     if (changes.stage !== undefined) dbFields.stage = changes.stage;
     if (changes.topics !== undefined) dbFields.topics = changes.topics;
 
-    const written = await writeTaskLine(ctx, located, newLine, dbFields);
-    if (!written.ok) return errorResult(written.error);
+    const written = await afterTaskWrite(ctx, located, newLine, dbFields);
     const changed = Object.keys(changes).map(k => (k === 'title' ? 'title' : k.replace('_', ' '))).join(', ');
     return replyFor(located, newLine, written, { changed: Object.keys(changes) }, `Updated ${changed} of "${located.task.title}".`);
   },

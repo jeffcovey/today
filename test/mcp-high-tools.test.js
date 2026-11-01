@@ -13,7 +13,7 @@ import { clearConfigCache } from '../src/config.js';
 import { getTodayDate } from '../src/date-utils.js';
 import { getSqlColumns } from '../src/plugin-schemas.js';
 import { getRegisteredTools, setRegisteredToolsForTesting } from '../src/mcp-tools/index.js';
-import { tools as readTools, searchTasks } from '../src/mcp-tools/day-reads.js';
+import { tools as readTools, searchTasks, minutesBetween, runningTimers } from '../src/mcp-tools/day-reads.js';
 import { tools as writeTools } from '../src/mcp-tools/task-writes.js';
 import { planFileName } from '../src/plan-files.js';
 import { getDailyPlanRelativePath } from '../src/plan-utils.js';
@@ -77,6 +77,18 @@ describe('shared time helpers', () => {
     expect(parseInstant('2026-11-01T20:00:00', TZ).toISOString()).toBe('2026-11-02T01:00:00.000Z');
     expect(formatInstant('2026-11-02T01:00:00Z', TZ)).toBe('2026-11-01T20:00:00-05:00');
     expect(formatInstant('2026-07-01T09:30:00-04:00', TZ)).toBe('2026-07-01T09:30:00-04:00');
+  });
+});
+
+describe('durations', () => {
+  test('a timestamp without an offset counts from wall time in the configured zone', () => {
+    const now = new Date('2026-11-01T14:30:00Z');
+    expect(minutesBetween('2026-11-01T09:00:00', now, TZ)).toBe(30);
+    expect(minutesBetween('2026-11-01T09:00:00', '2026-11-01T10:15:00', TZ)).toBe(75);
+    expect(minutesBetween('2026-11-01T14:00:00Z', '2026-11-01T09:30:00', TZ)).toBe(30);
+    const db = makeDb('time-logs');
+    db.prepare("INSERT INTO time_logs (id, source, start_time, description) VALUES ('t1', 'markdown-time-tracking/default', '2026-11-01T09:00:00', 'Writing')").run();
+    expect(runningTimers(db, { tz: TZ, now })[0]).toMatchObject({ elapsed_minutes: 30, start: '2026-11-01T09:00:00-05:00' });
   });
 });
 
@@ -365,6 +377,20 @@ describe('task line edits', () => {
     expect(moveTaskLineTo('- [ ] No dates', '2026-11-02').error).toMatch(/no scheduled or due date/);
   });
 
+  test('a block id stays last, other tags and spacing stay as written', () => {
+    expect(updateTaskLine('- [ ] Prepare report ^report-id', { priority: 'high', due_date: '2030-01-01' }))
+      .toBe('- [ ] Prepare report ⏫ 📅 2030-01-01 ^report-id');
+    expect(updateTaskLine('- [ ] Discuss #project/alpha with Sam 📅 2030-01-01', { title: 'Call Sam' }))
+      .toBe('- [ ] Call Sam #project/alpha 📅 2030-01-01');
+    expect(updateTaskLine('- [ ] Open [[My  Note]] and `a  b`', { priority: 'low' }))
+      .toBe('- [ ] Open [[My  Note]] and `a  b` 🔽');
+  });
+
+  test('the title is read the way markdown-tasks reads it', () => {
+    expect(taskTitleOf('- [ ] Trip 🛫 2030-01-01 📅 2030-01-05')).toBe('Trip 🛫 2030-01-01');
+    expect(taskTitleOf('- [-] Dropped ❌ 2030-01-02')).toBe('Dropped ❌ 2030-01-02');
+  });
+
   test('validation', () => {
     expect(validateTaskChanges({}).error).toMatch(/at least one/);
     expect(validateTaskChanges({ due_date: '2026-02-30' }).error).toMatch(/YYYY-MM-DD/);
@@ -480,6 +506,35 @@ describe('postpone_task and update_task', () => {
     expect(fs.readFileSync(file, 'utf8')).toBe('- [ ] Something else\n');
   });
 
+  test('a same-titled task is never taken for this one', async () => {
+    setup(['- [ ] Water plants ⏳ 2030-01-01', '- [ ] Water plants 📅 2030-02-01']);
+    // The first task was deleted, so the second one now sits on line 1.
+    fs.writeFileSync(file, ['- [ ] Water plants 📅 2030-02-01', '- [ ] Other'].join('\n'));
+    const moved = await tool('update_task').handler({ task_id: id(2), title: 'Water plants', priority: 'high' }, ctx());
+    expect(json(moved)).toMatchObject({ line_number: 1, line_moved: true });
+    const gone = await tool('update_task').handler({ task_id: id(1), title: 'Water plants', priority: 'low' }, ctx());
+    expect(text(gone)).toMatch(/no longer this task/);
+
+    fs.writeFileSync(file, ['- [ ] Water plants 🔼', '- [ ] Water plants 🔽'].join('\n'));
+    // A row synced before raw_line was recorded can only go by its title.
+    db.prepare('UPDATE tasks SET metadata = json_remove(metadata, \'$.raw_line\') WHERE id = ?').run(id(1));
+    const ambiguous = await tool('update_task').handler({ task_id: id(1), title: 'Water plants', priority: 'low' }, ctx());
+    expect(text(ambiguous)).toMatch(/more than one task that could be it/);
+    expect(fileLines()).toEqual(['- [ ] Water plants 🔼', '- [ ] Water plants 🔽']);
+  });
+
+  test('the write holds the file\'s lock and leaves no lock file behind', async () => {
+    setup(['- [ ] Draft report']);
+    await tool('update_task').handler({ task_id: id(1), title: 'Draft report', priority: 'low' }, ctx());
+    expect(fs.existsSync(`${file}.lock`)).toBe(false);
+    // Another writer holding the lock makes the edit wait, then give up.
+    fs.writeFileSync(`${file}.lock`, `${process.pid}\n${Date.now()}`);
+    const busy = await tool('update_task').handler({ task_id: id(1), title: 'Draft report', priority: 'high' }, ctx());
+    expect(busy.isError).toBe(true);
+    expect(text(busy)).toMatch(/Another write to the task file is in progress\. Nothing was changed/);
+    expect(fileLines()[0]).toBe('- [ ] Draft report 🔽');
+  });
+
   test('update_task rewrites the fields given and refreshes the row', async () => {
     setup(['- [ ] Draft report #topic/work 🔼 📅 2030-01-10 ➕ 2026-10-01']);
     const result = await tool('update_task').handler({
@@ -514,5 +569,13 @@ describe('postpone_task and update_task', () => {
     expect(result.isError).toBeUndefined();
     expect(result.content[0].text).toMatch(/re-reading it into the database failed \(locked\)/);
     expect(fileLines()[0]).toBe('- [ ] Draft report 🔽');
+  });
+
+  test('a refresh skipped for a running sync is reported', async () => {
+    setup(['- [ ] Draft report']);
+    const result = await tool('update_task').handler({ task_id: id(1), title: 'Draft report', priority: 'low' }, {
+      ...ctx(), refreshTaskFile: async () => ({ success: true, count: 0, message: 'Skipped markdown-tasks/default: sync already in progress' }),
+    });
+    expect(result.content[0].text).toMatch(/another sync of the task source was running.*sync_data/);
   });
 });

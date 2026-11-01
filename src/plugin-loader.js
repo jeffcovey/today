@@ -781,7 +781,9 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   const { db } = context;
   // Taken before the plugin reads anything — see updateSyncMetadata.
   const syncStartedAt = db.prepare(`SELECT datetime('now') AS t`).get().t;
-  const { fileFilter, skipAutoTag = false } = options;
+  // skipWriteHooks: only read, without the auto-archive, auto-date, stage and
+  // priority hooks below (they act on the whole source, not just fileFilter).
+  const { fileFilter, skipAutoTag = false, skipWriteHooks = false } = options;
 
   // Get last sync time to enable incremental sync
   const syncMeta = getSyncMetadata(db, sourceId);
@@ -1047,7 +1049,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
 
   // Run auto-archive first if enabled (removes completed tasks, rebalances files)
   let archiveResult = null;
-  if (sourceConfig.auto_archive_completed && getPluginAccess(plugin) === 'read-write') {
+  if (!skipWriteHooks && sourceConfig.auto_archive_completed && getPluginAccess(plugin) === 'read-write') {
     try {
       archiveResult = await runAutoArchive({
         plugin,
@@ -1079,7 +1081,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
 
   // Run auto date-created if enabled (never fails the sync)
   let dateCreatedResult = null;
-  if (sourceConfig.auto_add_date_created && getPluginAccess(plugin) === 'read-write') {
+  if (!skipWriteHooks && sourceConfig.auto_add_date_created && getPluginAccess(plugin) === 'read-write') {
     try {
       dateCreatedResult = await runAutoDateCreated({
         db,
@@ -1114,7 +1116,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   // Run auto-classification if enabled (never fails the sync)
   let classificationResult = null;
   const supportsStageClassification = plugin.settings?.supports_stage_classification?.default !== false;
-  if (sourceConfig.auto_classify_stages && supportsStageClassification && getPluginAccess(plugin) === 'read-write') {
+  if (!skipWriteHooks && sourceConfig.auto_classify_stages && supportsStageClassification && getPluginAccess(plugin) === 'read-write') {
     try {
       classificationResult = await runAutoStageClassification({
         db,
@@ -1149,7 +1151,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   // Run auto-priority if enabled (never fails the sync)
   let priorityResult = null;
   const supportsPriorityClassification = plugin.settings?.supports_priority_classification?.default !== false;
-  if (sourceConfig.auto_add_priority && supportsPriorityClassification && getPluginAccess(plugin) === 'read-write') {
+  if (!skipWriteHooks && sourceConfig.auto_add_priority && supportsPriorityClassification && getPluginAccess(plugin) === 'read-write') {
     try {
       priorityResult = await runAutoPriority({
         db,
