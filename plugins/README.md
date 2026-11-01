@@ -216,6 +216,8 @@ The read command reads data and outputs JSON. It can be written in any language.
 - `LAST_SYNC_TIME`: ISO timestamp of last sync (empty for first sync)
 - `SOURCE_ID`: Full source identifier (e.g., `markdown-time-tracking/local`)
 - `CONTEXT_ONLY`: Set to `"true"` when gathering context for AI prompts (see below)
+- `FILE_FILTER`: Comma-separated file paths, relative to the project root, when the sync is for those files only (e.g. after a write); read just those
+- `READ_ONLY`: Set to `"true"` for a read-only sync (see below)
 
 **Output:**
 - JSON object to stdout with entries and metadata
@@ -348,6 +350,22 @@ The markdown-plans plugin generates AI summaries for past days and suggestions f
 - Operations that don't modify files or call AI
 
 The goal is fast context gathering (~5-10 seconds) for responsive AI sessions.
+
+## The READ_ONLY Flag
+
+The MCP server freshens the database before it answers a read (`list_tasks`, `habits_today` and the like). That sync is read-only: the loader runs no write hooks (auto-tag, auto-archive, date-created, stage and priority) and starts the read command with `READ_ONLY=true`. A reader that changes things as it reads (resetting overdue routine checkboxes, creating today's diary file, deleting old export files, adding fields on a remote service) must skip those changes when it's set, and report entries as the files and services currently stand. The next full sync (the scheduler's `bin/plugins sync`, the web app, or the MCP `sync_data` tool) does them as before.
+
+```javascript
+const readOnly = process.env.READ_ONLY === 'true';
+
+if (!readOnly) {
+  resetOverdueRoutines(files);
+}
+
+console.log(JSON.stringify({ entries: readEntries(files) }));
+```
+
+A reader that only reads needs no change.
 
 ## Plugin Types
 

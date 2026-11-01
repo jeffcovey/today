@@ -10,6 +10,8 @@
  * exit 0. syncForRead uses the exit only to know the sync is over.
  * Started by runReadSyncInChild in mcp-reads.js, from the server's working
  * directory, so it opens the same database.
+ * The sync is read-only (skipWriteHooks): it refreshes the database from the
+ * files as they stand and writes nothing to the vault.
  */
 
 import { getDatabase } from './database-service.js';
@@ -29,7 +31,10 @@ try {
   // plugin commands' detached process groups before exiting, or they would
   // keep running with no timeout left to end them.
   stopProcessGroupsBeforeExitOnSigterm({ killGraceMs: 2000 });
-  await ensureSyncForType(db, pluginType);
+  // Read-only: a read must not change the vault. No write hooks, and the
+  // readers run with READ_ONLY=true (no auto-tagging either, which
+  // ensureSyncForType skips by default). sync_data is the full sync.
+  await ensureSyncForType(db, pluginType, { skipWriteHooks: true });
   process.exit(0);
 } catch (error) {
   console.error(`read-sync-worker: ${pluginType} sync failed: ${error.message}`);

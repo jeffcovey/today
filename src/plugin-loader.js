@@ -638,10 +638,13 @@ export function readSyncNeeded(db, pluginType, options = {}) {
  * @param {object} options - Options
  * @param {number} options.staleMinutes - Minutes before data is considered stale (uses schema default if not specified)
  * @param {boolean} options.force - Force sync even if not stale (default: false)
+ * @param {boolean} options.skipWriteHooks - A read-only sync: no write hooks,
+ *   and the readers run with READ_ONLY=true so they write nothing either
+ *   (default: false). The MCP server's pre-read syncs use it.
  * @returns {boolean} - True if sync was performed, false if data was fresh
  */
 export async function ensureSyncForType(db, pluginType, options = {}) {
-  const { staleMinutes = getStaleMinutes(pluginType), force = false, skipAutoTag = true } = options;
+  const { staleMinutes = getStaleMinutes(pluginType), force = false, skipAutoTag = true, skipWriteHooks = false } = options;
 
   if (!force && !readSyncNeeded(db, pluginType, { staleMinutes })) {
     return false;
@@ -658,7 +661,7 @@ export async function ensureSyncForType(db, pluginType, options = {}) {
         // Callers waiting on a read (CLI commands and MCP reads) use this to
         // freshen data first. Auto-tagging is a blocking AI call of several
         // seconds; the scheduler's full syncs do it instead unless overridden.
-        await syncPluginSource(plugin, sourceName, config, context, { skipAutoTag, _caller: 'ensure-sync' });
+        await syncPluginSource(plugin, sourceName, config, context, { skipAutoTag, skipWriteHooks, _caller: 'ensure-sync' });
       }
     }
     return true;
@@ -838,8 +841,11 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   const { db } = context;
   // Taken before the plugin reads anything — see updateSyncMetadata.
   const syncStartedAt = db.prepare(`SELECT datetime('now') AS t`).get().t;
-  // skipWriteHooks: only read, without the auto-archive, auto-date, stage and
-  // priority hooks below (they act on the whole source, not just fileFilter).
+  // skipWriteHooks: only read, without the auto-tag, auto-archive, auto-date,
+  // stage and priority hooks below (they act on the whole source, not just
+  // fileFilter). The reader is told too, with READ_ONLY=true, so a reader that
+  // writes as it reads (resetting routines, creating today's diary file)
+  // reports the files as they stand instead.
   const { fileFilter, skipAutoTag = false, skipWriteHooks = false } = options;
   // keepSyncWatermark: a filtered re-read leaves last_synced_at alone, so
   // readSyncNeeded doesn't take the whole source as fresh.
@@ -868,6 +874,10 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   // If file filter specified, pass it to read command for targeted sync
   if (fileFilter) {
     envVars.FILE_FILTER = fileFilter;
+  }
+
+  if (skipWriteHooks) {
+    envVars.READ_ONLY = 'true';
   }
 
   // Run the read command with last sync time and source ID
@@ -1071,7 +1081,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   // Run auto-tagger if enabled (never fails the sync)
   let taggingResult = null;
   const taggableField = sourceConfig.taggable_field || plugin.settings?.taggable_field?.default;
-  if (!skipAutoTag && sourceConfig.auto_add_topics && taggableField && getPluginAccess(plugin) === 'read-write') {
+  if (!skipAutoTag && !skipWriteHooks && sourceConfig.auto_add_topics && taggableField && getPluginAccess(plugin) === 'read-write') {
     try {
       const updater = createFileBasedUpdater(PROJECT_ROOT);
       taggingResult = await runAutoTagger({

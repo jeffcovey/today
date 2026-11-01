@@ -395,6 +395,8 @@ Tools are built into `src/mcp-server.js` or defined in modules under `src/mcp-to
 - `write` is a vault change that is easy to undo. Hidden and refused when `read_only = true`.
 - `destructive` deletes or moves data, rewrites in bulk, or writes to an outside service such as Google Calendar updates or YNAB. Hidden and refused unless `[mcp] allow_destructive = true`, and always refused on a read-only connection.
 
+Before a read tool answers, the server freshens that plugin type if it is stale (`syncForRead` in `src/mcp-reads.js`, run in `src/read-sync-worker.js`). That sync is read-only: no write hooks run, and the readers run with `READ_ONLY=true`, so they report the vault as it stands and write nothing (see `plugins/README.md`). `sync_data` is the full sync, hooks and all.
+
 Tools that take a task, event or contact ID require the item's `title` and refuse when it doesn't match. Batch tools take `dry_run`, on by default. Every `write` and `destructive` call, including refused ones, is appended to `<vault>/logs/mcp-writes/YYYY-MM-DD.md`; `[mcp] write_log = "other/dir"` moves it and `write_log = false` turns it off.
 
 - `src/mcp-tools/day-reads.js` (read): `get_plan` (a day, week, month, quarter or year plan file), `timer_status`, `list_time_entries`, `habits_today`, `list_issues` and `search_tasks`, mirroring `bin/track`, `bin/habits`, `bin/issues` and `bin/tasks`.

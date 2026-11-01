@@ -16,25 +16,30 @@ const projectRoot = process.env.PROJECT_ROOT || path.resolve(__dirname, '../..')
 
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const calendarSource = config.calendar_source;
+// READ_ONLY=true (an MCP server's pre-read sync): don't push projects to the
+// calendar; report the ones the last full sync put there (the mapping file).
+const readOnly = process.env.READ_ONLY === 'true';
 
 if (!calendarSource) {
   console.log(JSON.stringify({ entries: [], files_processed: [], incremental: false, error: 'No calendar_source configured' }));
   process.exit(1);
 }
 
-try {
-  const out = execSync('node bin/calendar sync-projects ' + JSON.stringify(calendarSource), {
-    cwd: projectRoot,
-    encoding: 'utf8',
-    stdio: ['inherit', 'pipe', 'pipe'],
-  });
-  // Print progress to stderr so it's visible in the console but doesn't corrupt the JSON output
-  if (out) process.stderr.write(out);
-} catch (err) {
-  const msg = (err.stderr?.trim() || err.stdout?.trim() || err.message);
-  if (err.stderr) process.stderr.write(err.stderr);
-  console.log(JSON.stringify({ entries: [], files_processed: [], incremental: false, error: msg }));
-  process.exit(1);
+if (!readOnly) {
+  try {
+    const out = execSync('node bin/calendar sync-projects ' + JSON.stringify(calendarSource), {
+      cwd: projectRoot,
+      encoding: 'utf8',
+      stdio: ['inherit', 'pipe', 'pipe'],
+    });
+    // Print progress to stderr so it's visible in the console but doesn't corrupt the JSON output
+    if (out) process.stderr.write(out);
+  } catch (err) {
+    const msg = (err.stderr?.trim() || err.stdout?.trim() || err.message);
+    if (err.stderr) process.stderr.write(err.stderr);
+    console.log(JSON.stringify({ entries: [], files_processed: [], incremental: false, error: msg }));
+    process.exit(1);
+  }
 }
 
 // Read the mapping file to know which projects were successfully synced

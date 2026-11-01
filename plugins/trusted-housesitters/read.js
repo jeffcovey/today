@@ -19,6 +19,9 @@ const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 const sourceId = process.env.SOURCE_ID || 'trusted-housesitters/default';
 const contextOnly = process.env.CONTEXT_ONLY === 'true';
+// READ_ONLY=true (an MCP server's pre-read sync): report the cached listings
+// without scraping, downloading images, or writing the cache or vault views.
+const readOnly = process.env.READ_ONLY === 'true';
 
 // Credentials
 const email = config.email;
@@ -1035,9 +1038,9 @@ async function main() {
   try {
     let allListings;
 
-    if (contextOnly) {
-      // Just read from cache for AI context gathering
-      console.error('CONTEXT_ONLY mode - reading from cache');
+    if (contextOnly || readOnly) {
+      // Just read from cache for AI context gathering, or for a read-only sync
+      console.error(`${readOnly ? 'READ_ONLY' : 'CONTEXT_ONLY'} mode - reading from cache`);
       allListings = loadCache();
     } else {
       // Full scrape
@@ -1100,7 +1103,7 @@ async function main() {
     console.error(`${filteredListings.length} listings after filtering (from ${allListings.length} total)`);
 
     // Generate markdown views
-    if (filteredListings.length > 0) {
+    if (filteredListings.length > 0 && !readOnly) {
       generateAllViews(filteredListings);
     }
 

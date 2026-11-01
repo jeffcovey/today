@@ -29,6 +29,9 @@ const createDateFields = config.create_date_fields === true || config.create_dat
 const createPriorityField = config.create_priority_field === true || config.create_priority_field === 'true';
 const createStatusField = config.create_status_field === true || config.create_status_field === 'true';
 const createStageField = config.create_stage_field === true || config.create_stage_field === 'true';
+// READ_ONLY=true (an MCP server's pre-read sync): only query GitHub. Missing
+// fields are added by the next full sync, not by a read.
+const readOnly = process.env.READ_ONLY === 'true';
 
 // Priority options for the single-select field
 const PRIORITY_OPTIONS = [
@@ -495,28 +498,28 @@ if (!includeClosed) {
 }
 
 // Create date fields on projects that don't have them (if enabled)
-if (createDateFields) {
+if (createDateFields && !readOnly) {
   for (const project of projects) {
     ensureDateFields(project);
   }
 }
 
 // Create priority field on projects that don't have it (if enabled)
-if (createPriorityField) {
+if (createPriorityField && !readOnly) {
   for (const project of projects) {
     ensurePriorityField(project);
   }
 }
 
 // Create status field on projects that don't have it (if enabled)
-if (createStatusField) {
+if (createStatusField && !readOnly) {
   for (const project of projects) {
     ensureStatusField(project);
   }
 }
 
 // Create stage field on projects that don't have it (if enabled)
-if (createStageField) {
+if (createStageField && !readOnly) {
   for (const project of projects) {
     ensureStageField(project);
   }
