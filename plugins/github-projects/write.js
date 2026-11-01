@@ -6,6 +6,7 @@ const PROJECT_ITEMS_PAGE_SIZE = 50;
 const MAX_PROJECT_ITEM_PAGES = 20;
 
 import { execSync } from 'child_process';
+import { buildMetadataIssueBody } from './review-schedule.js';
 
 // Clear environment tokens so gh uses its own OAuth session
 delete process.env.GH_TOKEN;
@@ -36,20 +37,6 @@ function escapeGraphQLString(value) {
     .replace(/\\/g, '\\\\')
     .replace(/"/g, '\\"')
     .replace(/\n/g, '\\n');
-}
-
-function buildMetadataIssueBody(projectTitle, reviewDate, frequency) {
-  const dayOfWeek = new Date(`${reviewDate}T00:00:00Z`).toLocaleDateString('en-US', {
-    weekday: 'long',
-    timeZone: 'UTC'
-  });
-
-  return `This issue tracks review scheduling for the ${projectTitle} project.
-
-**Next Review Date:** ${reviewDate} (${dayOfWeek})
-**Review Frequency:** ${frequency}
-
-This is a metadata issue for project management - not a development task.`;
 }
 
 // Parse project ID to extract owner type, owner, and project number
@@ -332,19 +319,27 @@ function createNextReviewDateField(projectId) {
 // Get repository for project (assumes project contains issues from one repository)
 function getProjectRepository(owner, number, ownerType) {
   const ownerField = ownerType === 'user' ? 'user' : 'organization';
+  let after = null;
 
-  const query = `
-    query {
-      ${ownerField}(login: "${owner}") {
-        projectV2(number: ${number}) {
-          items(first: 10) {
-            nodes {
-              content {
-                ... on Issue {
-                  repository {
-                    name
-                    owner {
-                      login
+  while (true) {
+    const afterArgument = after ? `, after: "${after}"` : '';
+    const query = `
+      query {
+        ${ownerField}(login: "${owner}") {
+          projectV2(number: ${number}) {
+            items(first: ${PROJECT_ITEMS_PAGE_SIZE}${afterArgument}) {
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+              nodes {
+                content {
+                  ... on Issue {
+                    repository {
+                      name
+                      owner {
+                        login
+                      }
                     }
                   }
                 }
@@ -353,23 +348,32 @@ function getProjectRepository(owner, number, ownerType) {
           }
         }
       }
-    }
-  `;
+    `;
 
-  const result = graphql(query);
-  const items = result.data?.[ownerField]?.projectV2?.items?.nodes || [];
+    const itemsConnection = graphql(query).data?.[ownerField]?.projectV2?.items;
+    const items = itemsConnection?.nodes || [];
 
-  for (const item of items) {
-    if (item.content?.repository) {
-      return {
-        owner: item.content.repository.owner.login,
-        name: item.content.repository.name
-      };
+    for (const item of items) {
+      if (item.content?.repository) {
+        return {
+          owner: item.content.repository.owner.login,
+          name: item.content.repository.name
+        };
+      }
     }
+
+    if (!itemsConnection?.pageInfo?.hasNextPage || !itemsConnection.pageInfo.endCursor) break;
+    after = itemsConnection.pageInfo.endCursor;
   }
 
-  // Default fallback - use project owner (works for org projects)
-  return { owner, name: owner === 'OlderGay-Men' ? 'OlderGay.Men' : 'today' };
+  // No item carries a repository: use the plugin's configured one, if any.
+  let configured = null;
+  try {
+    configured = JSON.parse(process.env.PLUGIN_CONFIG || '{}').repository || null;
+  } catch {
+    configured = null;
+  }
+  return configured ? { owner, name: configured } : null;
 }
 
 // Create metadata issue for review scheduling
@@ -798,6 +802,9 @@ async function handleSetReviewDate() {
     } else {
       // Create new metadata issue
       const repo = getProjectRepository(owner, number, type);
+      if (!repo) {
+        return output({ success: false, error: 'No repository could be inferred from the project items; set repository in the plugin config' });
+      }
       metadataIssue = createMetadataIssue(repo.owner, repo.name, details.title, reviewDate, finalFrequency);
       if (!metadataIssue) {
         return output({ success: false, error: 'Failed to create metadata issue' });
