@@ -149,6 +149,25 @@ describe('email', () => {
     expect(missing.content[0].text).toMatch(/No synced email/);
   });
 
+  test('get_email: an attachment-only body is synced and empty; a body cut at sync says so', async () => {
+    const db = emailDb();
+    const base = { source: 'imap-email/icloud', from_address: 'a@example.com', folder: 'INBOX', flags: '[]' };
+    insert(db, 'email', { ...base, id: 'imap-email/icloud:INBOX:6', subject: 'Scan', date: '2026-11-01T17:00:00.000Z', text_content: '', html_content: '', attachments: '[{"filename":"scan.pdf","contentType":"application/pdf","size":1000}]' });
+    insert(db, 'email', { ...base, id: 'imap-email/icloud:INBOX:7', subject: 'Huge', date: '2026-11-01T18:00:00.000Z', text_content: `${'y'.repeat(50)}\n[truncated]` });
+
+    const scan = parse(await getEmail({ email_id: 'imap-email/icloud:INBOX:6' }, ctxFor(db)));
+    expect(scan.data).toMatchObject({ body_synced: true, body: '', body_truncated_at_sync: false });
+    expect(scan.data.attachments[0].filename).toBe('scan.pdf');
+    expect(scan.lead).toMatch(/no text or html body/);
+    const listed = parse(await listEmails({}, ctxFor(db))).data.emails.find(e => e.id.endsWith(':6'));
+    expect(listed.body_synced).toBe(true);
+
+    const huge = parse(await getEmail({ email_id: 'imap-email/icloud:INBOX:7' }, ctxFor(db)));
+    expect(huge.data).toMatchObject({ body_truncated: false, body_truncated_at_sync: true });
+    expect(huge.lead).toMatch(/max_body_size/);
+    expect(parse(await getEmail({ email_id: 'imap-email/icloud:INBOX:1' }, ctxFor(db))).data.body_truncated_at_sync).toBe(false);
+  });
+
   test('a missing table is reported, not thrown', async () => {
     const result = await listEmails({}, ctxFor(new Database(':memory:')));
     expect(result.isError).toBe(true);
@@ -185,6 +204,36 @@ describe('contacts', () => {
     expect(one.birthdays.map(b => [b.name, b.turning])).toEqual([['Pat Doe', null]]);
     expect(parse(await upcomingBirthdays({ date: '2026-12-20', days: 10 }, ctxFor(db))).data.total).toBe(1);
     expect((await upcomingBirthdays({ date: '11/01' }, ctxFor(db))).isError).toBe(true);
+  });
+
+  test('upcoming_birthdays: YYYYMMDD and --MMDD birthdays count too', async () => {
+    const db = contactsDb();
+    insert(db, 'contacts', { id: 'c5', source: 'icloud-contacts/default', full_name: 'Alex Kay', birthday: '19851102' });
+    insert(db, 'contacts', { id: 'c6', source: 'icloud-contacts/default', full_name: 'Jo Fox', birthday: '--1104' });
+    const { data } = parse(await upcomingBirthdays({}, ctxFor(db)));
+    expect(data.birthdays.map(b => [b.name, b.date, b.turning])).toEqual([
+      ['Robin Ames', '2026-11-01', 46], ['Alex Kay', '2026-11-02', 41], ['Sam Lee', '2026-11-03', null], ['Jo Fox', '2026-11-04', null],
+    ]);
+  });
+
+  test('upcoming_birthdays: the list is capped and says how many were left out', async () => {
+    const db = contactsDb();
+    for (let i = 0; i < 60; i++) {
+      insert(db, 'contacts', { id: `m${i}`, source: 'icloud-contacts/default', full_name: `Many ${String(i).padStart(2, '0')}`, birthday: '1970-11-05' });
+    }
+    const first = parse(await upcomingBirthdays({}, ctxFor(db)));
+    expect(first.data).toMatchObject({ total: 62, returned: 50, limit: 50, has_more: true });
+    expect(first.data.birthdays).toHaveLength(50);
+    expect(first.lead).toMatch(/62 birthday\(s\).*showing the first 50/);
+    expect(parse(await upcomingBirthdays({ limit: 500 }, ctxFor(db))).data).toMatchObject({ returned: 62, limit: 200, has_more: false });
+  });
+
+  test('search_contacts: a secondary email in metadata matches; bad metadata is skipped', async () => {
+    const db = contactsDb();
+    insert(db, 'contacts', { id: 'c7', source: 'icloud-contacts/default', full_name: 'Broken Meta', metadata: '{not json' });
+    const hit = parse(await searchContacts({ query: 'r@work.example' }, ctxFor(db))).data;
+    expect(hit.contacts.map(c => c.name)).toEqual(['Robin Ames']);
+    expect(parse(await searchContacts({ query: 'broken' }, ctxFor(db))).data.total).toBe(1);
   });
 
   test('search_contacts: name, organization, notes; other emails; long notes cut', async () => {
@@ -233,6 +282,28 @@ describe('diary', () => {
     expect(recent).toMatchObject({ total: 7, returned: 2, has_more: true });
   });
 
+  test('mixed UTC and local timestamps sort by when they were written, before the limit', async () => {
+    const db = makeDb('diary');
+    // 22:00 local (markdown) is newer than 21:30 local (Day One, 02:30 UTC next day).
+    insert(db, 'diary', { id: 'm1', source: 'markdown-diary/default', date: '2026-11-01T22:00:00', text: 'Late note', metadata: '{}' });
+    insert(db, 'diary', { id: 'j1', source: 'dayone-diary/default', date: '2026-11-02T02:30:00Z', text: 'Day One evening', metadata: '{}' });
+    insert(db, 'diary', { id: 'm0', source: 'markdown-diary/default', date: '2026-10-31T08:00:00', text: 'Older', metadata: '{}' });
+    const recent = parse(await listDiary({ range: 'recent', limit: 1 }, ctxFor(db))).data;
+    expect(recent.entries.map(e => e.id)).toEqual(['m1']);
+    expect(recent).toMatchObject({ total: 3, has_more: true });
+    expect(parse(await listDiary({ range: 'recent', limit: 3 }, ctxFor(db))).data.entries.map(e => e.id)).toEqual(['m1', 'j1', 'm0']);
+    expect(parse(await listDiary({ date: '2026-11-01' }, ctxFor(db))).data.entries.map(e => e.id)).toEqual(['m1', 'j1']);
+  });
+
+  test('on_this_day in a non-leap year finds a Day One entry stored on Feb 29 UTC', async () => {
+    const db = makeDb('diary');
+    // 2024-02-29 03:00 UTC is 22:00 on Feb 28 in New York.
+    insert(db, 'diary', { id: 'leap', source: 'dayone-diary/default', date: '2024-02-29T03:00:00Z', text: 'Late on the 28th', metadata: '{}' });
+    insert(db, 'diary', { id: 'leapday', source: 'dayone-diary/default', date: '2024-02-29T15:00:00Z', text: 'On the 29th', metadata: '{}' });
+    const { data } = parse(await listDiary({ date: '2027-02-28', range: 'on_this_day' }, ctxFor(db)));
+    expect(data.entries.map(e => [e.id, e.date])).toEqual([['leap', '2024-02-28']]);
+  });
+
   test('query alone searches everything; with a range it narrows; long text is cut', async () => {
     const db = diaryDb();
     expect(parse(await listDiary({ query: 'coffee' }, ctxFor(db))).data.entries.map(e => e.id)).toEqual(['d1', 'd6']);
@@ -275,6 +346,26 @@ describe('health', () => {
     const steps = data.metrics.find(m => m.metric === 'step_count');
     expect(steps).toMatchObject({ average: 6061.7, min: 4000, max: 8123.4, days_with_data: 2 });
     expect(data.other_metrics).toEqual(expect.arrayContaining(['dietary_water', 'heart_rate']));
+  });
+
+  test('weight and distance keep the units they were stored in; mixed units are not averaged together', async () => {
+    const db = healthDb();
+    const add = (id, date, metric, value, units, source = 'apple-health-auto-export/default') => insert(db, 'health_metrics', { id, source, date, metric_name: metric, value, units });
+    add('w1', '2026-11-01', 'weight_body_mass', 70, 'kg');
+    add('w2', '2026-10-31', 'weight_body_mass', 154.3, 'lb', 'other-scale/default');
+    add('w3', '2026-10-30', 'weight_body_mass', 71, 'kg');
+    add('d1', '2026-11-01', 'distance_walking_running', 3.2, 'mi');
+    const today = parse(await healthToday({ all: true }, ctxFor(db))).data.metrics;
+    expect(today.find(m => m.metric === 'weight_body_mass').formatted).toBe('70 kg');
+    expect(today.find(m => m.metric === 'distance_walking_running').formatted).toBe('3.20 mi');
+
+    const summary = parse(await healthSummary({ days: 7 }, ctxFor(db))).data.metrics.filter(m => m.metric === 'weight_body_mass');
+    expect(summary.map(m => [m.units, m.average, m.average_formatted]).sort()).toEqual([['kg', 70.5, '70.5 kg'], ['lb', 154.3, '154.3 lbs']]);
+
+    const one = parse(await healthSummary({ metric: 'weight_body_mass' }, ctxFor(db))).data;
+    expect(one.stats).toBeNull();
+    expect(one.stats_by_units).toEqual({ kg: { average: 70.5, min: 70, max: 71 }, lb: { average: 154.3, min: 154.3, max: 154.3 } });
+    expect(one.history.map(h => h.formatted)).toEqual(['70 kg', '154.3 lbs', '71 kg']);
   });
 
   test('health_summary with metric: exact name wins over a substring, labels work, unknowns list what exists', async () => {
@@ -323,6 +414,31 @@ describe('habits', () => {
     const { lead, data } = parse(await habitStreaks({}, ctxFor(db)));
     expect(data.as_of).toBe('2026-10-31');
     expect(lead).toMatch(/as of 2026-10-31/);
+  });
+
+  test('habit_streaks reads each source at its own newest day', async () => {
+    const db = habitsDb();
+    insert(db, 'habits', { id: 'r1', source: 'markdown-routines/default', habit_id: 'morning', title: 'Morning routine', date: '2026-10-29', status: 'completed', metadata: '{"current_streak":4}' });
+    const { lead, data } = parse(await habitStreaks({}, ctxFor(db)));
+    expect(data.streaks.map(s => [s.title, s.streak, s.as_of])).toEqual([
+      ['Walk 30 minutes', 12, '2026-11-01'], ['Morning routine', 4, '2026-10-29'], ['Drink water', 3, '2026-11-01'],
+    ]);
+    expect(data.sources).toEqual([
+      { source: 'markdown-routines/default', as_of: '2026-10-29' },
+      { source: 'streaks-habits/default', as_of: '2026-11-01' },
+    ]);
+    expect(lead).toMatch(/markdown-routines\/default as of 2026-10-29/);
+  });
+
+  test('habit_history: one habit_id in two sources is ambiguous; source picks one', async () => {
+    const db = habitsDb();
+    insert(db, 'habits', { id: 'o1', source: 'streaks-habits/phone2', habit_id: 'walk', title: 'Walk 30 minutes', date: '2026-11-01', status: 'skipped', metadata: '{"current_streak":0}' });
+    const both = await habitHistory({ habit: 'walk' }, ctxFor(db));
+    expect(both.isError).toBe(true);
+    expect(both.content[0].text).toMatch(/matches 2 habits.*phone2/);
+    const phone2 = parse(await habitHistory({ habit: 'walk', source: 'phone2' }, ctxFor(db))).data;
+    expect(phone2).toMatchObject({ source: 'streaks-habits/phone2', counts: { skipped: 1 }, current_streak: 0 });
+    expect(phone2.history).toHaveLength(1);
   });
 
   test('habit_history: exact title first, ambiguity refused, counts and streak', async () => {
@@ -376,6 +492,36 @@ describe('finance', () => {
     expect(data).toMatchObject({ from: '2026-11-01', to: '2026-12-01', total_count: 1, net_total: -1500 });
     expect(data.transactions[0]).toMatchObject({ payee: 'Landlord', frequency: 'monthly' });
     expect(parse(await financeOverview({ view: 'upcoming', days: 200 }, ctxFor(financeDb()))).data.total_count).toBe(2);
+  });
+
+  test('upcoming: the list is capped, totals cover every row', async () => {
+    const db = financeDb();
+    for (let i = 0; i < 5; i++) {
+      insert(db, 'financial_transactions', { id: `s${i}`, source: 'ynab-api/default', account: 'Checking', date: `2026-11-1${i}`, payee: `Bill ${i}`, amount: -10, scheduled: 1 });
+    }
+    const { lead, data } = parse(await financeOverview({ view: 'upcoming', limit: 2 }, ctxFor(db)));
+    expect(data).toMatchObject({ total_count: 6, net_total: -1550, returned: 2, limit: 2, has_more: true });
+    expect(data.transactions.map(t => t.payee)).toEqual(['Landlord', 'Bill 0']);
+    expect(lead).toMatch(/showing the first 2/);
+  });
+
+  test('accounts: transaction stats and summed balances stop at local today, not the UTC day', async () => {
+    const db = financeDb();
+    // An account with no stored balance; one row dated local tomorrow.
+    insert(db, 'financial_transactions', { id: 'p1', source: 'ynab-api/default', account: 'Wallet', date: '2026-11-01', payee: 'Cafe', amount: -5 });
+    insert(db, 'financial_transactions', { id: 'p2', source: 'ynab-api/default', account: 'Wallet', date: '2026-11-02', payee: 'Tomorrow', amount: -7 });
+    insert(db, 'financial_transactions', { id: 'p3', source: 'ynab-api/default', account: 'Future only', date: '2026-11-02', payee: 'Later', amount: -1 });
+    const { data } = parse(await financeOverview({ view: 'accounts' }, ctxFor(db)));
+    expect(data.accounts.map(a => a.account)).toEqual(['Checking', 'Wallet']);
+    expect(data.accounts[1]).toMatchObject({ balance: -5, partial: true, transactions_cached: 1, last_transaction: '2026-11-01' });
+    expect(data.accounts[0]).toMatchObject({ balance: 1234.5, partial: false, last_transaction: '2026-11-01' });
+  });
+
+  test('budget: a category overspent with nothing assigned counts as over budget', async () => {
+    const db = financeDb();
+    insert(db, 'budget_allocations', { id: 'a5', source: 'ynab-finance/default', month: '2026-11-01', category: 'Gifts', category_group: 'Everyday', assigned: 0, activity: -30, available: -30 });
+    const { data } = parse(await financeOverview({ view: 'budget' }, ctxFor(db)));
+    expect(data.over_budget.map(c => [c.category, c.percent_used])).toEqual([['Gifts', null], ['Groceries', 112.5]]);
   });
 
   test('recent: no scheduled or superseded rows, totals without transfers, filters and limit', async () => {

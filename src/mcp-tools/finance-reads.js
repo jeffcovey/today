@@ -19,6 +19,7 @@ export const VIEWS = ['accounts', 'upcoming', 'recent', 'budget'];
 export const RECENT_DEFAULT_LIMIT = 20;
 export const MAX_LIMIT = 200;
 export const UNCATEGORIZED_DEFAULT_LIMIT = 40;
+export const UPCOMING_DEFAULT_LIMIT = 50;
 
 function filters(args, where, params, { account = true, category = true } = {}) {
   if (args.source) {
@@ -50,8 +51,45 @@ function txRecord(r) {
   return out;
 }
 
-function accountsView(args, ctx, tz) {
-  let accounts = getAccountList(ctx.db, { source: args.source || null });
+/**
+ * getAccountList's per-account transaction stats cut at SQLite's UTC
+ * DATE('now'). Recount them up to today in the configured zone, and rebuild
+ * the partial (summed) accounts from that count.
+ */
+function withLocalDayStats(db, accounts, source, today) {
+  let sql = `
+    SELECT account, COUNT(*) AS count, SUM(amount) AS total, MAX(date) AS last_transaction
+    FROM financial_transactions
+    WHERE superseded_by IS NULL AND date <= ? AND IFNULL(scheduled, 0) = 0
+  `;
+  const params = [today];
+  if (source) {
+    sql += ' AND source LIKE ?';
+    params.push(`%${source}%`);
+  }
+  let stats;
+  try {
+    stats = db.prepare(`${sql} GROUP BY account`).all(...params);
+  } catch (error) {
+    if (isMissingTable(error)) return accounts;
+    throw error;
+  }
+  const byAccount = new Map(stats.map(s => [s.account, s]));
+  const stored = accounts.filter(a => !a.partial).map(a => {
+    const s = byAccount.get(a.account);
+    return { ...a, count: s?.count ?? 0, last_transaction: s?.last_transaction ?? null };
+  });
+  const covered = new Set(stored.map(a => a.account));
+  const partial = stats.filter(s => !covered.has(s.account)).map(s => ({
+    account: s.account, balance: s.total, cleared_balance: null, uncleared_balance: null,
+    type: null, on_budget: null, budget_name: null, as_of: null, partial: true,
+    count: s.count, last_transaction: s.last_transaction,
+  }));
+  return [...stored, ...partial].sort((a, b) => a.account.localeCompare(b.account));
+}
+
+function accountsView(args, ctx, tz, today) {
+  let accounts = withLocalDayStats(ctx.db, getAccountList(ctx.db, { source: args.source || null }), args.source || null, today);
   if (args.account) {
     const needle = String(args.account).toLowerCase();
     accounts = accounts.filter(a => String(a.account).toLowerCase().includes(needle));
@@ -80,6 +118,7 @@ function accountsView(args, ctx, tz) {
 
 function upcomingView(args, ctx, today) {
   const days = clampInt(args.days, 30, 1, 366);
+  const limit = clampInt(args.limit, UPCOMING_DEFAULT_LIMIT, 1, MAX_LIMIT);
   const until = addDays(today, days);
   const where = ['IFNULL(scheduled, 0) = 1', 'superseded_by IS NULL', 'date >= ?', 'date <= ?'];
   const params = [today, until];
@@ -89,12 +128,19 @@ function upcomingView(args, ctx, today) {
     FROM financial_transactions WHERE ${where.join(' AND ')}
     ORDER BY date ASC, id
   `).all(...params);
-  const items = rows.map(r => ({ ...txRecord(r), frequency: parseJson(r.metadata, {}).frequency || null }));
+  // Totals cover every scheduled row in the window; the list is capped.
+  const items = rows.slice(0, limit).map(r => ({ ...txRecord(r), frequency: parseJson(r.metadata, {}).frequency || null }));
   const total = money(rows.reduce((sum, r) => sum + Number(r.amount || 0), 0));
-  const text = items.length === 0
+  const text = rows.length === 0
     ? `Nothing scheduled from ${today} through ${until}.`
-    : `${items.length} scheduled transaction(s) from ${today} through ${until}, net ${total}.`;
-  return { value: { view: 'upcoming', from: today, to: until, days, total_count: items.length, net_total: total, transactions: items }, text };
+    : `${rows.length} scheduled transaction(s) from ${today} through ${until}, net ${total}${items.length < rows.length ? `; showing the first ${items.length}` : ''}.`;
+  return {
+    value: {
+      view: 'upcoming', from: today, to: until, days, total_count: rows.length, net_total: total,
+      returned: items.length, limit, has_more: items.length < rows.length, transactions: items,
+    },
+    text,
+  };
 }
 
 function recentView(args, ctx, today) {
@@ -177,8 +223,15 @@ function budgetView(args, ctx, today) {
     acc.available += r.available || 0;
     return acc;
   }, { assigned: 0, activity: 0, available: 0 });
-  const over = rows.filter(r => r.assigned > 0 && r.available < 0)
-    .sort((a, b) => (pct(b) ?? 0) - (pct(a) ?? 0)).slice(0, 10).map(cat);
+  // Overspent is a negative available, whether or not anything was assigned;
+  // with nothing assigned there is no percent, so those lead, most negative first.
+  const over = rows.filter(r => r.available < 0)
+    .sort((a, b) => {
+      const pa = pct(a);
+      const pb = pct(b);
+      if ((pa === null) !== (pb === null)) return pa === null ? -1 : 1;
+      return (pb ?? 0) - (pa ?? 0) || a.available - b.available;
+    }).slice(0, 10).map(cat);
   const under = rows.filter(r => r.assigned > 0 && r.available > 0 && r.activity !== 0)
     .sort((a, b) => b.available - a.available).slice(0, 10).map(cat);
   const groups = new Map();
@@ -221,7 +274,7 @@ export async function financeOverview(args, ctx) {
 
   let out;
   try {
-    if (view === 'accounts') out = accountsView(args, ctx, tz);
+    if (view === 'accounts') out = accountsView(args, ctx, tz, today);
     else if (view === 'upcoming') out = upcomingView(args, ctx, today);
     else if (view === 'recent') out = recentView(args, ctx, today);
     else out = budgetView(args, ctx, today);
@@ -302,7 +355,7 @@ export const tools = [
       properties: {
         view: { type: 'string', enum: VIEWS, description: 'Which view.' },
         days: { type: 'number', description: 'upcoming: days ahead (default 30). recent: days back (default 30). Max 366.' },
-        limit: { type: 'number', description: `recent: max transactions (default ${RECENT_DEFAULT_LIMIT}, max ${MAX_LIMIT}).` },
+        limit: { type: 'number', description: `recent and upcoming: max transactions (default ${RECENT_DEFAULT_LIMIT} recent, ${UPCOMING_DEFAULT_LIMIT} upcoming; max ${MAX_LIMIT}).` },
         month: { type: 'string', description: 'budget: YYYY-MM, default this month.' },
         account: { type: 'string', description: 'accounts, upcoming, recent: account name contains this.' },
         category: { type: 'string', description: 'upcoming, recent, budget: category name contains this.' },

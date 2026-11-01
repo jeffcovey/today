@@ -12,14 +12,21 @@ import {
 
 export const SEARCH_DEFAULT_LIMIT = 20;
 export const SEARCH_MAX_LIMIT = 100;
+export const BIRTHDAYS_DEFAULT_LIMIT = 50;
+export const BIRTHDAYS_MAX_LIMIT = 200;
 const NOTES_CHARS = 500;
 
-function birthYear(birthday) {
-  const m = /^(\d{4})-\d{2}-\d{2}/.exec(String(birthday || ''));
+/**
+ * A stored birthday as { year, monthDay }. Contacts sync BDAY as written:
+ * YYYY-MM-DD, YYYYMMDD (the iCloud writer's form), or --MM-DD / --MMDD with
+ * no year.
+ */
+function parseBirthday(birthday) {
+  const m = /^(\d{4}|--)-?(\d{2})-?(\d{2})/.exec(String(birthday || '').trim());
   if (!m) return null;
-  const year = Number(m[1]);
+  const year = m[1] === '--' ? null : Number(m[1]);
   // Apple Contacts stores "no year" as 1604; anything that old is not a year.
-  return year > 1900 ? year : null;
+  return { year: year && year > 1900 ? year : null, monthDay: `${m[2]}-${m[3]}` };
 }
 
 export async function upcomingBirthdays(args, ctx) {
@@ -29,27 +36,34 @@ export async function upcomingBirthdays(args, ctx) {
   const start = args.date || todayIn(tz, now);
   // With a date and no days, show that one day (like bin/contacts birthday --date).
   const days = clampInt(args.days, args.date ? 1 : 7, 1, 366);
+  const limit = clampInt(args.limit, BIRTHDAYS_DEFAULT_LIMIT, 1, BIRTHDAYS_MAX_LIMIT);
   const note = await freshen(ctx, 'contacts', 'contacts');
 
-  let stmt;
+  let contacts;
   try {
-    stmt = ctx.db.prepare(`
+    contacts = ctx.db.prepare(`
       SELECT full_name, nickname, birthday, organization, primary_email, primary_phone
       FROM contacts
-      WHERE birthday LIKE ?
+      WHERE birthday IS NOT NULL AND birthday != ''
       ORDER BY full_name
-    `);
+    `).all();
   } catch (error) {
     if (isMissingTable(error)) return jsonResult({ user_timezone: tz, start, days, total: 0, birthdays: [] }, 'No contacts have been synced yet.');
     throw error;
+  }
+  const byMonthDay = new Map();
+  for (const c of contacts) {
+    const parsed = parseBirthday(c.birthday);
+    if (!parsed) continue;
+    if (!byMonthDay.has(parsed.monthDay)) byMonthDay.set(parsed.monthDay, []);
+    byMonthDay.get(parsed.monthDay).push({ ...c, year: parsed.year });
   }
 
   const birthdays = [];
   for (let i = 0; i < days; i++) {
     const day = addDays(start, i);
-    const monthDay = day.slice(5);
-    for (const c of stmt.all(`%${monthDay}`)) {
-      const year = birthYear(c.birthday);
+    for (const c of byMonthDay.get(day.slice(5)) || []) {
+      const year = c.year;
       birthdays.push({
         date: day,
         days_away: i,
@@ -66,10 +80,14 @@ export async function upcomingBirthdays(args, ctx) {
 
   const end = addDays(start, days - 1);
   const span = days === 1 ? `on ${start}` : `from ${start} through ${end}`;
-  const text = birthdays.length === 0
+  const total = birthdays.length;
+  const shown = birthdays.slice(0, limit);
+  const text = total === 0
     ? `No birthdays ${span}.`
-    : `${birthdays.length} birthday(s) ${span}.`;
-  return jsonResult({ user_timezone: tz, start, end, days, total: birthdays.length, birthdays }, lead(text, note));
+    : `${total} birthday(s) ${span}${shown.length < total ? `; showing the first ${shown.length} (raise limit or narrow days for more)` : ''}.`;
+  return jsonResult({
+    user_timezone: tz, start, end, days, total, returned: shown.length, limit, has_more: shown.length < total, birthdays: shown,
+  }, lead(text, note));
 }
 
 function contactRecord(c) {
@@ -102,9 +120,12 @@ export async function searchContacts(args, ctx) {
   const note = await freshen(ctx, 'contacts', 'contacts');
 
   const term = likeTerm(query.toLowerCase());
-  const where = ['full_name', 'nickname', 'organization', 'notes', 'primary_email']
-    .map(col => `LOWER(${col}) LIKE ? ESCAPE '\\'`).join(' OR ');
-  const params = Array(5).fill(term);
+  // Secondary addresses live in metadata.emails (iCloud); CASE guards
+  // json_extract against a malformed metadata value.
+  const cols = ['full_name', 'nickname', 'organization', 'notes', 'primary_email',
+    "CASE WHEN json_valid(metadata) THEN json_extract(metadata, '$.emails') END"];
+  const where = cols.map(col => `LOWER(${col}) LIKE ? ESCAPE '\\'`).join(' OR ');
+  const params = Array(cols.length).fill(term);
   let total;
   let rows;
   try {
@@ -139,6 +160,7 @@ export const tools = [
       properties: {
         days: { type: 'number', description: 'How many days to look ahead, today included (default 7, max 366; 1 when date is given).' },
         date: { type: 'string', description: 'Start from this day (YYYY-MM-DD) instead of today.' },
+        limit: { type: 'number', description: `Max birthdays (default ${BIRTHDAYS_DEFAULT_LIMIT}, max ${BIRTHDAYS_MAX_LIMIT}).` },
       },
     },
     handler: upcomingBirthdays,

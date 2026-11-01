@@ -48,6 +48,25 @@ function entryRecord(row, tz, maxChars) {
   return out;
 }
 
+/**
+ * When a stored date happened, in ms. Day One stores UTC instants and
+ * markdown stores local wall time, so the raw strings don't sort together.
+ */
+function instantMs(value, tz) {
+  const local = toLocal(value, tz);
+  const iso = local.iso || (local.day ? toLocal(`${local.day}T00:00:00`, tz).iso : null);
+  const ms = iso ? Date.parse(iso) : NaN;
+  return Number.isNaN(ms) ? -Infinity : ms;
+}
+
+/** Newest first by the moment written, then id. */
+function sortNewest(rows, tz) {
+  return rows
+    .map(r => ({ r, t: instantMs(r.date, tz) }))
+    .sort((a, b) => b.t - a.t || String(a.r.id).localeCompare(String(b.r.id)))
+    .map(x => x.r);
+}
+
 /** Rows whose local day is in [first, last], from a slightly wider SQL window. */
 function rowsForDays(db, args, first, last, tz) {
   const where = ['substr(date, 1, 10) >= ?', 'substr(date, 1, 10) <= ?'];
@@ -62,14 +81,17 @@ function rowsForDays(db, args, first, last, tz) {
     WHERE ${where.join(' AND ')}
     ORDER BY date DESC, id
   `).all(...params);
-  return rows.filter(r => {
+  return sortNewest(rows.filter(r => {
     const day = toLocal(r.date, tz).day;
     return day >= first && day <= last;
-  });
+  }), tz);
 }
 
 function rowsOnThisDay(db, args, day, tz) {
   const monthDays = [addDays(day, -1), day, addDays(day, 1)].map(d => d.slice(5));
+  // In a non-leap year Feb 28 and Mar 1 sit next to Feb 29 in leap years: a
+  // Day One entry stored on Feb 29 UTC can be local Feb 28 or Mar 1.
+  if ((monthDays.includes('02-28') || monthDays.includes('03-01')) && !monthDays.includes('02-29')) monthDays.push('02-29');
   const where = [`substr(date, 6, 5) IN (${monthDays.map(() => '?').join(', ')})`, 'substr(date, 1, 4) < ?'];
   const params = [...monthDays, String(Number(day.slice(0, 4)) + 1)];
   sourceClause(args, where, params);
@@ -82,13 +104,13 @@ function rowsOnThisDay(db, args, day, tz) {
     WHERE ${where.join(' AND ')}
     ORDER BY date DESC, id
   `).all(...params);
-  return rows.filter(r => {
+  return sortNewest(rows.filter(r => {
     const local = toLocal(r.date, tz).day;
     return local.slice(5) === day.slice(5) && local.slice(0, 4) < day.slice(0, 4);
-  });
+  }), tz);
 }
 
-function rowsRecent(db, args, fetchLimit) {
+function rowsRecent(db, args, fetchLimit, tz) {
   const where = [];
   const params = [];
   sourceClause(args, where, params);
@@ -98,11 +120,22 @@ function rowsRecent(db, args, fetchLimit) {
   }
   const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const total = db.prepare(`SELECT COUNT(*) AS n FROM diary ${whereClause}`).get(...params).n;
+  // The raw strings mix UTC and local wall time, which differ by at most a
+  // day, so take every row from the day before the fetchLimit-th string on
+  // and sort by the real moment before cutting to the limit.
+  const edge = db.prepare(`SELECT date FROM diary ${whereClause} ORDER BY date DESC LIMIT 1 OFFSET ?`)
+    .get(...params, fetchLimit - 1);
+  const floorWhere = [...where];
+  const floorParams = [...params];
+  if (edge && String(edge.date).length >= 10) {
+    floorWhere.push('substr(date, 1, 10) >= ?');
+    floorParams.push(addDays(String(edge.date).slice(0, 10), -1));
+  }
   const rows = db.prepare(`
-    SELECT id, date, text, metadata, source FROM diary ${whereClause}
-    ORDER BY date DESC, id LIMIT ?
-  `).all(...params, fetchLimit);
-  return { total, rows };
+    SELECT id, date, text, metadata, source FROM diary
+    ${floorWhere.length ? `WHERE ${floorWhere.join(' AND ')}` : ''}
+  `).all(...floorParams);
+  return { total, rows: sortNewest(rows, tz).slice(0, fetchLimit) };
 }
 
 export async function listDiary(args, ctx) {
@@ -140,7 +173,7 @@ export async function listDiary(args, ctx) {
       rows = rowsOnThisDay(ctx.db, queryArgs, day, tz);
       label = `on ${day.slice(5)} in years before ${day.slice(0, 4)}`;
     } else {
-      const recent = rowsRecent(ctx.db, queryArgs, limit);
+      const recent = rowsRecent(ctx.db, queryArgs, limit, tz);
       rows = recent.rows;
       total = recent.total;
       label = range === 'search' ? 'in the whole diary' : 'most recent';

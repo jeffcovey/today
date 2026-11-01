@@ -31,6 +31,12 @@ function addresses(value) {
   return value ? [String(value)] : [];
 }
 
+/** Whether the body fetcher has stored this row's body ('' counts). */
+function hasStoredBody(row) {
+  return (row.text_content !== null && row.text_content !== undefined)
+    || (row.html_content !== null && row.html_content !== undefined);
+}
+
 function header(row, tz) {
   const flags = parseJson(row.flags, []);
   const snippetSource = row.snippet || (row.text_content ? row.text_content.replace(/\s+/g, ' ').trim() : null);
@@ -44,7 +50,7 @@ function header(row, tz) {
     unread: !(Array.isArray(flags) && flags.includes('seen')),
     flagged: Array.isArray(flags) && flags.includes('flagged'),
     snippet: snippetSource ? cap(snippetSource, SNIPPET_CHARS).text : null,
-    body_synced: Boolean(row.text_content || row.html_content),
+    body_synced: hasStoredBody(row),
     source: row.source,
   };
 }
@@ -205,15 +211,25 @@ export async function getEmail(args, ctx) {
     return errorResult(`No synced email has id ${id}. Use list_emails or search_email for ids; mail outside the sync window can only be fetched with bin/email download on the CLI.`);
   }
 
+  // The body fetcher stores '' for a message with no text or html part (an
+  // attachment-only mail), so '' is a synced, empty body, not a missing one.
+  const synced = hasStoredBody(row);
   let body = null;
   let bodyFormat = null;
+  let raw = null;
   if (row.text_content) {
-    body = row.text_content;
+    raw = row.text_content;
+    body = raw;
     bodyFormat = 'text';
   } else if (row.html_content) {
-    body = stripHtml(row.html_content);
+    raw = row.html_content;
+    body = stripHtml(raw);
     bodyFormat = 'html converted to text';
+  } else if (synced) {
+    body = '';
   }
+  // The fetcher cuts bodies over the plugin's max_body_size and marks them.
+  const truncatedAtSync = typeof raw === 'string' && raw.endsWith('\n[truncated]');
   const capped = cap(body, maxChars);
   const flags = parseJson(row.flags, []);
   const attachments = parseJson(row.attachments, []);
@@ -239,6 +255,7 @@ export async function getEmail(args, ctx) {
     body_format: bodyFormat,
     body: capped.text,
     body_truncated: capped.truncated,
+    body_truncated_at_sync: truncatedAtSync,
     body_length: capped.length,
     snippet: body === null ? (row.snippet || null) : undefined,
     source: row.source,
@@ -247,10 +264,15 @@ export async function getEmail(args, ctx) {
   let text;
   if (body === null) {
     text = 'This email\'s body has not been synced yet (the plugin fetches bodies in the background), so only the headers and snippet are here. It was not fetched from the mail server; bin/email download can do that on the CLI, or try again after the next sync.';
+  } else if (body === '') {
+    text = 'This email has no text or html body (it may carry only attachments).';
   } else if (capped.truncated) {
     text = `Body cut to ${maxChars} of ${capped.length} characters (pass max_chars, up to 100000, for more).`;
   } else {
     text = `Full body, ${capped.length} characters.`;
+  }
+  if (truncatedAtSync) {
+    text += ' The sync stored only the start of this body (the plugin\'s max_body_size), so the rest is not in the local copy; bin/email download can fetch it on the CLI.';
   }
   return jsonResult(value, `${text} ${DATA_NOTE}`);
 }

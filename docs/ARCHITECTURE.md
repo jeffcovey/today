@@ -397,7 +397,7 @@ Tools are built into `src/mcp-server.js` or defined in modules under `src/mcp-to
 
 Tools that take a task, event or contact ID require the item's `title` and refuse when it doesn't match. Batch tools take `dry_run`, on by default. Every `write` and `destructive` call, including refused ones, is appended to `<vault>/logs/mcp-writes/YYYY-MM-DD.md`; `[mcp] write_log = "other/dir"` moves it and `write_log = false` turns it off.
 
-Read tools that mirror everyday `bin/` commands, each listed only when a plugin of its type is enabled and each reading the synced tables (no live calls to IMAP or YNAB):
+Read tools that mirror everyday `bin/` commands, each listed only when a plugin of its type is enabled and each reading the synced tables after the same bounded freshen-before-read (`syncForRead`) the built-in reads use; the tools themselves make no live calls to IMAP or YNAB:
 
 - `src/mcp-tools/email.js`: `list_emails`, `search_email`, `get_email` (the `email` table; `get_email` caps the body and says when it hasn't been synced).
 - `src/mcp-tools/contacts.js`: `upcoming_birthdays`, `search_contacts`.
