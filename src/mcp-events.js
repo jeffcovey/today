@@ -85,6 +85,66 @@ function normalizeDays(days) {
   return Math.min(n, LIST_EVENTS_MAX_DAYS);
 }
 
+const PREFILTER_PAD_DAYS = 2;
+const EVENT_COLUMNS = `id, title, start_date, end_date, start_timezone, end_timezone,
+           all_day, location, calendar_name, source`;
+
+/**
+ * One stored event row as the MCP reads return it, with its sort key (the
+ * start instant; local midnight for all-day events). Null when its start
+ * can't be read.
+ */
+function toListedEvent(row, tz) {
+  const isAllDay = row.all_day === 1 || row.all_day === true || DATE_ONLY.test(row.start_date || '');
+
+  if (isAllDay) {
+    const start = (row.start_date || '').slice(0, 10);
+    if (!DATE_ONLY.test(start)) return null;
+    let end = (row.end_date || '').slice(0, 10);
+    if (!DATE_ONLY.test(end) || end <= start) end = addDays(start, 1);
+    const startInstant = wallTimeToInstant(`${start}T00:00:00`, tz);
+    return {
+      sortKey: startInstant.getTime(),
+      startInstant,
+      endInstant: wallTimeToInstant(`${end}T00:00:00`, tz),
+      event: {
+        id: row.id,
+        title: row.title,
+        all_day: true,
+        start_date: start,
+        end_date: end,
+        location: row.location,
+        calendar_name: row.calendar_name,
+        source: row.source,
+      },
+    };
+  }
+
+  const start = eventInstant(row.start_date, row.start_timezone, tz);
+  if (!start) return null;
+  let end = eventInstant(row.end_date || row.start_date, row.end_timezone || row.start_timezone, tz) || start;
+  if (end < start) end = start;
+
+  return {
+    sortKey: start.getTime(),
+    startInstant: start,
+    endInstant: end,
+    event: {
+      id: row.id,
+      title: row.title,
+      all_day: false,
+      start: isoInZone(start, tz),
+      end: isoInZone(end, tz),
+      start_utc: start.toISOString().replace('.000Z', 'Z'),
+      end_utc: end.toISOString().replace('.000Z', 'Z'),
+      event_timezone: row.start_timezone || null,
+      location: row.location,
+      calendar_name: row.calendar_name,
+      source: row.source,
+    },
+  };
+}
+
 /**
  * Events overlapping `days` local days starting at `date` (default: today).
  *
@@ -110,65 +170,27 @@ export function listEventsForDays(db, args = {}, opts = {}) {
   const rangeStart = wallTimeToInstant(`${from}T00:00:00`, tz);
   const rangeEnd = wallTimeToInstant(`${endDay}T00:00:00`, tz);
 
-  // A wide string prefilter (a day either side covers any UTC offset);
-  // the exact overlap test runs below on real instants.
+  // A wide string prefilter: stored values are UTC or a local time in the
+  // event's own zone, and offsets run from -12:00 to +14:00, so a stored date
+  // can sit up to two days from the user's local date. The exact overlap
+  // test runs below on real instants.
   const rows = db.prepare(`
-    SELECT id, title, start_date, end_date, start_timezone, end_timezone,
-           all_day, location, calendar_name, source
+    SELECT ${EVENT_COLUMNS}
     FROM events
     WHERE start_date < ? AND COALESCE(end_date, start_date) >= ?
-  `).all(addDays(endDay, 1), addDays(from, -1));
+  `).all(addDays(endDay, PREFILTER_PAD_DAYS), addDays(from, -PREFILTER_PAD_DAYS));
 
   const events = [];
   for (const row of rows) {
-    const isAllDay = row.all_day === 1 || row.all_day === true || DATE_ONLY.test(row.start_date || '');
-
-    if (isAllDay) {
-      const start = row.start_date.slice(0, 10);
-      let end = (row.end_date || '').slice(0, 10);
-      if (!DATE_ONLY.test(end) || end <= start) end = addDays(start, 1);
-      if (start < endDay && end > from) {
-        events.push({
-          sortKey: wallTimeToInstant(`${start}T00:00:00`, tz).getTime(),
-          event: {
-            id: row.id,
-            title: row.title,
-            all_day: true,
-            start_date: start,
-            end_date: end,
-            location: row.location,
-            calendar_name: row.calendar_name,
-            source: row.source,
-          },
-        });
-      }
+    const item = toListedEvent(row, tz);
+    if (!item) continue;
+    if (item.event.all_day) {
+      if (item.event.start_date < endDay && item.event.end_date > from) events.push(item);
       continue;
     }
-
-    const start = eventInstant(row.start_date, row.start_timezone, tz);
-    if (!start) continue;
-    let end = eventInstant(row.end_date || row.start_date, row.end_timezone || row.start_timezone, tz) || start;
-    if (end < start) end = start;
-
-    const overlaps = start < rangeEnd && (end > rangeStart || start >= rangeStart);
-    if (!overlaps) continue;
-
-    events.push({
-      sortKey: start.getTime(),
-      event: {
-        id: row.id,
-        title: row.title,
-        all_day: false,
-        start: isoInZone(start, tz),
-        end: isoInZone(end, tz),
-        start_utc: start.toISOString().replace('.000Z', 'Z'),
-        end_utc: end.toISOString().replace('.000Z', 'Z'),
-        event_timezone: row.start_timezone || null,
-        location: row.location,
-        calendar_name: row.calendar_name,
-        source: row.source,
-      },
-    });
+    const start = item.startInstant;
+    const end = item.endInstant;
+    if (start < rangeEnd && (end > rangeStart || start >= rangeStart)) events.push(item);
   }
 
   events.sort((a, b) =>
@@ -176,6 +198,44 @@ export function listEventsForDays(db, args = {}, opts = {}) {
   );
 
   return { info, from, to: addDays(endDay, -1), days, events: events.map(e => e.event) };
+}
+
+/**
+ * The next `limit` events with no end date bound: anything still running or
+ * yet to start, from the start of today in the user's zone, in start order
+ * (all-day events at local midnight), so far-off events still appear when
+ * the calendar is quiet.
+ */
+export function listUpcomingEvents(db, { limit = 50 } = {}, opts = {}) {
+  const info = timeZoneInfo(opts);
+  const tz = info.user_timezone;
+  const cap = Math.max(1, Math.min(500, Math.floor(Number(limit)) || 50));
+  const todayStart = wallTimeToInstant(`${info.today}T00:00:00`, tz);
+
+  const rows = db.prepare(`
+    SELECT ${EVENT_COLUMNS}
+    FROM events
+    WHERE COALESCE(end_date, start_date) >= ?
+    ORDER BY start_date
+  `).all(addDays(info.today, -PREFILTER_PAD_DAYS));
+
+  const events = [];
+  for (const row of rows) {
+    const item = toListedEvent(row, tz);
+    if (!item) continue;
+    const running = item.event.all_day
+      ? item.event.end_date > info.today
+      : (item.endInstant > todayStart || item.startInstant >= todayStart);
+    if (running) events.push(item);
+  }
+  events.sort((a, b) => (a.sortKey - b.sortKey) || String(a.event.id).localeCompare(String(b.event.id)));
+
+  return {
+    info,
+    total: events.length,
+    has_more: events.length > cap,
+    events: events.slice(0, cap).map(e => e.event),
+  };
 }
 
 /** The text reply for list_events: a line on where the user is, then JSON. */

@@ -11,6 +11,7 @@ import {
   timeZoneInfo,
   timeZoneLine,
   listEventsForDays,
+  listUpcomingEvents,
   formatEventList,
   eventTimeLabel,
   buildCreateEvent,
@@ -140,6 +141,14 @@ describe('listEventsForDays', () => {
     expect(() => listEventsForDays(db, { date: 'tomorrow' }, { timezone: NY, now: NOW })).toThrow('YYYY-MM-DD');
   });
 
+  test('a floating time far from the user still lands on the right local day', () => {
+    // 23:30 in Pago Pago (UTC-11) on 1 Nov is 00:30 on 3 Nov in Kiritimati (UTC+14).
+    const db = eventDb([{ id: 'far', title: 'Far call', start: '2026-11-01T23:30:00', end: '2026-11-01T23:45:00', tz: 'Pacific/Pago_Pago' }]);
+    const result = listEventsForDays(db, { date: '2026-11-03' }, { timezone: 'Pacific/Kiritimati', now: NOW });
+    expect(titles(result)).toEqual(['Far call']);
+    expect(result.events[0].start).toBe('2026-11-03T00:30:00+14:00');
+  });
+
   test('the reply opens with where the user is', () => {
     const text = formatEventList(listEventsForDays(eventDb(rows), {}, { timezone: NY, now: NOW }));
     const [first, second] = text.split('\n');
@@ -204,4 +213,27 @@ test('addDays crosses months and DST without drifting', () => {
   expect(addDays('2026-10-31', 1)).toBe('2026-11-01');
   expect(addDays('2026-11-01', -1)).toBe('2026-10-31');
   expect(addDays('2026-03-08', 1)).toBe('2026-03-09');
+});
+
+describe('listUpcomingEvents', () => {
+  const rows = [
+    { id: 'past', title: 'Yesterday', start: '2026-10-31T15:00:00Z' },
+    { id: 'running', title: 'Retreat', start: '2026-10-30', end: '2026-11-03', all_day: 1 },
+    { id: 'later', title: 'Dentist', start: '2026-12-05T15:00:00Z' },
+    { id: 'evening', title: 'Evening mixer', start: '2026-11-01T23:30:00Z' },
+    { id: 'allday', title: 'Holiday', start: '2026-11-11', end: '2026-11-12', all_day: 1 },
+  ];
+
+  test('has no day limit and goes in start order', () => {
+    const result = listUpcomingEvents(eventDb(rows), {}, { timezone: NY, now: NOW });
+    expect(titles(result)).toEqual(['Retreat', 'Evening mixer', 'Holiday', 'Dentist']);
+    expect(result).toMatchObject({ total: 4, has_more: false });
+    expect(result.info.user_timezone).toBe(NY);
+  });
+
+  test('caps the list and says there is more', () => {
+    const result = listUpcomingEvents(eventDb(rows), { limit: 2 }, { timezone: NY, now: NOW });
+    expect(titles(result)).toEqual(['Retreat', 'Evening mixer']);
+    expect(result).toMatchObject({ total: 4, has_more: true });
+  });
 });

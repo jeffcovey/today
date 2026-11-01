@@ -54,6 +54,7 @@ import {
 } from './mcp-reads.js';
 import {
   listEventsForDays,
+  listUpcomingEvents,
   formatEventList,
   eventTimeLabel,
   buildCreateEvent,
@@ -639,13 +640,13 @@ export function createMCPServer({ readOnly = false } = {}) {
 
       if (uri === 'today://events') {
         await syncForRead(db, 'events');
-        const { info, from, to, events } = listEventsForDays(db, { days: LIST_EVENTS_MAX_DAYS });
+        const { info, total, has_more, events } = listUpcomingEvents(db, { limit: 50 });
 
         return {
           contents: [{
             uri,
             mimeType: 'application/json',
-            text: JSON.stringify({ ...info, from, to, events: events.slice(0, 50) }, null, 2),
+            text: JSON.stringify({ ...info, total, has_more, events }, null, 2),
           }],
         };
       }
