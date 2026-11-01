@@ -398,15 +398,23 @@ describe('task line edits', () => {
       .toBe('- [ ] Open [[My  Note]] and `a  b` 🔽');
   });
 
-  test('tags, dates and priorities inside links and inline code are left alone', () => {
-    expect(updateTaskLine('- [ ] Review [[#topic/work]] #topic/home', { topics: [] })).toBe('- [ ] Review [[#topic/work]]');
-    expect(updateTaskLine('- [ ] Fix [docs](https://x.test/#stage/front-stage) #stage/back-stage', { stage: 'front-stage' }))
-      .toBe('- [ ] Fix [docs](https://x.test/#stage/front-stage) #stage/front-stage');
-    expect(updateTaskLine('- [ ] Water `📅 2026-01-01` 📅 2026-11-01', { due_date: '2026-11-05' }))
-      .toBe('- [ ] Water `📅 2026-01-01` 📅 2026-11-05');
+  test('links and inline code are never edited; a field whose marker sits in one is refused', () => {
+    // The reader counts markers inside links and code too, so changing only
+    // the ones outside would leave the two disagreeing.
+    expect(() => updateTaskLine('- [ ] Review [[#topic/work]] #topic/home', { topics: [] })).toThrow(/topic tag inside a link or inline code.*Nothing was changed/);
+    expect(() => updateTaskLine('- [ ] Water `📅 2026-01-01` 📅 2026-11-01', { due_date: '2026-11-05' })).toThrow(/due date inside a link/);
+    expect(moveTaskLineTo('- [ ] Water `📅 2026-01-01` 📅 2030-01-01', '2027-01-01').error).toMatch(/due date inside a link/);
+    // Other fields on such a line still change, and the span stays as written.
+    expect(updateTaskLine('- [ ] Review [[#topic/work]] #topic/home', { priority: 'high' })).toBe('- [ ] Review [[#topic/work]] #topic/home ⏫');
+    expect(updateTaskLine('- [ ] Fix [docs](https://x.test/a) #stage/back-stage', { stage: 'front-stage' }))
+      .toBe('- [ ] Fix [docs](https://x.test/a) #stage/front-stage');
     expect(updateTaskLine('- [ ] Old [[Note]] 📅 2026-11-01', { title: 'New [[Other]] title' })).toBe('- [ ] New [[Other]] title 📅 2026-11-01');
     // Only whole tags count.
     expect(updateTaskLine('- [ ] a#topic/a b', { topics: [] })).toBe('- [ ] a#topic/a b');
+  });
+
+  test('a rename keeps HTML comments such as Obsidian ids', () => {
+    expect(updateTaskLine('- [ ] Repair <!-- id:123 --> pipeline', { title: 'Fix pipeline' })).toBe('- [ ] Fix pipeline <!-- id:123 -->');
   });
 
   test('the title is read the way markdown-tasks reads it', () => {
@@ -616,6 +624,23 @@ describe('postpone_task and update_task', () => {
     const refused = await tool('update_task').handler({ task_id: id(3), title: 'Water plants', priority: 'low' }, ctx());
     expect(refused.isError).toBe(true);
     expect(text(refused)).toMatch(/identical lines .* can't be told/);
+    expect(fs.readFileSync(file, 'utf8')).toBe(before);
+
+    // Two copies synced, one deleted: the survivor now sits on line 1, the
+    // old first task's line. Its id must not be taken for the survivor.
+    setup(['- [ ] Water plants', '- [ ] Water plants']);
+    fs.writeFileSync(file, ['- [ ] Water plants', '- [ ] Other'].join('\n'));
+    const survivor = await tool('update_task').handler({ task_id: id(1), title: 'Water plants', priority: 'low' }, ctx());
+    expect(text(survivor)).toMatch(/identical lines .* can't be told/);
+    expect(fileLines()).toEqual(['- [ ] Water plants', '- [ ] Other']);
+  });
+
+  test('postpone_task refuses a line whose date sits inside inline code', async () => {
+    setup(['- [ ] Water `📅 2026-01-01` 📅 2026-01-02']);
+    const before = fs.readFileSync(file, 'utf8');
+    const result = await tool('postpone_task').handler({ task_id: id(1), title: taskTitleOf('- [ ] Water `📅 2026-01-01` 📅 2026-01-02') }, ctx());
+    expect(result.isError).toBe(true);
+    expect(text(result)).toMatch(/due date inside a link or inline code/);
     expect(fs.readFileSync(file, 'utf8')).toBe(before);
   });
 

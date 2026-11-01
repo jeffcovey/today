@@ -25,6 +25,7 @@ import {
   taskDatesOf,
   updateTaskLine,
   moveTaskLineTo,
+  protectedMetadataIn,
   validateTaskChanges,
   TASK_PRIORITIES,
   TASK_STAGES,
@@ -118,26 +119,27 @@ export function locateTask(db, args, { projectRoot = PROJECT_ROOT, vaultPath = g
   if (meta.raw_line) {
     const inFile = [];
     lines.forEach((line, i) => { if (line === meta.raw_line) inFile.push(i + 1); });
-    if (inFile.length > 1) {
-      const prefix = `${task.source}:${file}:`;
-      let synced = [];
-      try {
-        synced = db.prepare(`
-          SELECT id FROM tasks
-          WHERE source = ? AND substr(id, 1, ?) = ?
-            AND json_valid(metadata) AND json_extract(metadata, '$.raw_line') = ?
-        `).all(task.source, prefix.length, prefix, meta.raw_line)
-          .map(row => Number(row.id.slice(prefix.length)))
-          .sort((a, b) => a - b);
-      } catch {
-        synced = [];
-      }
-      if (synced.join(',') !== inFile.join(',')) {
-        return {
-          ok: false,
-          error: `${file} has ${inFile.length} identical lines for this task and they've moved since the last sync, so which one is this task can't be told. Call sync_data with plugin_type "tasks" and look the task up again. Nothing was changed.`,
-        };
-      }
+    const prefix = `${task.source}:${file}:`;
+    let synced = [];
+    try {
+      synced = db.prepare(`
+        SELECT id FROM tasks
+        WHERE source = ? AND substr(id, 1, ?) = ?
+          AND json_valid(metadata) AND json_extract(metadata, '$.raw_line') = ?
+      `).all(task.source, prefix.length, prefix, meta.raw_line)
+        .map(row => Number(row.id.slice(prefix.length)))
+        .sort((a, b) => a - b);
+    } catch {
+      synced = [];
+    }
+    // Either the file or the last sync has more than one copy: the copies
+    // must sit exactly where the sync saw them, or a deleted copy's twin may
+    // have moved into this one's place.
+    if ((inFile.length > 1 || synced.length > 1) && synced.join(',') !== inFile.join(',')) {
+      return {
+        ok: false,
+        error: `${file} has identical lines for this task that moved since the last sync, so which one is this task can't be told. Call sync_data with plugin_type "tasks" and look the task up again. Nothing was changed.`,
+      };
     }
   }
 
@@ -299,6 +301,12 @@ const postponeTask = {
         const moved = moveTaskLineTo(line, toDate);
         if (moved.error) return { error: `${moved.error}. Nothing was changed.` };
         return { newLine: moved.line, ...moved };
+      }
+      // The shared postpone helper reads dates wherever they sit, as the
+      // reader does; refuse rather than move a date inside a link or code.
+      const clash = protectedMetadataIn(line, ['due_date', 'scheduled_date']);
+      if (clash) {
+        return { error: `The task's line has a ${clash} inside a link or inline code, which the task reader also counts, so it can't be postponed safely here. Edit the line by hand. Nothing was changed.` };
       }
       const postponed = postponeTaskLine(line, today);
       if (!postponed) return { error: 'The task has no scheduled or due date to move; use update_task to give it one. Nothing was changed.' };
