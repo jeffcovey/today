@@ -216,6 +216,8 @@ The read command reads data and outputs JSON. It can be written in any language.
 - `LAST_SYNC_TIME`: ISO timestamp of last sync (empty for first sync)
 - `SOURCE_ID`: Full source identifier (e.g., `markdown-time-tracking/local`)
 - `CONTEXT_ONLY`: Set to `"true"` when gathering context for AI prompts (see below)
+- `FILE_FILTER`: Comma-separated file paths, relative to the project root, when the sync is for those files only (e.g. after a write); read just those
+- `READ_ONLY`: Set to `"true"` for a read-only sync (see below)
 
 **Output:**
 - JSON object to stdout with entries and metadata
@@ -348,6 +350,28 @@ The markdown-plans plugin generates AI summaries for past days and suggestions f
 - Operations that don't modify files or call AI
 
 The goal is fast context gathering (~5-10 seconds) for responsive AI sessions.
+
+## The READ_ONLY Flag
+
+The MCP server freshens the database before it answers a read (`list_tasks`, `habits_today` and the like). That sync is read-only: the loader runs no write hooks (auto-tag, auto-archive, date-created, stage and priority) and starts the read command with `READ_ONLY=true`. A reader that changes things as it reads (resetting overdue routine checkboxes, creating today's diary file, deleting old export files, adding fields on a remote service) must skip those changes when it's set, and report entries as the files and services currently stand. The next full sync (the scheduler's `bin/plugins sync`, the web app, or the MCP `sync_data` tool) does them as before. A read-only sync that stores entries for a source with write hooks enabled marks them owed in `extra_data` (`write_hooks_pending` for the file hooks, `auto_tag_pending` for the auto-tagger), and the next writable sync of the whole source runs them even when its own read finds no changes, since the read-only sync already moved the cursor past what it stored. A writable sync with `skipAutoTag` (a post-write refresh, `ensureSyncForType`'s default) runs the file hooks but leaves the auto-tagger owed for the next sync that tags. A reader that can't report the source as it stands without writing (an export still zipped, no cache yet) answers no change (`incremental: true` with no entries), which keeps the stored rows; empty entries without it are a full snapshot that deletes them.
+
+```javascript
+const readOnly = process.env.READ_ONLY === 'true';
+
+if (!readOnly) {
+  resetOverdueRoutines(files);
+}
+
+console.log(JSON.stringify({ entries: readEntries(files) }));
+```
+
+A reader that only reads needs no change. A reader that can't report its entries without first writing (project-calendar builds its events from what it pushes to the calendar) can print `{"entries": [], "incremental": true}` instead: the loader takes that as no change and keeps the rows the last full sync stored.
+
+## Read Syncs and Staleness
+
+The CLI tools (`bin/tasks`, `bin/calendar` and the rest) and the MCP server's reads freshen their data first with `ensureSyncForType()`. Each enabled source of the type is judged on its own `sync_metadata` row (keyed `<plugin>/<source>`): a source that has never synced, or last synced longer ago than its type's `staleMinutes` in [plugin-schemas.js](/src/plugin-schemas.js) (0 means every read), is synced; fresh sources are left alone. So one fresh source doesn't hide a stale one, and a stale one doesn't make the fresh ones re-read. `force` (the MCP `sync_data` tool) syncs every source.
+
+A successful read that reports no changes (an incremental read with no entries) still counts as a sync for staleness, so the next read skips the source; it is recorded as `checked_at` in `extra_data`, and `last_synced_at` (the `LAST_SYNC_TIME` a reader gets) stays where the last sync with changes left it. A source whose read keeps failing records no sync time, so it stays stale and is tried again on the next read.
 
 ## Plugin Types
 

@@ -28,6 +28,10 @@ try {
 
 const logsDirectory = config.logs_directory || 'vault/logs';
 const cleanupOldFiles = config.cleanup_old_files !== false; // Default true
+// READ_ONLY=true (an MCP server's pre-read sync): read the CSVs already in the
+// logs directory. No ZIP extraction and no cleanup of older exports; the next
+// full sync does both.
+const readOnly = process.env.READ_ONLY === 'true';
 const retentionDays = config.retention_days || 365;
 const ynabCsvPattern = /^(.+) as of (\d{4}-\d{2}-\d{2} \d{2}-\d{2}) - (Register|Plan)\.csv$/;
 const ynabZipPattern = /^(?:YNAB Export - )?(.+) as of (\d{4}-\d{2}-\d{2} \d{2}-\d{2})\.zip$/;
@@ -441,21 +445,42 @@ function convertTransaction(ynabTx, filePath, rowIndex, budgetName) {
 
 // Extract latest ZIP export first (if present), then process CSV files
 let zipExtraction = { zipFiles: [], extractedFiles: [] };
-try {
-  zipExtraction = extractLatestYnabZip(logsDir);
-} catch (error) {
-  console.log(JSON.stringify({
-    entries: [],
-    metadata: {
-      error: `Failed to extract YNAB ZIP export: ${error.message}`
-    }
-  }));
-  process.exit(1);
+if (readOnly) {
+  zipExtraction = { zipFiles: findYnabZipFiles(logsDir), extractedFiles: [] };
+} else {
+  try {
+    zipExtraction = extractLatestYnabZip(logsDir);
+  } catch (error) {
+    console.log(JSON.stringify({
+      entries: [],
+      metadata: {
+        error: `Failed to extract YNAB ZIP export: ${error.message}`
+      }
+    }));
+    process.exit(1);
+  }
 }
 
 const ynabZipFiles = zipExtraction.zipFiles;
 const ynabFiles = findYnabFiles(logsDir);
 const latestZip = ynabZipFiles.length > 0 ? ynabZipFiles[0] : null;
+// Read-only: a ZIP that hasn't been extracted yet is left for the next full
+// sync. Report no change, which keeps the transactions the last full sync
+// stored. Reading the CSVs already here instead would at best store the same
+// export again, and with only the ZIP here it would be an empty snapshot that
+// deletes them all.
+const isExtracted = zip => ['register', 'plan'].every(kind =>
+  ynabFiles[kind].some(f => f.budgetName === zip.budgetName && f.timestamp === zip.timestamp));
+if (readOnly && latestZip && !isExtracted(latestZip)) {
+  console.log(JSON.stringify({
+    entries: [],
+    incremental: true,
+    metadata: {
+      message: `${latestZip.filename} awaits extraction by the next full sync`
+    }
+  }));
+  process.exit(0);
+}
 const latestRegisterFile = latestZip
   ? ynabFiles.register.find(file => file.budgetName === latestZip.budgetName && file.timestamp === latestZip.timestamp) || null
   : ynabFiles.register[0] || null;
@@ -586,7 +611,7 @@ if (latestPlanFile) {
 }
 
 // Cleanup old files if enabled
-if (cleanupOldFiles) {
+if (cleanupOldFiles && !readOnly) {
   const filesToDelete = [
     ...ynabFiles.register.slice(1),
     ...ynabFiles.plan.slice(1),

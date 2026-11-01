@@ -89,12 +89,18 @@ describe('listTasks', () => {
 });
 
 describe('syncForRead', () => {
-  const lastSync = new Date('2026-11-01T12:00:00Z');
+  const lastSync = new Date('2025-11-01T12:00:00Z');
+  // Stands in for a stale type; readSyncNeeded is tested in plugin-loader-per-source-staleness.
+  const needed = () => true;
+  const staleSources = () => [
+    { sourceId: 'google-calendar/work', lastSync },
+    { sourceId: 'public-calendars/holidays', lastSync: null },
+  ];
 
   test('waits for a sync that finishes inside the budget', async () => {
     const sync = jest.fn(async () => true);
-    const result = await syncForRead({}, 'events-fast', { sync, budgetMs: 1000, lastSyncTime: () => lastSync });
-    expect(result).toEqual({ complete: true, lastSync: null });
+    const result = await syncForRead({}, 'events-fast', { sync, needed, budgetMs: 1000, staleSources });
+    expect(result).toEqual({ complete: true, due: [] });
     expect(staleNote('calendar', result)).toBeNull();
   });
 
@@ -102,17 +108,18 @@ describe('syncForRead', () => {
     let finish;
     const sync = jest.fn(() => new Promise(resolve => { finish = resolve; }));
     const started = Date.now();
-    const result = await syncForRead({}, 'events-slow', { sync, budgetMs: 50, lastSyncTime: () => lastSync });
+    const result = await syncForRead({}, 'events-slow', { sync, needed, budgetMs: 50, staleSources });
     expect(Date.now() - started).toBeLessThan(1000);
-    expect(result).toEqual({ complete: false, lastSync });
+    expect(result).toEqual({ complete: false, due: staleSources() });
     expect(staleNote('calendar', result)).toBe(
       'Note: a calendar sync is still running, so this comes from the database as it stood. '
-      + 'The most recent calendar source sync started at 2026-11-01T12:00:00.000Z; other sources may be older. '
+      + 'Still to refresh: google-calendar/work (last synced 2025-11-01T12:00:00.000Z), '
+      + 'public-calendars/holidays (never synced). '
       + 'Call again in a minute for fresher data.'
     );
 
     // A second read while the first sync runs joins it rather than starting another.
-    const again = await syncForRead({}, 'events-slow', { sync, budgetMs: 20, lastSyncTime: () => lastSync });
+    const again = await syncForRead({}, 'events-slow', { sync, needed, budgetMs: 20, staleSources });
     expect(again.complete).toBe(false);
     expect(sync).toHaveBeenCalledTimes(1);
 
@@ -125,13 +132,99 @@ describe('syncForRead', () => {
     finish(true);
     await waiting;
     expect(waited).toBe(true);
-    const after = await syncForRead({}, 'events-slow', { sync: async () => false, budgetMs: 50 });
+    const after = await syncForRead({}, 'events-slow', { sync: async () => false, needed, budgetMs: 50 });
     expect(after.complete).toBe(true);
+  });
+
+  test('sources this run already synced are not listed as due, even when always stale', async () => {
+    // A type with staleMinutes 0 (time-logs) counts every source as stale, so
+    // the ones this run finished still come back from staleSources.
+    let finish;
+    const sync = jest.fn(() => new Promise(resolve => { finish = resolve; }));
+    const old = new Date('2025-11-01T12:00:00Z');
+    // Synced by this run: a second after the one it started in.
+    const later = () => new Date(Date.now() + 1000);
+    const alwaysStale = () => [
+      { sourceId: 'markdown-time-tracking/a', lastSync: later() },
+      { sourceId: 'markdown-time-tracking/b', lastSync: later() },
+      { sourceId: 'markdown-time-tracking/c', lastSync: later() },
+      { sourceId: 'markdown-time-tracking/d', lastSync: old },
+      { sourceId: 'markdown-time-tracking/e', lastSync: null },
+    ];
+    const result = await syncForRead({}, 'time-logs-slow', { sync, needed, budgetMs: 30, staleSources: alwaysStale });
+    expect(result).toEqual({
+      complete: false,
+      due: [
+        { sourceId: 'markdown-time-tracking/d', lastSync: old },
+        { sourceId: 'markdown-time-tracking/e', lastSync: null },
+      ],
+    });
+    expect(staleNote('time', result)).toBe(
+      'Note: a time sync is still running, so this comes from the database as it stood. '
+      + 'Still to refresh: markdown-time-tracking/d (last synced 2025-11-01T12:00:00.000Z), '
+      + 'markdown-time-tracking/e (never synced). '
+      + 'Call again in a minute for fresher data.'
+    );
+    finish(true);
+    await waitForReadSyncs('time-logs-slow');
+  });
+
+  test('a run in the same second as the previous one counts none of its sync times as its own', async () => {
+    // Two reads of an always-stale type within one second: the first run
+    // syncs every source and finishes, the second starts and stalls on its
+    // worker. sync_metadata keeps whole seconds, so the first run's times
+    // equal the second run's start second. None of them is the second run's,
+    // so every source is still due; one synced in a later second is not.
+    const now = jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-11-01T12:00:00.200Z'));
+    try {
+      const sameSecond = new Date('2026-11-01T12:00:00Z');
+      const sources = () => [
+        { sourceId: 'markdown-time-tracking/a', lastSync: sameSecond },
+        { sourceId: 'markdown-time-tracking/b', lastSync: sameSecond },
+      ];
+      const first = await syncForRead({}, 'time-logs-twice', {
+        sync: async () => true, needed, budgetMs: 1000, staleSources: sources,
+      });
+      expect(first).toEqual({ complete: true, due: [] });
+
+      now.mockReturnValue(Date.parse('2026-11-01T12:00:00.700Z'));
+      let finish;
+      const sync = jest.fn(() => new Promise(resolve => { finish = resolve; }));
+      const second = await syncForRead({}, 'time-logs-twice', { sync, needed, budgetMs: 30, staleSources: sources });
+      expect(sync).toHaveBeenCalledTimes(1);
+      expect(second).toEqual({ complete: false, due: sources() });
+
+      const nextSecond = new Date('2026-11-01T12:00:01Z');
+      const third = await syncForRead({}, 'time-logs-twice', {
+        sync, needed, budgetMs: 20,
+        staleSources: () => [
+          { sourceId: 'markdown-time-tracking/a', lastSync: nextSecond },
+          { sourceId: 'markdown-time-tracking/b', lastSync: sameSecond },
+        ],
+      });
+      expect(third).toEqual({ complete: false, due: [{ sourceId: 'markdown-time-tracking/b', lastSync: sameSecond }] });
+      finish(true);
+      await waitForReadSyncs('time-logs-twice');
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  test('the note names at most three sources, and says how many more', () => {
+    const due = ['a/1', 'b/1', 'c/1', 'd/1', 'e/1'].map(sourceId => ({ sourceId, lastSync: null }));
+    expect(staleNote('tasks', { complete: false, due })).toBe(
+      'Note: a tasks sync is still running, so this comes from the database as it stood. '
+      + 'Still to refresh: a/1 (never synced), b/1 (never synced), c/1 (never synced), and 2 more. '
+      + 'Call again in a minute for fresher data.'
+    );
+    expect(staleNote('tasks', { complete: false, due: [] })).toBe(
+      'Note: a tasks sync is still running, so this comes from the database as it stood. Call again in a minute for fresher data.'
+    );
   });
 
   test('a sync that throws still lets the read go ahead', async () => {
     const sync = jest.fn(async () => { throw new Error('calendar down'); });
-    const result = await syncForRead({}, 'events-broken', { sync, budgetMs: 1000 });
+    const result = await syncForRead({}, 'events-broken', { sync, needed, budgetMs: 1000 });
     expect(result.complete).toBe(true);
   });
 });
@@ -140,7 +233,7 @@ describe('syncForRead without a stale type', () => {
   test('fresh data starts no sync at all', async () => {
     const sync = jest.fn(async () => true);
     const result = await syncForRead({}, 'events-fresh', { sync, needed: () => false });
-    expect(result).toEqual({ complete: true, lastSync: null });
+    expect(result).toEqual({ complete: true, due: [] });
     expect(sync).not.toHaveBeenCalled();
   });
 });
@@ -201,7 +294,7 @@ describe('runReadSyncInChild', () => {
       needed: () => true,
       sync: (_db, type) => runReadSyncInChild(type, { workerPath: busy }),
       budgetMs: 100,
-      lastSyncTime: () => null,
+      staleSources: () => [],
     });
     expect(result.complete).toBe(false);
     expect(Date.now() - started).toBeLessThan(1000);

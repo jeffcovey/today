@@ -264,7 +264,7 @@ Also outside Today itself. Users manage `git pull`/`git push` for the vault repo
 
 ### 5. Sync safety
 
-- `sync_metadata` stores per-source sync state and lock information.
+- `sync_metadata` stores per-source sync state and lock information. Read-time syncs (`ensureSyncForType`) use each source's own `last_synced_at` to decide whether it is stale.
 - `src/db-health.js` can recreate the cache when corruption is detected because the data can be re-synced.
 - `SYNC_DISABLED` prevents sync commands from running when the repository is in a state that risks data loss.
 - `src/fs-atomic.js` is used for atomic file writes and compare-and-swap style updates.
@@ -394,6 +394,8 @@ Tools are built into `src/mcp-server.js` or defined in modules under `src/mcp-to
 - `read` changes nothing.
 - `write` is a vault change that is easy to undo. Hidden and refused when `read_only = true`.
 - `destructive` deletes or moves data, rewrites in bulk, or writes to an outside service such as Google Calendar updates or YNAB. Hidden and refused unless `[mcp] allow_destructive = true`, and always refused on a read-only connection.
+
+Before a read tool answers, the server syncs the type's stale sources (`syncForRead` in `src/mcp-reads.js`, run in `src/read-sync-worker.js`). Staleness is per source: each enabled source is judged by its own `sync_metadata` row against the type's `staleMinutes`, and only the sources that are due are synced. A read that answers before they finish says which sources are still due and when each last synced. That sync is read-only: no write hooks run, and the readers run with `READ_ONLY=true`, so they report the vault as it stands and write nothing (see `plugins/README.md`). Hooks a read-only sync skipped stay owed (`write_hooks_pending`, and `auto_tag_pending` for the auto-tagger, which a `skipAutoTag` sync also leaves owed) until the next writable sync of the source that runs them. `sync_data` is the full sync, hooks and all.
 
 Tools that take a task, event or contact ID require the item's `title` and refuse when it doesn't match. Batch tools take `dry_run`, on by default. Every `write` and `destructive` call, including refused ones, is appended to `<vault>/logs/mcp-writes/YYYY-MM-DD.md`; `[mcp] write_log = "other/dir"` moves it and `write_log = false` turns it off.
 

@@ -14,6 +14,9 @@ const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 const logsDirectory = config.logs_directory || `${process.env.VAULT_PATH}/logs`;
 const retentionDays = config.retention_days || 30;
 const cleanupOldFiles = config.cleanup_old_files || false;
+// READ_ONLY=true (an MCP server's pre-read sync): read the latest export and
+// leave the older ones in place for the next full sync to clean up.
+const readOnly = process.env.READ_ONLY === 'true';
 
 const logsDir = path.join(projectRoot, logsDirectory);
 
@@ -302,7 +305,7 @@ for (const task of data.tasks || []) {
 
 // Cleanup old files if enabled
 let deletedFiles = [];
-if (cleanupOldFiles) {
+if (cleanupOldFiles && !readOnly) {
   deletedFiles = cleanupOldStreaksFiles(streaksFile);
 }
 

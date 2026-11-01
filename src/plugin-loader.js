@@ -155,6 +155,15 @@ const pluginCache = new Map();
  * @returns {Promise<Map<string, object>>} Map of plugin name to plugin metadata
  */
 export async function discoverPlugins() {
+  return discoverPluginsSync();
+}
+
+/**
+ * discoverPlugins without the promise: the manifests are read once per
+ * process and cached, so later calls cost nothing. For callers that must stay
+ * synchronous (readSyncNeeded runs on every MCP read).
+ */
+function discoverPluginsSync() {
   if (pluginCache.size > 0) {
     return pluginCache;
   }
@@ -606,9 +615,86 @@ export function getLatestSyncTimeForType(db, pluginType) {
 }
 
 /**
- * Whether ensureSyncForType would sync this type now: false when its data is
- * fresh or when CONTEXT_ONLY is set. A cheap check, for callers that want to
- * skip starting a sync at all (see syncForRead in mcp-reads.js).
+ * The enabled sources of a plugin type that have a read command, each with
+ * its sync_metadata key. Synchronous and cheap: plugin manifests are cached
+ * after the first load and config.toml is re-read only when it changes.
+ * @returns {Array<{plugin: object, sourceName: string, config: object, sourceId: string}>}
+ */
+export function getReadSourcesForType(pluginType) {
+  const sources = [];
+  for (const [name, plugin] of discoverPluginsSync()) {
+    if (plugin.type !== pluginType || !plugin.commands?.read) continue;
+    for (const { sourceName, config } of getPluginSources(name)) {
+      sources.push({ plugin, sourceName, config, sourceId: `${plugin.name}/${sourceName}` });
+    }
+  }
+  return sources;
+}
+
+/**
+ * Each source's last sync time, from its own sync_metadata row: the later of
+ * last_synced_at and a no-change read's checked_at (see recordNoChangeSync).
+ * Null when it has neither, e.g. no row, or a lock taken by a sync that never
+ * finished.
+ * @returns {Map<string, Date|null>}
+ */
+function getSyncTimesForSources(db, sourceIds) {
+  const times = new Map(sourceIds.map(id => [id, null]));
+  if (sourceIds.length === 0) return times;
+  try {
+    const rows = db.prepare(`
+      SELECT source, last_synced_at, extra_data FROM sync_metadata
+      WHERE source IN (${sourceIds.map(() => '?').join(', ')})
+    `).all(...sourceIds);
+    for (const row of rows) {
+      const stamps = [row.last_synced_at, parseExtraData(row.extra_data)?.checked_at]
+        .filter(t => typeof t === 'string' && t)
+        .map(t => new Date(t + 'Z'))
+        .filter(d => !Number.isNaN(d.getTime()));
+      if (stamps.length > 0) times.set(row.source, new Date(Math.max(...stamps)));
+    }
+  } catch {
+    // Table might not exist yet: every source counts as never synced
+  }
+  return times;
+}
+
+/**
+ * The enabled sources of a type that are due a read sync: never synced, or
+ * synced longer ago than staleMinutes (0 means always due). Each source is
+ * judged by its own sync time, so one fresh source doesn't hide a stale one.
+ * @returns {Array<{plugin, sourceName, config, sourceId, lastSync: Date|null}>}
+ */
+export function getStaleSourcesForType(db, pluginType, options = {}) {
+  const { staleMinutes = getStaleMinutes(pluginType), sources = getReadSourcesForType(pluginType) } = options;
+  const times = getSyncTimesForSources(db, sources.map(s => s.sourceId));
+  const now = Date.now();
+  return sources
+    .map(source => ({ ...source, lastSync: times.get(source.sourceId) }))
+    .filter(({ lastSync }) => staleMinutes <= 0 || !lastSync || (now - lastSync.getTime()) / 60000 >= staleMinutes);
+}
+
+/**
+ * The oldest sync time among a type's enabled sources, or null when any of
+ * them has never synced (or the type has none).
+ */
+export function getOldestSyncTimeForType(db, pluginType) {
+  const sources = getReadSourcesForType(pluginType);
+  if (sources.length === 0) return null;
+  let oldest = null;
+  for (const time of getSyncTimesForSources(db, sources.map(s => s.sourceId)).values()) {
+    if (!time) return null;
+    if (!oldest || time < oldest) oldest = time;
+  }
+  return oldest;
+}
+
+/**
+ * Whether ensureSyncForType would sync this type now: true when any enabled
+ * source of the type is stale, false when all are fresh or CONTEXT_ONLY is
+ * set. A cheap check (one sync_metadata query, plugin manifests cached), for
+ * callers that want to skip starting a sync at all (see syncForRead in
+ * mcp-reads.js).
  */
 export function readSyncNeeded(db, pluginType, options = {}) {
   const { staleMinutes = getStaleMinutes(pluginType) } = options;
@@ -618,48 +704,44 @@ export function readSyncNeeded(db, pluginType, options = {}) {
     return false;
   }
 
-  const lastSync = getLatestSyncTimeForType(db, pluginType);
-
-  // staleMinutes of 0 means always sync
-  if (staleMinutes > 0 && lastSync) {
-    const ageMinutes = (Date.now() - lastSync.getTime()) / 1000 / 60;
-    if (ageMinutes < staleMinutes) {
-      return false; // Data is fresh
-    }
-  }
-  return true;
+  return getStaleSourcesForType(db, pluginType, { staleMinutes }).length > 0;
 }
 
 /**
  * Ensure data for a plugin type is synced before read operations.
- * Silently syncs if data is stale or has never been synced.
+ * Silently syncs each enabled source that is stale or has never been synced;
+ * fresh sources are left alone.
  * @param {object} db - Database instance
  * @param {string} pluginType - Plugin type (e.g., 'events', 'time-logs', 'issues')
  * @param {object} options - Options
- * @param {number} options.staleMinutes - Minutes before data is considered stale (uses schema default if not specified)
- * @param {boolean} options.force - Force sync even if not stale (default: false)
- * @returns {boolean} - True if sync was performed, false if data was fresh
+ * @param {number} options.staleMinutes - Minutes before a source's data is considered stale (uses schema default if not specified)
+ * @param {boolean} options.force - Sync every source, fresh or not (default: false)
+ * @param {boolean} options.skipWriteHooks - A read-only sync: no write hooks,
+ *   and the readers run with READ_ONLY=true so they write nothing either
+ *   (default: false). The MCP server's pre-read syncs use it.
+ * @returns {boolean} - True if any source was synced, false if all were fresh
  */
 export async function ensureSyncForType(db, pluginType, options = {}) {
-  const { staleMinutes = getStaleMinutes(pluginType), force = false, skipAutoTag = true } = options;
+  const { staleMinutes = getStaleMinutes(pluginType), force = false, skipAutoTag = true, skipWriteHooks = false } = options;
 
-  if (!force && !readSyncNeeded(db, pluginType, { staleMinutes })) {
+  // Skip sync when CONTEXT_ONLY is set (during context gathering for AI prompts)
+  if (!force && process.env.CONTEXT_ONLY === 'true') {
     return false;
   }
 
   try {
+    const targets = force
+      ? getReadSourcesForType(pluginType)
+      : getStaleSourcesForType(db, pluginType, { staleMinutes });
+    if (targets.length === 0) return false;
+
     const vaultPath = getAbsoluteVaultPath();
     const context = { db, vaultPath };
-    const enabledPlugins = await getEnabledPlugins();
-
-    for (const { plugin, sources } of enabledPlugins) {
-      if (!plugin.commands?.read || plugin.type !== pluginType) continue;
-      for (const { sourceName, config } of sources) {
-        // Callers waiting on a read (CLI commands and MCP reads) use this to
-        // freshen data first. Auto-tagging is a blocking AI call of several
-        // seconds; the scheduler's full syncs do it instead unless overridden.
-        await syncPluginSource(plugin, sourceName, config, context, { skipAutoTag, _caller: 'ensure-sync' });
-      }
+    for (const { plugin, sourceName, config } of targets) {
+      // Callers waiting on a read (CLI commands and MCP reads) use this to
+      // freshen data first. Auto-tagging is a blocking AI call of several
+      // seconds; the scheduler's full syncs do it instead unless overridden.
+      await syncPluginSource(plugin, sourceName, config, context, { skipAutoTag, skipWriteHooks, _caller: 'ensure-sync' });
     }
     return true;
   } catch {
@@ -692,7 +774,8 @@ function formatTimeAgo(date) {
  * @returns {string} Formatted status message
  */
 export function getSyncStatusMessage(db, pluginType) {
-  const lastSync = getLatestSyncTimeForType(db, pluginType);
+  // The oldest source, since each source syncs on its own clock.
+  const lastSync = getOldestSyncTimeForType(db, pluginType);
   const staleMinutes = getStaleMinutes(pluginType);
 
   // For types that sync on every read, just show that info
@@ -732,6 +815,27 @@ function updateSyncMetadata(db, sourceId, filesProcessed, entriesCount, extraDat
       entries_count = excluded.entries_count,
       extra_data = excluded.extra_data
   `).run(sourceId, stamp, JSON.stringify(filesProcessed), entriesCount, extraData ? JSON.stringify(extraData) : null);
+}
+
+/**
+ * Record a successful read that found nothing new, as checked_at in
+ * extra_data, so readSyncNeeded takes the source as fresh. last_synced_at is
+ * the reader's cursor (LAST_SYNC_TIME) and stays put: a reader also answers
+ * "no changes" when it couldn't look (its directory is missing, #508), and
+ * moving the cursor then would skip files restored with older mtimes. The
+ * file list, row count and plugin state stay as the last full sync left
+ * them, except the owed-hook markers (write_hooks_pending, auto_tag_pending),
+ * which are set or cleared as owed says. A filtered re-read (keepWatermark)
+ * records nothing.
+ */
+function recordNoChangeSync(db, sourceId, syncStartedAt, { keepWatermark = false, owed = {} } = {}) {
+  if (keepWatermark) return;
+  const stamp = syncStartedAt || db.prepare(`SELECT datetime('now') AS t`).get().t;
+  const { write_hooks_pending: _hooks, auto_tag_pending: _tag, ...previous } = parseExtraData(getSyncMetadata(db, sourceId)?.extra_data) || {};
+  const next = withOwedHooks({ ...previous, checked_at: stamp }, owed);
+  db.prepare(`INSERT OR IGNORE INTO sync_metadata (source) VALUES (?)`).run(sourceId);
+  db.prepare(`UPDATE sync_metadata SET extra_data = ? WHERE source = ?`)
+    .run(JSON.stringify(next), sourceId);
 }
 
 const SYNC_LOCK_STALE_MINUTES = 5;
@@ -838,8 +942,12 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   const { db } = context;
   // Taken before the plugin reads anything — see updateSyncMetadata.
   const syncStartedAt = db.prepare(`SELECT datetime('now') AS t`).get().t;
-  // skipWriteHooks: only read, without the auto-archive, auto-date, stage and
-  // priority hooks below (they act on the whole source, not just fileFilter).
+  // skipWriteHooks: only read, without the auto-tag, auto-archive, auto-date,
+  // stage and priority hooks (runSyncWriteHooks; they act on the whole
+  // source, not just fileFilter). They stay owed to the next writable sync
+  // (write_hooks_pending below). The reader is told too, with READ_ONLY=true,
+  // so a reader that writes as it reads (resetting routines, creating today's
+  // diary file) reports the files as they stand instead.
   const { fileFilter, skipAutoTag = false, skipWriteHooks = false } = options;
   // keepSyncWatermark: a filtered re-read leaves last_synced_at alone, so
   // readSyncNeeded doesn't take the whole source as fresh.
@@ -855,7 +963,8 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   // (#621). A filtered sync keeps the previous fingerprint, since it does not
   // rescan the source.
   const isFileBased = FILE_BASED_TYPES.has(plugin.type);
-  const previousFingerprint = isFileBased ? parseExtraData(syncMeta?.extra_data)?.config_fingerprint : undefined;
+  const previousExtraData = parseExtraData(syncMeta?.extra_data) || {};
+  const previousFingerprint = isFileBased ? previousExtraData.config_fingerprint : undefined;
   const configFingerprint = isFileBased ? fingerprintConfig(sourceConfig) : undefined;
   const configChanged = isFileBased && !fileFilter && previousFingerprint !== configFingerprint;
 
@@ -868,6 +977,10 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   // If file filter specified, pass it to read command for targeted sync
   if (fileFilter) {
     envVars.FILE_FILTER = fileFilter;
+  }
+
+  if (skipWriteHooks) {
+    envVars.READ_ONLY = 'true';
   }
 
   // Run the read command with last sync time and source ID
@@ -993,6 +1106,14 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
     const fingerprint = fileFilter ? previousFingerprint : configFingerprint;
     if (fingerprint) extraData = { ...(extraData || {}), config_fingerprint: fingerprint };
   }
+  // Write hooks a sync skipped stay owed in extra_data until a writable sync
+  // runs them: write_hooks_pending for the file hooks a read-only sync
+  // skipped, auto_tag_pending for the auto-tagger, which skipAutoTag skips
+  // too. The skipping sync still moves the cursor, so the next read may well
+  // find no changes; the hooks act on the whole source, not on what that
+  // read returns, so they run then anyway.
+  const hooksOwed = previousExtraData.write_hooks_pending === true;
+  const tagOwed = previousExtraData.auto_tag_pending === true;
   const pluginPurgedRows = Number(pluginMetadata?.rows_purged || 0);
   const metadataMsg = pluginMetadata?.message ? `\n    ${pluginMetadata.message}` : '';
   const hintMsg = pluginMetadata?.hint ? `\n    Hint: ${pluginMetadata.hint}` : '';
@@ -1035,23 +1156,34 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
 
   if (entries.length === 0 && isIncremental) {
     db.transaction(reconcileFiles)();
+    // A writable sync of the whole source runs the hooks still owed; the
+    // tagger stays owed while this sync skips it.
+    const canRun = !skipWriteHooks && !fileFilter;
+    const runOwedHooks = canRun && (hooksOwed || (tagOwed && !skipAutoTag));
+    const owed = {
+      hooks: hooksOwed && !runOwedHooks,
+      tag: tagOwed && !(runOwedHooks && !skipAutoTag),
+    };
+    let message;
     if (reconciledDeletions > 0 || pluginPurgedRows > 0) {
       const count = db.prepare(`SELECT COUNT(*) as count FROM ${tableName} WHERE source = ?`).get(sourceId).count;
-      updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData, syncStartedAt, { keepWatermark });
+      updateSyncMetadata(db, sourceId, filesProcessed || [], count, withOwedHooks(extraData, owed), syncStartedAt, { keepWatermark });
       const messages = [];
       if (reconciledDeletions > 0) messages.push(`Removed ${reconciledDeletions} row(s) for deleted, moved, or excluded file(s)`);
       if (pluginPurgedRows > 0) messages.push(`Removed ${pluginPurgedRows} row(s) for plugin-managed deletions`);
-      return {
-        success: true,
-        count: 0,
-        message: `${messages.join('; ')}${metadataMsg}${hintMsg}${warningMsg}${reconcileMsg}`
-      };
+      message = `${messages.join('; ')}${metadataMsg}${hintMsg}${warningMsg}${reconcileMsg}`;
+    } else {
+      // Nothing changed, but the read succeeded: the source is fresh as of
+      // this sync, or readSyncNeeded keeps taking it as stale.
+      recordNoChangeSync(db, sourceId, syncStartedAt, { keepWatermark, owed });
+      message = `${pluginMetadata?.message || 'No changes since last sync'}${hintMsg}${warningMsg}${reconcileMsg}`;
     }
-    return {
-      success: true,
-      count: 0,
-      message: `${pluginMetadata?.message || 'No changes since last sync'}${hintMsg}${warningMsg}${reconcileMsg}`
-    };
+    if (runOwedHooks) {
+      const hooks = await runSyncWriteHooks({ db, plugin, sourceName, sourceConfig, sourceId, tableName, skipAutoTag });
+      db.pragma('wal_checkpoint(FULL)');
+      message += writeHooksMessage(hooks);
+    }
+    return { success: true, count: 0, message };
   }
 
   // Reconciliation and replacement must commit together or preserve the old snapshot.
@@ -1066,182 +1198,14 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   reconcileMsg = buildReconcileMsg(reconcileReport);
 
   // Update sync metadata (including plugin-specific state like folder_state for IMAP)
-  updateSyncMetadata(db, sourceId, filesProcessed || [], count, extraData, syncStartedAt, { keepWatermark });
+  const tagRuns = !skipWriteHooks && !skipAutoTag;
+  const owed = {
+    hooks: skipWriteHooks && (hooksOwed || fileHooksConfigured(plugin, sourceConfig)),
+    tag: !tagRuns && (tagOwed || autoTagConfigured(plugin, sourceConfig)),
+  };
+  updateSyncMetadata(db, sourceId, filesProcessed || [], count, withOwedHooks(extraData, owed), syncStartedAt, { keepWatermark });
 
-  // Run auto-tagger if enabled (never fails the sync)
-  let taggingResult = null;
-  const taggableField = sourceConfig.taggable_field || plugin.settings?.taggable_field?.default;
-  if (!skipAutoTag && sourceConfig.auto_add_topics && taggableField && getPluginAccess(plugin) === 'read-write') {
-    try {
-      const updater = createFileBasedUpdater(PROJECT_ROOT);
-      taggingResult = await runAutoTagger({
-        db,
-        plugin,
-        sourceName,
-        sourceConfig,
-        tableName,
-        taggableField,
-        updateEntry: (id, newValue) => updater.update(id, newValue)
-      });
-
-      // Flush any file changes
-      updater.flush();
-
-      // If we tagged entries, read again to update database
-      if (taggingResult.tagged > 0) {
-        const resyncResult = await runPluginCommand(plugin, 'read', sourceConfig, {
-          LAST_SYNC_TIME: '', // Force full re-read of modified files
-          SOURCE_ID: sourceId
-        }, sourceName);
-        if (resyncResult.success && resyncResult.data) {
-          const resyncEntries = Array.isArray(resyncResult.data)
-            ? resyncResult.data
-            : resyncResult.data.entries || [];
-          const resyncFiles = resyncResult.data.files_processed || null;
-          insertEntries(db, tableName, plugin.type, resyncEntries, sourceId, resyncFiles);
-        }
-      }
-    } catch (error) {
-      // Log but never fail sync due to tagging
-      console.warn(`Warning: Auto-tagging failed for ${sourceId}: ${error.message}`);
-    }
-  }
-
-  // Run auto-archive first if enabled (removes completed tasks, rebalances files)
-  let archiveResult = null;
-  if (!skipWriteHooks && sourceConfig.auto_archive_completed && getPluginAccess(plugin) === 'read-write') {
-    try {
-      archiveResult = await runAutoArchive({
-        plugin,
-        sourceName,
-        sourceConfig
-      });
-
-      // If we archived/rebalanced, read again to update database
-      if (archiveResult.files_modified?.length > 0) {
-        const fileFilter = archiveResult.files_modified.join(',');
-        const resyncResult = await runPluginCommand(plugin, 'read', sourceConfig, {
-          LAST_SYNC_TIME: '',
-          SOURCE_ID: sourceId,
-          FILE_FILTER: fileFilter
-        }, sourceName);
-        if (resyncResult.success && resyncResult.data) {
-          const resyncEntries = Array.isArray(resyncResult.data)
-            ? resyncResult.data
-            : resyncResult.data.entries || [];
-          const resyncFiles = resyncResult.data.files_processed || null;
-          insertEntries(db, tableName, plugin.type, resyncEntries, sourceId, resyncFiles);
-        }
-      }
-    } catch (error) {
-      // Log but never fail sync due to archiving
-      console.warn(`Warning: Auto-archive failed for ${sourceId}: ${error.message}`);
-    }
-  }
-
-  // Run auto date-created if enabled (never fails the sync)
-  let dateCreatedResult = null;
-  if (!skipWriteHooks && sourceConfig.auto_add_date_created && getPluginAccess(plugin) === 'read-write') {
-    try {
-      dateCreatedResult = await runAutoDateCreated({
-        db,
-        plugin,
-        sourceName,
-        sourceConfig,
-        tableName
-      });
-
-      // If we added dates, read again to update database
-      if (dateCreatedResult.added > 0 && dateCreatedResult.files_modified?.length > 0) {
-        const fileFilter = dateCreatedResult.files_modified.join(',');
-        const resyncResult = await runPluginCommand(plugin, 'read', sourceConfig, {
-          LAST_SYNC_TIME: '',
-          SOURCE_ID: sourceId,
-          FILE_FILTER: fileFilter
-        }, sourceName);
-        if (resyncResult.success && resyncResult.data) {
-          const resyncEntries = Array.isArray(resyncResult.data)
-            ? resyncResult.data
-            : resyncResult.data.entries || [];
-          const resyncFiles = resyncResult.data.files_processed || null;
-          insertEntries(db, tableName, plugin.type, resyncEntries, sourceId, resyncFiles);
-        }
-      }
-    } catch (error) {
-      // Log but never fail sync due to date adding
-      console.warn(`Warning: Auto date-created failed for ${sourceId}: ${error.message}`);
-    }
-  }
-
-  // Run auto-classification if enabled (never fails the sync)
-  let classificationResult = null;
-  const supportsStageClassification = plugin.settings?.supports_stage_classification?.default !== false;
-  if (!skipWriteHooks && sourceConfig.auto_classify_stages && supportsStageClassification && getPluginAccess(plugin) === 'read-write') {
-    try {
-      classificationResult = await runAutoStageClassification({
-        db,
-        plugin,
-        sourceName,
-        sourceConfig,
-        tableName
-      });
-
-      // If we classified entries, read again to update database
-      if (classificationResult.classified > 0 && classificationResult.files_modified?.length > 0) {
-        const fileFilter = classificationResult.files_modified.join(',');
-        const resyncResult = await runPluginCommand(plugin, 'read', sourceConfig, {
-          LAST_SYNC_TIME: '',
-          SOURCE_ID: sourceId,
-          FILE_FILTER: fileFilter
-        }, sourceName);
-        if (resyncResult.success && resyncResult.data) {
-          const resyncEntries = Array.isArray(resyncResult.data)
-            ? resyncResult.data
-            : resyncResult.data.entries || [];
-          const resyncFiles = resyncResult.data.files_processed || null;
-          insertEntries(db, tableName, plugin.type, resyncEntries, sourceId, resyncFiles);
-        }
-      }
-    } catch (error) {
-      // Log but never fail sync due to classification
-      console.warn(`Warning: Auto-classification failed for ${sourceId}: ${error.message}`);
-    }
-  }
-
-  // Run auto-priority if enabled (never fails the sync)
-  let priorityResult = null;
-  const supportsPriorityClassification = plugin.settings?.supports_priority_classification?.default !== false;
-  if (!skipWriteHooks && sourceConfig.auto_add_priority && supportsPriorityClassification && getPluginAccess(plugin) === 'read-write') {
-    try {
-      priorityResult = await runAutoPriority({
-        db,
-        plugin,
-        sourceName,
-        sourceConfig,
-        tableName
-      });
-
-      // If we prioritized entries, read again to update database
-      if (priorityResult.prioritized > 0 && priorityResult.files_modified?.length > 0) {
-        const fileFilter = priorityResult.files_modified.join(',');
-        const resyncResult = await runPluginCommand(plugin, 'read', sourceConfig, {
-          LAST_SYNC_TIME: '',
-          SOURCE_ID: sourceId,
-          FILE_FILTER: fileFilter
-        }, sourceName);
-        if (resyncResult.success && resyncResult.data) {
-          const resyncEntries = Array.isArray(resyncResult.data)
-            ? resyncResult.data
-            : resyncResult.data.entries || [];
-          const resyncFiles = resyncResult.data.files_processed || null;
-          insertEntries(db, tableName, plugin.type, resyncEntries, sourceId, resyncFiles);
-        }
-      }
-    } catch (error) {
-      // Log but never fail sync due to priority assignment
-      console.warn(`Warning: Auto-priority failed for ${sourceId}: ${error.message}`);
-    }
-  }
+  const hooks = skipWriteHooks ? {} : await runSyncWriteHooks({ db, plugin, sourceName, sourceConfig, sourceId, tableName, skipAutoTag });
 
   // Force WAL checkpoint to ensure writes are visible to other processes
   // Critical for rapid timer start/stop cycles in different processes
@@ -1249,19 +1213,13 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   db.pragma('wal_checkpoint(FULL)');
 
   const incrementalMsg = isIncremental ? ' (incremental)' : '';
-  const archiveMsg = archiveResult?.archived ? `, archived ${archiveResult.archived}` : '';
-  const rebalanceMsg = archiveResult?.rebalanced ? `, rebalanced` : '';
-  const taggingMsg = taggingResult?.tagged ? `, tagged ${taggingResult.tagged}` : '';
-  const dateMsg = dateCreatedResult?.added ? `, dated ${dateCreatedResult.added}` : '';
-  const classifyMsg = classificationResult?.classified ? `, classified ${classificationResult.classified}` : '';
-  const priorityMsg = priorityResult?.prioritized ? `, prioritized ${priorityResult.prioritized}` : '';
   const createdSampleMsg = pluginMetadata?.created_sample
     ? `\n    Created sample: ${pluginMetadata.created_sample}`
     : '';
   return {
     success: true,
     count,
-    message: `Synced ${count} entries from ${sourceId}${incrementalMsg}${reconciledMsg}${reconcileMsg}${createdSampleMsg}${metadataMsg}${hintMsg}${warningMsg}${archiveMsg}${rebalanceMsg}${taggingMsg}${dateMsg}${classifyMsg}${priorityMsg}`
+    message: `Synced ${count} entries from ${sourceId}${incrementalMsg}${reconciledMsg}${reconcileMsg}${createdSampleMsg}${metadataMsg}${hintMsg}${warningMsg}${writeHooksMessage(hooks)}`
   };
 }
 
@@ -1335,6 +1293,239 @@ function reconcileFileRows(db, tableName, sourceId, filesProcessed, { complete =
     for (const file of toDelete) deleted += deleteRowsForFile(db, tableName, sourceId, file);
   })();
   return deleted;
+}
+
+/**
+ * The write hooks of a sync: auto-tag, auto-archive, auto date-created,
+ * stage classification and priority, each when its source config enables it
+ * and the plugin is read-write. They act on the whole source (its rows, or
+ * all its files), not just what the read returned, and re-read any files
+ * they change. None of them ever fails the sync.
+ * @returns {Promise<object>} each hook's result, or null when it didn't run
+ */
+async function runSyncWriteHooks({ db, plugin, sourceName, sourceConfig, sourceId, tableName, skipAutoTag }) {
+  // Run auto-tagger if enabled (never fails the sync)
+  let taggingResult = null;
+  const taggableField = sourceConfig.taggable_field || plugin.settings?.taggable_field?.default;
+  if (!skipAutoTag && sourceConfig.auto_add_topics && taggableField && getPluginAccess(plugin) === 'read-write') {
+    try {
+      const updater = createFileBasedUpdater(PROJECT_ROOT);
+      taggingResult = await runAutoTagger({
+        db,
+        plugin,
+        sourceName,
+        sourceConfig,
+        tableName,
+        taggableField,
+        updateEntry: (id, newValue) => updater.update(id, newValue)
+      });
+
+      // Flush any file changes
+      updater.flush();
+
+      // If we tagged entries, read again to update database
+      if (taggingResult.tagged > 0) {
+        const resyncResult = await runPluginCommand(plugin, 'read', sourceConfig, {
+          LAST_SYNC_TIME: '', // Force full re-read of modified files
+          SOURCE_ID: sourceId
+        }, sourceName);
+        if (resyncResult.success && resyncResult.data) {
+          const resyncEntries = Array.isArray(resyncResult.data)
+            ? resyncResult.data
+            : resyncResult.data.entries || [];
+          const resyncFiles = resyncResult.data.files_processed || null;
+          insertEntries(db, tableName, plugin.type, resyncEntries, sourceId, resyncFiles);
+        }
+      }
+    } catch (error) {
+      // Log but never fail sync due to tagging
+      console.warn(`Warning: Auto-tagging failed for ${sourceId}: ${error.message}`);
+    }
+  }
+
+  // Run auto-archive first if enabled (removes completed tasks, rebalances files)
+  let archiveResult = null;
+  if (sourceConfig.auto_archive_completed && getPluginAccess(plugin) === 'read-write') {
+    try {
+      archiveResult = await runAutoArchive({
+        plugin,
+        sourceName,
+        sourceConfig
+      });
+
+      // If we archived/rebalanced, read again to update database
+      if (archiveResult.files_modified?.length > 0) {
+        const fileFilter = archiveResult.files_modified.join(',');
+        const resyncResult = await runPluginCommand(plugin, 'read', sourceConfig, {
+          LAST_SYNC_TIME: '',
+          SOURCE_ID: sourceId,
+          FILE_FILTER: fileFilter
+        }, sourceName);
+        if (resyncResult.success && resyncResult.data) {
+          const resyncEntries = Array.isArray(resyncResult.data)
+            ? resyncResult.data
+            : resyncResult.data.entries || [];
+          const resyncFiles = resyncResult.data.files_processed || null;
+          insertEntries(db, tableName, plugin.type, resyncEntries, sourceId, resyncFiles);
+        }
+      }
+    } catch (error) {
+      // Log but never fail sync due to archiving
+      console.warn(`Warning: Auto-archive failed for ${sourceId}: ${error.message}`);
+    }
+  }
+
+  // Run auto date-created if enabled (never fails the sync)
+  let dateCreatedResult = null;
+  if (sourceConfig.auto_add_date_created && getPluginAccess(plugin) === 'read-write') {
+    try {
+      dateCreatedResult = await runAutoDateCreated({
+        db,
+        plugin,
+        sourceName,
+        sourceConfig,
+        tableName
+      });
+
+      // If we added dates, read again to update database
+      if (dateCreatedResult.added > 0 && dateCreatedResult.files_modified?.length > 0) {
+        const fileFilter = dateCreatedResult.files_modified.join(',');
+        const resyncResult = await runPluginCommand(plugin, 'read', sourceConfig, {
+          LAST_SYNC_TIME: '',
+          SOURCE_ID: sourceId,
+          FILE_FILTER: fileFilter
+        }, sourceName);
+        if (resyncResult.success && resyncResult.data) {
+          const resyncEntries = Array.isArray(resyncResult.data)
+            ? resyncResult.data
+            : resyncResult.data.entries || [];
+          const resyncFiles = resyncResult.data.files_processed || null;
+          insertEntries(db, tableName, plugin.type, resyncEntries, sourceId, resyncFiles);
+        }
+      }
+    } catch (error) {
+      // Log but never fail sync due to date adding
+      console.warn(`Warning: Auto date-created failed for ${sourceId}: ${error.message}`);
+    }
+  }
+
+  // Run auto-classification if enabled (never fails the sync)
+  let classificationResult = null;
+  const supportsStageClassification = plugin.settings?.supports_stage_classification?.default !== false;
+  if (sourceConfig.auto_classify_stages && supportsStageClassification && getPluginAccess(plugin) === 'read-write') {
+    try {
+      classificationResult = await runAutoStageClassification({
+        db,
+        plugin,
+        sourceName,
+        sourceConfig,
+        tableName
+      });
+
+      // If we classified entries, read again to update database
+      if (classificationResult.classified > 0 && classificationResult.files_modified?.length > 0) {
+        const fileFilter = classificationResult.files_modified.join(',');
+        const resyncResult = await runPluginCommand(plugin, 'read', sourceConfig, {
+          LAST_SYNC_TIME: '',
+          SOURCE_ID: sourceId,
+          FILE_FILTER: fileFilter
+        }, sourceName);
+        if (resyncResult.success && resyncResult.data) {
+          const resyncEntries = Array.isArray(resyncResult.data)
+            ? resyncResult.data
+            : resyncResult.data.entries || [];
+          const resyncFiles = resyncResult.data.files_processed || null;
+          insertEntries(db, tableName, plugin.type, resyncEntries, sourceId, resyncFiles);
+        }
+      }
+    } catch (error) {
+      // Log but never fail sync due to classification
+      console.warn(`Warning: Auto-classification failed for ${sourceId}: ${error.message}`);
+    }
+  }
+
+  // Run auto-priority if enabled (never fails the sync)
+  let priorityResult = null;
+  const supportsPriorityClassification = plugin.settings?.supports_priority_classification?.default !== false;
+  if (sourceConfig.auto_add_priority && supportsPriorityClassification && getPluginAccess(plugin) === 'read-write') {
+    try {
+      priorityResult = await runAutoPriority({
+        db,
+        plugin,
+        sourceName,
+        sourceConfig,
+        tableName
+      });
+
+      // If we prioritized entries, read again to update database
+      if (priorityResult.prioritized > 0 && priorityResult.files_modified?.length > 0) {
+        const fileFilter = priorityResult.files_modified.join(',');
+        const resyncResult = await runPluginCommand(plugin, 'read', sourceConfig, {
+          LAST_SYNC_TIME: '',
+          SOURCE_ID: sourceId,
+          FILE_FILTER: fileFilter
+        }, sourceName);
+        if (resyncResult.success && resyncResult.data) {
+          const resyncEntries = Array.isArray(resyncResult.data)
+            ? resyncResult.data
+            : resyncResult.data.entries || [];
+          const resyncFiles = resyncResult.data.files_processed || null;
+          insertEntries(db, tableName, plugin.type, resyncEntries, sourceId, resyncFiles);
+        }
+      }
+    } catch (error) {
+      // Log but never fail sync due to priority assignment
+      console.warn(`Warning: Auto-priority failed for ${sourceId}: ${error.message}`);
+    }
+  }
+
+  return { taggingResult, archiveResult, dateCreatedResult, classificationResult, priorityResult };
+}
+
+function writeHooksMessage({ taggingResult, archiveResult, dateCreatedResult, classificationResult, priorityResult } = {}) {
+  return [
+    archiveResult?.archived ? `, archived ${archiveResult.archived}` : '',
+    archiveResult?.rebalanced ? `, rebalanced` : '',
+    taggingResult?.tagged ? `, tagged ${taggingResult.tagged}` : '',
+    dateCreatedResult?.added ? `, dated ${dateCreatedResult.added}` : '',
+    classificationResult?.classified ? `, classified ${classificationResult.classified}` : '',
+    priorityResult?.prioritized ? `, prioritized ${priorityResult.prioritized}` : '',
+  ].join('');
+}
+
+/**
+ * Whether a sync of this source would run the auto-tagger (see
+ * runSyncWriteHooks), so whether a sync that skips it leaves it owed.
+ */
+function autoTagConfigured(plugin, sourceConfig) {
+  const taggableField = sourceConfig.taggable_field || plugin.settings?.taggable_field?.default;
+  return Boolean(sourceConfig.auto_add_topics && taggableField && getPluginAccess(plugin) === 'read-write');
+}
+
+/**
+ * Whether a sync of this source would run any write hook but the auto-tagger
+ * (see runSyncWriteHooks), so whether a read-only sync leaves any owed.
+ */
+function fileHooksConfigured(plugin, sourceConfig) {
+  if (getPluginAccess(plugin) !== 'read-write') return false;
+  return Boolean(
+    sourceConfig.auto_archive_completed
+    || sourceConfig.auto_add_date_created
+    || (sourceConfig.auto_classify_stages && plugin.settings?.supports_stage_classification?.default !== false)
+    || (sourceConfig.auto_add_priority && plugin.settings?.supports_priority_classification?.default !== false)
+  );
+}
+
+/**
+ * extra_data with the owed-hook markers set as owed says ({ hooks, tag }).
+ */
+function withOwedHooks(extra, { hooks = false, tag = false } = {}) {
+  if (!hooks && !tag) return extra;
+  return {
+    ...(extra || {}),
+    ...(hooks ? { write_hooks_pending: true } : {}),
+    ...(tag ? { auto_tag_pending: true } : {}),
+  };
 }
 
 function parseExtraData(raw) {

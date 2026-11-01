@@ -26,6 +26,9 @@ import { extractRoleBlocks } from '../../src/diary-role-blocks.js';
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 const lastSyncTime = process.env.LAST_SYNC_TIME || '';
+// READ_ONLY=true (an MCP server's pre-read sync): read the diary files as they
+// stand. No cleanup of past days and no creating or updating today's file.
+const readOnly = process.env.READ_ONLY === 'true';
 
 const diaryDirectory = config.diary_directory || (process.env.VAULT_PATH ? `${process.env.VAULT_PATH}/diary` : 'vault/diary');
 const diaryDir = path.join(projectRoot, diaryDirectory);
@@ -674,20 +677,25 @@ let isIncremental = false;
 let createdTodaysFile = false;
 let removedEmptyFiles = [];
 
-// Create diary directory if it doesn't exist
-if (!fs.existsSync(diaryDir)) {
-  fs.mkdirSync(diaryDir, { recursive: true });
+let sectionCleanupResult = { cleaned: [], skipped: [] };
+let cleanupResult = { removed: [], skipped: [] };
+
+if (!readOnly) {
+  // Create diary directory if it doesn't exist
+  if (!fs.existsSync(diaryDir)) {
+    fs.mkdirSync(diaryDir, { recursive: true });
+  }
+
+  // Remove TODAY sections from old diary files (not relevant after the day passes)
+  sectionCleanupResult = removeTodaySectionsFromOldFiles();
+
+  // Clean up empty diary files from previous days
+  cleanupResult = cleanupEmptyDiaryFiles();
+  removedEmptyFiles = cleanupResult.removed;
+
+  // Ensure today's diary file exists
+  createdTodaysFile = ensureTodaysDiaryFile();
 }
-
-// Remove TODAY sections from old diary files (not relevant after the day passes)
-const sectionCleanupResult = removeTodaySectionsFromOldFiles();
-
-// Clean up empty diary files from previous days
-const cleanupResult = cleanupEmptyDiaryFiles();
-removedEmptyFiles = cleanupResult.removed;
-
-// Ensure today's diary file exists
-createdTodaysFile = ensureTodaysDiaryFile();
 
 // Get list of diary files to process
 let diaryFiles = [];

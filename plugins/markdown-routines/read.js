@@ -30,6 +30,9 @@ const projectRoot = process.env.PROJECT_ROOT || process.cwd();
 const routinesDirectory = config.routines_directory || `${process.env.VAULT_PATH}/routines`;
 const historyLimit = config.history_limit || 30;
 const fileFilter = process.env.FILE_FILTER || '';
+// READ_ONLY=true (an MCP server's pre-read sync): report the routines as the
+// files stand. No period reset, no new directory or sample routine.
+const readOnly = process.env.READ_ONLY === 'true';
 
 // Get timezone from global config
 const globalConfigPath = process.env.CONFIG_PATH || path.join(projectRoot, 'config.toml');
@@ -328,7 +331,7 @@ function processRoutine(filePath, today) {
   const currentPeriodStr = formatDate(currentPeriodStart);
   const periodStartsToday = currentPeriodStr === todayStr;
 
-  const needsReset = scheduledDate && (
+  const needsReset = !readOnly && scheduledDate && (
     periodStartsToday
       ? scheduledDate < todayStr      // yesterday < today
       : scheduledDate <= todayStr     // next period start has arrived
@@ -543,7 +546,7 @@ const processed = [];
 let createdSample = null;
 
 // Create routines directory if it doesn't exist
-if (!fs.existsSync(routinesDir)) {
+if (!readOnly && !fs.existsSync(routinesDir)) {
   fs.mkdirSync(routinesDir, { recursive: true });
 }
 
@@ -561,6 +564,8 @@ if (filterFiles) {
   files = filterFiles.filter(f => fs.existsSync(f) && f.endsWith('.md') &&
     (f === routinesDir || f.startsWith(routinesDir + path.sep)));
   isIncremental = true;
+} else if (!fs.existsSync(routinesDir)) {
+  files = []; // read-only, so the directory wasn't created above
 } else {
   files = fs.readdirSync(routinesDir)
     .filter(f => f.endsWith('.md'))
@@ -568,7 +573,7 @@ if (filterFiles) {
 }
 
 // Create sample routine if none exist (only on full scan)
-if (!isIncremental && files.length === 0) {
+if (!readOnly && !isIncremental && files.length === 0) {
   const todayStr = formatDate(getToday());
   const samplePath = path.join(routinesDir, 'morning.md');
   writeFileAtomic(samplePath, getSampleMorningRoutine(todayStr));
