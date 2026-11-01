@@ -5,6 +5,7 @@
  */
 
 import { jest } from '@jest/globals';
+import crypto from 'crypto';
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
@@ -14,7 +15,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { clearConfigCache } from '../src/config.js';
-import { attachMcp, bearerToken, getMcpConfig, tokenMatches, MCP_PATH, SESSION_IDLE_MS } from '../src/web-mcp.js';
+import { attachMcp, bearerToken, createMcpHandler, getMcpConfig, getOrCreateMcpToken, readStoredMcpToken, tokenMatches, MCP_PATH, MCP_TOKEN_ENV, SESSION_IDLE_MS } from '../src/web-mcp.js';
 import { createMCPServer, WRITE_TOOLS } from '../src/mcp-server.js';
 import { startServer } from './helpers/a11y-harness.js';
 
@@ -66,6 +67,101 @@ function stubServer({ readOnly }) {
   }));
   return server;
 }
+
+describe('readStoredMcpToken', () => {
+  test('returns the stored token after a successful read', () => {
+    expect(readStoredMcpToken({ exec: () => 'stored-token\n' })).toBe('stored-token');
+  });
+
+  test('returns null when a successful read is empty', () => {
+    expect(readStoredMcpToken({ exec: () => '\n' })).toBeNull();
+  });
+
+  test('a key that was never set is a confirmed absence, not a read failure', () => {
+    // `dotenvx get` exits 1 with this on stderr when the key is not in .env.
+    const error = Object.assign(new Error('Command failed: npx dotenvx get MCP_TOKEN'), {
+      status: 1,
+      stderr: '\u2620 [MISSING_KEY] missing key (MCP_TOKEN). fix: [https://github.com/dotenvx/dotenvx/issues/759]\n',
+      stdout: ''
+    });
+    expect(readStoredMcpToken({ exec: () => { throw error; } })).toBeNull();
+  });
+
+  test('propagates read failures instead of reporting absence', () => {
+    const error = new Error('dotenvx get failed');
+    expect(() => readStoredMcpToken({ exec: () => { throw error; } })).toThrow(error);
+  });
+});
+
+describe('getOrCreateMcpToken', () => {
+  const quiet = { log: () => {}, error: () => {} };
+
+  test('uses the token already in the environment without touching .env', () => {
+    const env = { [MCP_TOKEN_ENV]: 'from-env' };
+    const readStored = jest.fn();
+    const store = jest.fn();
+    expect(getOrCreateMcpToken({ env, readStored, store, log: quiet })).toBe('from-env');
+    expect(readStored).not.toHaveBeenCalled();
+    expect(store).not.toHaveBeenCalled();
+  });
+
+  test('reuses the token stored in .env when the environment lacks it (#701)', () => {
+    const env = {};
+    const store = jest.fn();
+    const token = getOrCreateMcpToken({ env, readStored: () => 'stored-token', store, log: quiet });
+    expect(token).toBe('stored-token');
+    expect(env[MCP_TOKEN_ENV]).toBe('stored-token');
+    expect(store).not.toHaveBeenCalled();
+  });
+
+  test('generates and stores a token after a successful empty read', () => {
+    const env = {};
+    const store = jest.fn();
+    const token = getOrCreateMcpToken({ env, readStored: () => readStoredMcpToken({ exec: () => '\n' }), store, log: quiet });
+    expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(store).toHaveBeenCalledWith(token);
+    expect(env[MCP_TOKEN_ENV]).toBe(token);
+  });
+
+  test('does not generate or store a token on a read failure and leaves MCP unavailable', async () => {
+    const env = {};
+    const error = new Error('dotenvx get failed');
+    const store = jest.fn();
+    const log = { log: jest.fn(), error: jest.fn() };
+    const randomBytes = jest.spyOn(crypto, 'randomBytes');
+    try {
+      const token = getOrCreateMcpToken({
+        env,
+        readStored: () => readStoredMcpToken({ exec: () => { throw error; } }),
+        store,
+        log
+      });
+      expect(token).toBeNull();
+      expect(randomBytes).not.toHaveBeenCalled();
+      expect(store).not.toHaveBeenCalled();
+      expect(env).not.toHaveProperty(MCP_TOKEN_ENV);
+      expect(log.error).toHaveBeenCalledWith('Warning: Could not read MCP token from .env:', error.message);
+      expect(log.log).not.toHaveBeenCalled();
+
+      const handler = createMcpHandler({ config: () => ({ enabled: true }), token: () => env[MCP_TOKEN_ENV] });
+      const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+      await handler({ headers: {} }, res);
+      expect(res.status).toHaveBeenCalledWith(503);
+      expect(res.json).toHaveBeenCalledWith({ error: `${MCP_TOKEN_ENV} is not set` });
+    } finally {
+      randomBytes.mockRestore();
+    }
+  });
+
+  test('a second start after generation reuses the generated token', () => {
+    const vault = {};
+    const store = jest.fn((t) => { vault.token = t; });
+    const first = getOrCreateMcpToken({ env: {}, readStored: () => vault.token || null, store, log: quiet });
+    const second = getOrCreateMcpToken({ env: {}, readStored: () => vault.token || null, store, log: quiet });
+    expect(second).toBe(first);
+    expect(store).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('the /mcp endpoint', () => {
   let httpServer;
