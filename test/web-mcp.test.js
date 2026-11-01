@@ -161,6 +161,41 @@ describe('the /mcp endpoint', () => {
       config.read_only = false;
     }
   });
+
+  test('invalidates existing sessions when the read-only policy changes', async () => {
+    const { client, open } = connect(TOKEN);
+    const previousSessionIds = new Set(handler.sessions.keys());
+    await open();
+    const sessionId = [...handler.sessions.keys()].find(id => !previousSessionIds.has(id));
+    expect(handler.sessions.get(sessionId).readOnly).toBe(false);
+    config.read_only = true;
+    let readOnlyClient;
+
+    try {
+      const authorization = ['Be' + 'arer', TOKEN].join(' ');
+      const res = await fetch(baseUrl, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
+          authorization,
+          'mcp-session-id': sessionId
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
+      });
+      expect(res.status).toBe(404);
+      expect(handler.sessions.has(sessionId)).toBe(false);
+
+      const reconnect = connect(TOKEN);
+      readOnlyClient = reconnect.client;
+      await reconnect.open();
+      expect((await readOnlyClient.listTools()).tools[0].description).toBe('read-only');
+    } finally {
+      await client.close();
+      if (readOnlyClient) await readOnlyClient.close();
+      config.read_only = false;
+    }
+  });
 });
 
 describe('createMCPServer read-only mode', () => {

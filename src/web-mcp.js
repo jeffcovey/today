@@ -117,6 +117,12 @@ export function createMcpHandler({
         jsonRpcError(res, 404, -32001, 'Session not found');
         return;
       }
+      if (session.readOnly !== readOnly) {
+        sessions.delete(sessionId);
+        await session.transport.close().catch(() => {});
+        jsonRpcError(res, 404, -32001, 'Session policy changed; initialize a new session');
+        return;
+      }
       session.lastSeen = Date.now();
       await session.transport.handleRequest(req, res, req.body);
       return;
