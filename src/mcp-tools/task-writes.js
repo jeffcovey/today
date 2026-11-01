@@ -112,6 +112,35 @@ export function locateTask(db, args, { projectRoot = PROJECT_ROOT, vaultPath = g
     shifted = index !== lineNumber - 1;
   }
 
+  // Two tasks can share one exact line. Then a match at the old position is
+  // this task only if every copy is still where the last sync saw it; else a
+  // deleted copy's neighbour may have shifted into its place.
+  if (meta.raw_line) {
+    const inFile = [];
+    lines.forEach((line, i) => { if (line === meta.raw_line) inFile.push(i + 1); });
+    if (inFile.length > 1) {
+      const prefix = `${task.source}:${file}:`;
+      let synced = [];
+      try {
+        synced = db.prepare(`
+          SELECT id FROM tasks
+          WHERE source = ? AND substr(id, 1, ?) = ?
+            AND json_valid(metadata) AND json_extract(metadata, '$.raw_line') = ?
+        `).all(task.source, prefix.length, prefix, meta.raw_line)
+          .map(row => Number(row.id.slice(prefix.length)))
+          .sort((a, b) => a - b);
+      } catch {
+        synced = [];
+      }
+      if (synced.join(',') !== inFile.join(',')) {
+        return {
+          ok: false,
+          error: `${file} has ${inFile.length} identical lines for this task and they've moved since the last sync, so which one is this task can't be told. Call sync_data with plugin_type "tasks" and look the task up again. Nothing was changed.`,
+        };
+      }
+    }
+  }
+
   return { ok: true, task, source: task.source, file, abs: real, content, lines, index, shifted };
 }
 
@@ -120,10 +149,17 @@ async function defaultRefresh(db, { source, file }) {
   const { sources } = await getSourcesForType('tasks');
   const match = sources.find(s => s.sourceId === source);
   if (!match) return { success: false, message: `source ${source} is not enabled` };
+  // The plugin reads FILE_FILTER as a comma-separated list, so a file name
+  // with a comma can't be passed through it.
+  if (file.includes(',')) {
+    return { success: false, message: 'the file name has a comma, so the file can\'t be re-read on its own; call sync_data with plugin_type "tasks"' };
+  }
   // Only re-read the file: no auto-archive, dating, stage or priority hooks,
   // which could move or rewrite other tasks (or this one) behind the reply.
+  // Keep the source's sync time as it was: one file re-read doesn't make the
+  // others fresh, so the next read still syncs them when they're due.
   return syncPluginSource(match.plugin, match.sourceName, match.config, { db, vaultPath: getAbsoluteVaultPath() }, {
-    fileFilter: file, skipAutoTag: true, skipWriteHooks: true, _caller: 'mcp-write',
+    fileFilter: file, skipAutoTag: true, skipWriteHooks: true, keepSyncWatermark: true, _caller: 'mcp-write',
   });
 }
 

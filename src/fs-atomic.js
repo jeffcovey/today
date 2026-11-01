@@ -100,9 +100,19 @@ function atomicReplace(filePath, content, encoding) {
     `.${path.basename(filePath)}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   );
 
+  // Keep the target's permissions: the temp file is created with the
+  // process umask, and the rename would otherwise replace a 0600 file's mode.
+  let mode = null;
+  try {
+    mode = fs.statSync(filePath).mode & 0o7777;
+  } catch {
+    // No target yet: the umask decides, as for any new file.
+  }
+
   try {
     const fd = fs.openSync(tmpPath, 'w');
     try {
+      if (mode !== null) fs.fchmodSync(fd, mode);
       fs.writeFileSync(fd, content, { encoding });
       // Flush to disk before the rename so a crash can't leave the renamed
       // target pointing at unflushed (empty) data.
@@ -136,9 +146,17 @@ async function atomicReplaceAsync(filePath, content, encoding) {
     `.${path.basename(filePath)}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   );
 
+  let mode = null;
+  try {
+    mode = (await fsp.stat(filePath)).mode & 0o7777;
+  } catch {
+    // No target yet: the umask decides.
+  }
+
   try {
     const fileHandle = await fsp.open(tmpPath, 'w');
     try {
+      if (mode !== null) await fileHandle.chmod(mode);
       await fileHandle.writeFile(content, { encoding });
       await fileHandle.sync();
     } finally {

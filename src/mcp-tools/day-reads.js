@@ -200,9 +200,16 @@ export function listTimeEntries(db, { startDate, endDate, source, tz, today, now
     const inRange = day !== null && day >= startDate && day <= endDate;
     if (!inRange && !(isRunning && includesToday)) continue;
     seen.add(row.id);
+    // The markdown time-tracking reader works out durations in the host's
+    // zone, which is off by an hour across a DST change when the host isn't
+    // in the configured zone; recount those. Other sources' durations stand.
     const minutes = isRunning
       ? minutesBetween(row.start_time, now, tz)
-      : (row.duration_minutes || minutesBetween(row.start_time, row.end_time, tz));
+      : (String(row.source || '').startsWith('markdown-time-tracking/')
+        ? (parseInstant(row.start_time, tz) && parseInstant(row.end_time, tz)
+          ? minutesBetween(row.start_time, row.end_time, tz)
+          : (row.duration_minutes || 0))
+        : (row.duration_minutes || minutesBetween(row.start_time, row.end_time, tz)));
     entries.push({
       date: day,
       start: formatInstant(row.start_time, tz),
@@ -382,12 +389,28 @@ const BODY_PREVIEW = 500;
 // anyone ping it).
 const HIDDEN_DETAIL = /ping_url|token|secret|password|api_?key/i;
 
+// Nested metadata is cleaned the same way at every level, to this depth.
+const DETAIL_MAX_DEPTH = 4;
+
+function cleanDetail(value, depth) {
+  if (typeof value === 'string') return value.length > 300 ? `${value.slice(0, 300)}…` : value;
+  if (value === null || typeof value !== 'object') return value;
+  if (depth >= DETAIL_MAX_DEPTH) return '[nested data left out]';
+  if (Array.isArray(value)) return value.slice(0, 50).map(item => cleanDetail(item, depth + 1));
+  const out = {};
+  for (const [key, inner] of Object.entries(value)) {
+    if (HIDDEN_DETAIL.test(key)) continue;
+    out[key] = cleanDetail(inner, depth + 1);
+  }
+  return out;
+}
+
 function issueDetails(meta) {
   const out = {};
   for (const [key, value] of Object.entries(meta || {})) {
     if (HIDDEN_DETAIL.test(key)) continue;
     if (['labels', 'assignees', 'milestone', 'closed_at'].includes(key)) continue;
-    out[key] = typeof value === 'string' && value.length > 300 ? `${value.slice(0, 300)}…` : value;
+    out[key] = cleanDetail(value, 1);
   }
   return out;
 }

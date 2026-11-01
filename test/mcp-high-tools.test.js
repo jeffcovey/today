@@ -90,6 +90,17 @@ describe('durations', () => {
     db.prepare("INSERT INTO time_logs (id, source, start_time, description) VALUES ('t1', 'markdown-time-tracking/default', '2026-11-01T09:00:00', 'Writing')").run();
     expect(runningTimers(db, { tz: TZ, now })[0]).toMatchObject({ elapsed_minutes: 30, start: '2026-11-01T09:00:00-05:00' });
   });
+
+  test('markdown time-tracking durations are recounted across a DST change; other sources keep theirs', async () => {
+    const db = makeDb('time-logs');
+    const insert = db.prepare('INSERT INTO time_logs (id, source, start_time, end_time, duration_minutes, description) VALUES (?, ?, ?, ?, ?, ?)');
+    // 01:30 to 03:30 on the spring-forward night is one hour in New York; a
+    // UTC host's reader stored 120.
+    insert.run('m', 'markdown-time-tracking/default', '2026-03-08T01:30:00', '2026-03-08T03:30:00', 120, 'Late work');
+    insert.run('o', 'other-tracker/x', '2026-03-08T05:00:00', '2026-03-08T05:10:00', 25, 'Logged by hand');
+    const value = json(await tool('list_time_entries').handler({ date: '2026-03-08' }, { db, now: new Date('2026-03-09T12:00:00Z') }));
+    expect(value.entries.map(e => [e.description, e.duration_minutes])).toEqual([['Late work', 60], ['Logged by hand', 25]]);
+  });
 });
 
 describe('plan file names', () => {
@@ -267,7 +278,8 @@ describe('list_issues', () => {
     const db = makeDb('issues');
     const insert = db.prepare('INSERT INTO issues (id, source, title, state, opened_at, url, body, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
     insert.run('healthchecks-io/default:newsletter', 'healthchecks-io/default', 'newsletter is DOWN', 'open', '2026-11-01T03:00:00Z', null, null,
-      JSON.stringify({ status: 'down', ping_url: 'https://hc-ping.com/secret-uuid', last_ping: '2026-10-31T03:00:00Z' }));
+      JSON.stringify({ status: 'down', ping_url: 'https://hc-ping.com/secret-uuid', last_ping: '2026-10-31T03:00:00Z',
+        context: { api_key: 'nested-secret', checks: [{ token: 'deep-secret', name: 'nightly' }] } }));
     for (let i = 1; i <= 12; i++) {
       insert.run(`github-issues/today:${i}`, 'github-issues/today', `Issue ${i}`, 'open', `2026-10-${String(i).padStart(2, '0')}T12:00:00Z`,
         `https://github.com/x/y/issues/${i}`, 'body', JSON.stringify({ labels: ['bug'] }));
@@ -285,8 +297,8 @@ describe('list_issues', () => {
     expect(gh).toMatchObject({ total: 12, returned: 10, has_more: true });
     expect(gh.issues[0]).toMatchObject({ number: '12', title: 'Issue 12', labels: ['bug'], opened_at: '2026-10-12T08:00:00-04:00' });
     const hc = value.sources.find(s => s.source === 'healthchecks-io/default').issues[0];
-    expect(hc.details).toEqual({ status: 'down', last_ping: '2026-10-31T03:00:00Z' });
-    expect(JSON.stringify(value)).not.toMatch(/secret-uuid/);
+    expect(hc.details).toEqual({ status: 'down', last_ping: '2026-10-31T03:00:00Z', context: { checks: [{ name: 'nightly' }] } });
+    expect(JSON.stringify(value)).not.toMatch(/secret-uuid|nested-secret|deep-secret/);
   });
 
   test('closed issues, source filter and limit', async () => {
@@ -384,6 +396,17 @@ describe('task line edits', () => {
       .toBe('- [ ] Call Sam #project/alpha 📅 2030-01-01');
     expect(updateTaskLine('- [ ] Open [[My  Note]] and `a  b`', { priority: 'low' }))
       .toBe('- [ ] Open [[My  Note]] and `a  b` 🔽');
+  });
+
+  test('tags, dates and priorities inside links and inline code are left alone', () => {
+    expect(updateTaskLine('- [ ] Review [[#topic/work]] #topic/home', { topics: [] })).toBe('- [ ] Review [[#topic/work]]');
+    expect(updateTaskLine('- [ ] Fix [docs](https://x.test/#stage/front-stage) #stage/back-stage', { stage: 'front-stage' }))
+      .toBe('- [ ] Fix [docs](https://x.test/#stage/front-stage) #stage/front-stage');
+    expect(updateTaskLine('- [ ] Water `📅 2026-01-01` 📅 2026-11-01', { due_date: '2026-11-05' }))
+      .toBe('- [ ] Water `📅 2026-01-01` 📅 2026-11-05');
+    expect(updateTaskLine('- [ ] Old [[Note]] 📅 2026-11-01', { title: 'New [[Other]] title' })).toBe('- [ ] New [[Other]] title 📅 2026-11-01');
+    // Only whole tags count.
+    expect(updateTaskLine('- [ ] a#topic/a b', { topics: [] })).toBe('- [ ] a#topic/a b');
   });
 
   test('the title is read the way markdown-tasks reads it', () => {
@@ -577,5 +600,30 @@ describe('postpone_task and update_task', () => {
       ...ctx(), refreshTaskFile: async () => ({ success: true, count: 0, message: 'Skipped markdown-tasks/default: sync already in progress' }),
     });
     expect(result.content[0].text).toMatch(/another sync of the task source was running.*sync_data/);
+  });
+  test('identical task lines that moved since the sync are refused, unmoved ones are not', async () => {
+    setup(['- [ ] Water plants', '- [ ] Water plants', '- [ ] Other']);
+    // Nothing moved: the second copy is still the second task.
+    const ok = await tool('update_task').handler({ task_id: id(2), title: 'Water plants', priority: 'high' }, ctx());
+    expect(json(ok)).toMatchObject({ line_number: 2 });
+    expect(fileLines()).toEqual(['- [ ] Water plants', '- [ ] Water plants ⏫', '- [ ] Other']);
+
+    setup(['- [ ] Water plants', '- [ ] Other', '- [ ] Water plants', '- [ ] Water plants']);
+    // The first copy was deleted; the old third line now sits on line 1... and
+    // line 3 still reads "Water plants", but it is the old fourth task.
+    fs.writeFileSync(file, ['- [ ] Other', '- [ ] Water plants', '- [ ] Water plants'].join('\n'));
+    const before = fs.readFileSync(file, 'utf8');
+    const refused = await tool('update_task').handler({ task_id: id(3), title: 'Water plants', priority: 'low' }, ctx());
+    expect(refused.isError).toBe(true);
+    expect(text(refused)).toMatch(/identical lines .* can't be told/);
+    expect(fs.readFileSync(file, 'utf8')).toBe(before);
+  });
+
+  test('an edit keeps the task file\'s permissions', async () => {
+    setup(['- [ ] Draft report']);
+    fs.chmodSync(file, 0o600);
+    await tool('update_task').handler({ task_id: id(1), title: 'Draft report', priority: 'low' }, ctx());
+    expect(fs.statSync(file).mode & 0o777).toBe(0o600);
+    expect(fileLines()[0]).toBe('- [ ] Draft report 🔽');
   });
 });

@@ -100,4 +100,24 @@ describe('syncPluginSource skipWriteHooks', () => {
     expect(writes()).toBe(0);
     expect(db.prepare('SELECT count(*) AS n FROM tasks').get().n).toBe(1);
   });
+
+  test('keepSyncWatermark leaves the source\'s sync time and file list as they were', async () => {
+    const db = createDb();
+    db.prepare("INSERT INTO sync_metadata (source, last_synced_at, last_sync_files, extra_data) VALUES (?, '2026-01-01 00:00:00', '[\"a.md\",\"f.md\"]', '{\"k\":1}')")
+      .run('skip-write-hooks-stub/default');
+    const { source } = await getWritableSource('tasks', 'skip-write-hooks-stub/default');
+    const result = await syncPluginSource(source.plugin, source.sourceName, source.config, { db, vaultPath: 'vault' }, {
+      fileFilter: 'f.md', skipAutoTag: true, skipWriteHooks: true, keepSyncWatermark: true, _caller: 'test',
+    });
+    expect(result.success).toBe(true);
+    const meta = db.prepare('SELECT last_synced_at, last_sync_files, extra_data FROM sync_metadata WHERE source = ?').get('skip-write-hooks-stub/default');
+    expect(meta).toEqual({ last_synced_at: '2026-01-01 00:00:00', last_sync_files: '["a.md","f.md"]', extra_data: '{"k":1}' });
+    expect(db.prepare('SELECT count(*) AS n FROM tasks').get().n).toBe(1);
+
+    // Without it, a filtered re-read moves the sync time on, as before.
+    await syncPluginSource(source.plugin, source.sourceName, source.config, { db, vaultPath: 'vault' }, {
+      fileFilter: 'f.md', skipAutoTag: true, skipWriteHooks: true, _caller: 'test',
+    });
+    expect(db.prepare('SELECT last_synced_at FROM sync_metadata WHERE source = ?').get('skip-write-hooks-stub/default').last_synced_at).not.toBe('2026-01-01 00:00:00');
+  });
 });

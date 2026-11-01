@@ -14,8 +14,16 @@ const PRIORITY_EMOJI = { highest: '🔺', high: '⏫', medium: '🔼', low: '�
 const PRIORITY_CHARS = '🔺⏫🔼🔽⏬';
 const PRIORITY_ANY = /\s*[🔺⏫🔼🔽⏬]️?/gu;
 const STAGES = ['front-stage', 'back-stage', 'off-stage'];
-const STAGE_TAG = /\s*#stage\/(?:front|back|off)-stage\b/g;
-const TOPIC_TAG = /\s*#topic\/[a-z_-]+/g;
+// Whole tag tokens only: a tag starts the body or follows a space, and
+// ends at a space or the end, so `#topic/work2` or `x#topic/a` aren't cut.
+const STAGE_TAG = /(?:^|\s+)#stage\/(?:front|back|off)-stage(?![\w/-])/g;
+const TOPIC_TAG = /(?:^|\s+)#topic\/[a-z_-]+(?![\w/-])/g;
+// Wikilinks, markdown links and inline code are set aside while a line is
+// edited, so a tag, date or priority inside one is never changed.
+const PROTECTED = /\[\[[^\]\n]*\]\]|\[[^\]\n]*\]\([^)\n]*\)|`[^`\n]*`/g;
+const MASK_OPEN = '\uE000';
+const MASK_CLOSE = '\uE001';
+const MASKED = /\uE000(\d+)\uE001/g;
 const DATE_MARK = { due: '📅', scheduled: '⏳' };
 // New markers go before these, so recurrence, created/done dates and a
 // trailing block id (which Obsidian needs at the very end) stay last.
@@ -125,10 +133,27 @@ export function taskDatesOf(line) {
  * @throws {Error} When a new title is asked for but a recurrence sits inside
  *   the old title, so where the title ends can't be told safely.
  */
+function maskProtected(body) {
+  const saved = [];
+  const masked = body.replace(PROTECTED, span => {
+    saved.push(span);
+    return `${MASK_OPEN}${saved.length - 1}${MASK_CLOSE}`;
+  });
+  return { masked, saved };
+}
+
+function unmask(body, saved) {
+  return body.replace(MASKED, (_, n) => saved[Number(n)]);
+}
+
 export function updateTaskLine(line, changes) {
   const parts = splitTaskLine(line);
   if (!parts) return null;
-  let body = parts.body;
+  // The original line has no private-use mask characters of its own to
+  // confuse with ours; if it does, leave links unprotected rather than guess.
+  const hasMaskChars = /[\uE000\uE001]/u.test(parts.body);
+  const { masked, saved } = hasMaskChars ? { masked: parts.body, saved: [] } : maskProtected(parts.body);
+  let body = masked;
 
   if (changes.title !== undefined) {
     const { title, tail } = splitTitle(body);
@@ -142,7 +167,13 @@ export function updateTaskLine(line, changes) {
       ...[...title.matchAll(/(?:^|\s)(#[\p{L}\p{N}_/-]+)/gu)].map(m => m[1]),
       ...(title.match(/[📅⏳🛫➕✅❌]️?\s*\d{4}-\d{2}-\d{2}/gu) || []),
     ];
-    body = [changes.title.trim(), ...kept].join(' ') + tail;
+    // The new title goes in as written; protect its own links too.
+    const newTitle = changes.title.trim().replace(/[\uE000\uE001]/gu, '');
+    const titleMask = hasMaskChars ? { masked: newTitle, saved: [] } : maskProtected(newTitle);
+    const offset = saved.length;
+    saved.push(...titleMask.saved);
+    const shiftedTitle = titleMask.masked.replace(MASKED, (_, n) => `${MASK_OPEN}${Number(n) + offset}${MASK_CLOSE}`);
+    body = [shiftedTitle, ...kept].join(' ') + tail;
   }
 
   if (changes.priority !== undefined) {
@@ -165,7 +196,7 @@ export function updateTaskLine(line, changes) {
 
   // Each edit above cleans up its own spacing; the rest of the line, links
   // and inline code included, stays exactly as written.
-  body = body.trim();
+  body = unmask(body.trim(), saved);
   return `${parts.prefix}- [${parts.box}] ${body}`;
 }
 
