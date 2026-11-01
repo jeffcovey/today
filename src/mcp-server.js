@@ -5,7 +5,9 @@
  * Provides tools for actions, resources for data access, and prompts for workflows.
  *
  * Usage:
- *   bin/mcp-server
+ *   bin/mcp-server          stdio, for a client on the same machine
+ *   [mcp] enabled = true    in config.toml serves it over HTTP at /mcp
+ *                           inside the web server (see src/web-mcp.js)
  *
  * Configure in Claude Desktop:
  *   {
@@ -38,10 +40,33 @@ import {
   ensureSyncForType,
   syncPluginSource,
   syncAllPlugins,
+  getAIInstructionsByType,
 } from './plugin-loader.js';
 import { schemas, getTableName } from './plugin-schemas.js';
 import { getTodayDate, sqlLocalDate } from './date-utils.js';
+import {
+  syncForRead,
+  waitForReadSyncs,
+  staleNote,
+  listTasks,
+  formatTaskList,
+  LIST_TASKS_DEFAULT_LIMIT,
+  LIST_TASKS_MAX_LIMIT,
+} from './mcp-reads.js';
+import {
+  listEventsForDays,
+  listUpcomingEvents,
+  formatEventList,
+  eventTimeLabel,
+  buildCreateEvent,
+  isoInZone,
+  timeZoneInfo,
+  timeZoneLine,
+  LIST_EVENTS_MAX_DAYS,
+} from './mcp-events.js';
 import { getAbsoluteVaultPath } from './config.js';
+import { addGuidanceToTools, buildServerInstructions, buildContextText } from './mcp-guidance.js';
+import { readLiveContext } from './mcp-live-context.js';
 import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -50,10 +75,23 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 
+async function aiInstructionsByType() {
+  try {
+    return await getAIInstructionsByType();
+  } catch {
+    return null;
+  }
+}
+
+// Tools that change something: hidden and refused on a read-only connection.
+export const WRITE_TOOLS = new Set([
+  'create_task', 'complete_task', 'create_event', 'start_timer', 'stop_timer', 'sync_data',
+]);
+
 /**
  * Create and configure the MCP server
  */
-export function createMCPServer() {
+export function createMCPServer({ readOnly = false } = {}) {
   const server = new Server(
     {
       name: 'today',
@@ -65,6 +103,7 @@ export function createMCPServer() {
         resources: {},
         prompts: {},
       },
+      instructions: buildServerInstructions(),
     }
   );
 
@@ -125,7 +164,7 @@ export function createMCPServer() {
 
       tools.push({
         name: 'list_tasks',
-        description: 'List tasks with optional filters',
+        description: 'List tasks with optional filters. The reply starts with a line giving how many tasks matched and whether more pages exist; when has_more is true, call again with next_offset as offset to get the rest.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -133,7 +172,8 @@ export function createMCPServer() {
             include_completed: { type: 'boolean', description: 'Include completed tasks' },
             stage: { type: 'string', description: 'Filter by stage (front-stage, back-stage, off-stage)' },
             priority: { type: 'string', description: 'Filter by priority' },
-            limit: { type: 'number', description: 'Maximum number of tasks to return' },
+            limit: { type: 'number', description: `Maximum number of tasks to return (default: ${LIST_TASKS_DEFAULT_LIMIT}, max: ${LIST_TASKS_MAX_LIMIT})` },
+            offset: { type: 'number', description: 'Number of matching tasks to skip, for paging (default: 0)' },
           },
         },
       });
@@ -143,13 +183,14 @@ export function createMCPServer() {
     if (pluginTypes.has('events')) {
       tools.push({
         name: 'create_event',
-        description: 'Create a new calendar event',
+        description: `Create a new calendar event. Times without an offset are read in the user's configured time zone (currently ${timeZoneInfo().user_timezone}) unless timezone is given.`,
         inputSchema: {
           type: 'object',
           properties: {
             title: { type: 'string', description: 'Event title' },
-            start_date: { type: 'string', description: 'Start datetime in ISO format (YYYY-MM-DDTHH:MM:SS)' },
-            end_date: { type: 'string', description: 'End datetime in ISO format' },
+            start_date: { type: 'string', description: 'Start, ISO 8601. With Z or an offset (2026-11-05T14:00:00-05:00) it is used as given; without one (2026-11-05T14:00:00) it is a local time in timezone, or in the user\'s configured zone. YYYY-MM-DD for an all-day event.' },
+            end_date: { type: 'string', description: 'End, in the same form as start_date (default: start_date). For all-day events, the day after the last day.' },
+            timezone: { type: 'string', description: 'IANA time zone for start/end times given without an offset, e.g. Europe/London when booking something in another city (default: the user\'s configured zone)' },
             location: { type: 'string', description: 'Event location' },
             description: { type: 'string', description: 'Event description' },
             all_day: { type: 'boolean', description: 'Whether this is an all-day event' },
@@ -161,12 +202,12 @@ export function createMCPServer() {
 
       tools.push({
         name: 'list_events',
-        description: 'List calendar events',
+        description: 'List calendar events overlapping one or more days in the user\'s configured time zone. The reply starts with that zone, its UTC offset, the current time and today\'s date. Timed events give start/end in the user\'s zone with offset plus start_utc/end_utc; all-day events give start_date and an exclusive end_date.',
         inputSchema: {
           type: 'object',
           properties: {
-            date: { type: 'string', description: 'Date to show events for (YYYY-MM-DD), defaults to today' },
-            days: { type: 'number', description: 'Number of days to show (default: 1)' },
+            date: { type: 'string', description: 'First local day to show (YYYY-MM-DD), defaults to today in the user\'s zone' },
+            days: { type: 'number', description: `Number of days to show (default: 1, max: ${LIST_EVENTS_MAX_DAYS})` },
           },
         },
       });
@@ -224,11 +265,33 @@ export function createMCPServer() {
       },
     });
 
-    return { tools };
+    tools.push({
+      name: 'get_context',
+      description: "The user's context, as Today's own AI sees it: the current time and time zone, the user's profile, their instructions overall and for every data source, and live context (today's stage, plan, weather, vault changes). Call it at the start of a conversation.",
+      inputSchema: {
+        type: 'object',
+        properties: {
+          include_live: { type: 'boolean', description: 'Include live context-plugin output (default: true; slower)' },
+        },
+      },
+    });
+
+    // Filter first, so guidance for a type whose tools are hidden here goes
+    // on query_database instead.
+    const visible = readOnly ? tools.filter(tool => !WRITE_TOOLS.has(tool.name)) : tools;
+    addGuidanceToTools(visible, await aiInstructionsByType());
+
+    return { tools: visible };
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
+    if (readOnly && WRITE_TOOLS.has(name)) {
+      return {
+        content: [{ type: 'text', text: `Error: ${name} is not available on this read-only connection` }],
+        isError: true,
+      };
+    }
     const db = getDatabase();
 
     try {
@@ -301,73 +364,21 @@ export function createMCPServer() {
         }
 
         case 'list_tasks': {
-          await ensureSyncForType(db, 'tasks');
-
-          const conditions = [];
-          const params = [];
-
-          if (!args.include_completed) {
-            conditions.push("status = 'open'");
-          }
-
-          if (args.today_only) {
-            const today = getTodayDate();
-            conditions.push("(due_date <= ? OR json_extract(metadata, '$.scheduled_date') <= ?)");
-            params.push(today, today);
-          }
-
-          if (args.stage) {
-            conditions.push("json_extract(metadata, '$.stage') = ?");
-            params.push(args.stage);
-          }
-
-          if (args.priority) {
-            conditions.push('priority = ?');
-            params.push(args.priority);
-          }
-
-          const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-          const limit = args.limit || 50;
-
-          const sql = `
-            SELECT id, title, status, priority, due_date, metadata, source
-            FROM tasks
-            ${whereClause}
-            ORDER BY
-              CASE priority
-                WHEN 'highest' THEN 1
-                WHEN 'high' THEN 2
-                WHEN 'medium' THEN 3
-                WHEN 'low' THEN 4
-                WHEN 'lowest' THEN 5
-                ELSE 6
-              END,
-              due_date NULLS LAST
-            LIMIT ?
-          `;
-
-          const tasks = db.prepare(sql).all(...params, limit);
-
+          const sync = await syncForRead(db, 'tasks');
+          const result = listTasks(db, args);
+          const note = staleNote('tasks', sync);
           return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify(tasks, null, 2),
-            }],
+            content: [
+              { type: 'text', text: timeZoneLine(timeZoneInfo()) },
+              ...(note ? [{ type: 'text', text: note }] : []),
+              { type: 'text', text: formatTaskList(result) },
+            ],
           };
         }
 
         case 'create_event': {
-          const entry = {
-            action: 'create',
-            event: {
-              title: args.title,
-              start_date: args.start_date,
-              end_date: args.end_date || args.start_date,
-              location: args.location,
-              description: args.description,
-              all_day: args.all_day,
-            },
-          };
+          const created = buildCreateEvent(args);
+          const entry = { action: 'create', event: created.event };
 
           const result = await writeEntryAndSync('events', entry, {
             db,
@@ -384,33 +395,24 @@ export function createMCPServer() {
           return {
             content: [{
               type: 'text',
-              text: `Created event: ${args.title}`,
+              text: `Created event: ${args.title}` + (created.startInstant
+                ? ` at ${isoInZone(created.startInstant, created.timezone)} (${created.timezone})`
+                : ` on ${String(args.start_date).slice(0, 10)} (all day)`),
             }],
           };
         }
 
         case 'list_events': {
-          await ensureSyncForType(db, 'events');
+          const sync = await syncForRead(db, 'events');
 
-          const targetDate = args.date || getTodayDate();
-          const days = args.days || 1;
+          const result = listEventsForDays(db, args);
 
-          const endDate = new Date(targetDate);
-          endDate.setDate(endDate.getDate() + days);
-          const endDateStr = endDate.toISOString().split('T')[0];
-
-          const events = db.prepare(`
-            SELECT id, title, start_date, end_date, location, calendar_name, source
-            FROM events
-            WHERE date(start_date) >= ? AND date(start_date) < ?
-            ORDER BY start_date
-          `).all(targetDate, endDateStr);
-
+          const note = staleNote('calendar', sync);
           return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify(events, null, 2),
-            }],
+            content: [
+              ...(note ? [{ type: 'text', text: note }] : []),
+              { type: 'text', text: formatEventList(result) },
+            ],
           };
         }
 
@@ -468,6 +470,10 @@ export function createMCPServer() {
             const vaultPath = getAbsoluteVaultPath();
             const context = { db, vaultPath };
 
+            // A read that timed out may still be syncing in the background
+            // and holding source locks; this sync would skip those sources.
+            await waitForReadSyncs(args.plugin_type);
+
             if (args.plugin_type) {
               await ensureSyncForType(db, args.plugin_type, { force: true, skipAutoTag: false });
             } else {
@@ -486,6 +492,16 @@ export function createMCPServer() {
               isError: true,
             };
           }
+        }
+
+        case 'get_context': {
+          const [instructionsByType, liveContext] = await Promise.all([
+            aiInstructionsByType(),
+            args?.include_live === false ? Promise.resolve(null) : readLiveContext({ readOnly }),
+          ]);
+          return {
+            content: [{ type: 'text', text: buildContextText({ instructionsByType, liveContext }) }],
+          };
         }
 
         case 'query_database': {
@@ -618,7 +634,7 @@ export function createMCPServer() {
 
     try {
       if (uri === 'today://tasks') {
-        await ensureSyncForType(db, 'tasks');
+        await syncForRead(db, 'tasks');
         const tasks = db.prepare(`
           SELECT id, title, status, priority, due_date, metadata, source
           FROM tasks
@@ -639,7 +655,7 @@ export function createMCPServer() {
       }
 
       if (uri === 'today://tasks/today') {
-        await ensureSyncForType(db, 'tasks');
+        await syncForRead(db, 'tasks');
         const today = getTodayDate();
         const tasks = db.prepare(`
           SELECT id, title, status, priority, due_date, metadata, source
@@ -661,46 +677,33 @@ export function createMCPServer() {
       }
 
       if (uri === 'today://events') {
-        await ensureSyncForType(db, 'events');
-        const today = getTodayDate();
-        const events = db.prepare(`
-          SELECT id, title, start_date, end_date, location, calendar_name, source
-          FROM events
-          WHERE date(start_date) >= ?
-          ORDER BY start_date
-          LIMIT 50
-        `).all(today);
+        await syncForRead(db, 'events');
+        const { info, total, has_more, events } = listUpcomingEvents(db, { limit: 50 });
 
         return {
           contents: [{
             uri,
             mimeType: 'application/json',
-            text: JSON.stringify(events, null, 2),
+            text: JSON.stringify({ ...info, total, has_more, events }, null, 2),
           }],
         };
       }
 
       if (uri === 'today://events/today') {
-        await ensureSyncForType(db, 'events');
-        const today = getTodayDate();
-        const events = db.prepare(`
-          SELECT id, title, start_date, end_date, location, calendar_name, source
-          FROM events
-          WHERE date(start_date) = ?
-          ORDER BY start_date
-        `).all(today);
+        await syncForRead(db, 'events');
+        const { info, from, to, events } = listEventsForDays(db, {});
 
         return {
           contents: [{
             uri,
             mimeType: 'application/json',
-            text: JSON.stringify(events, null, 2),
+            text: JSON.stringify({ ...info, from, to, events }, null, 2),
           }],
         };
       }
 
       if (uri === 'today://time-logs') {
-        await ensureSyncForType(db, 'time-logs');
+        await syncForRead(db, 'time-logs');
         const today = getTodayDate();
         const logs = db.prepare(`
           SELECT id, start_time, end_time, duration_minutes, description, source
@@ -720,7 +723,7 @@ export function createMCPServer() {
       }
 
       if (uri === 'today://diary') {
-        await ensureSyncForType(db, 'diary');
+        await syncForRead(db, 'diary');
         const logs = db.prepare(`
           SELECT id, date, content, metadata, source
           FROM diary
@@ -843,8 +846,8 @@ export function createMCPServer() {
     switch (name) {
       case 'daily_planning': {
         // Gather context for daily planning
-        await ensureSyncForType(db, 'tasks');
-        await ensureSyncForType(db, 'events');
+        await syncForRead(db, 'tasks');
+        await syncForRead(db, 'events');
 
         const today = getTodayDate();
 
@@ -857,12 +860,7 @@ export function createMCPServer() {
           LIMIT 20
         `).all(today, today);
 
-        const events = db.prepare(`
-          SELECT title, start_date, end_date, location
-          FROM events
-          WHERE date(start_date) = ?
-          ORDER BY start_date
-        `).all(today);
+        const { info: tzInfo, events } = listEventsForDays(db, {});
 
         let context = '';
         try {
@@ -885,8 +883,10 @@ export function createMCPServer() {
                 type: 'text',
                 text: `Help me plan my day.${focusArea}
 
+${timeZoneLine(tzInfo)}
+
 ## Today's Events
-${events.length > 0 ? events.map(e => `- ${e.start_date.substring(11, 16)}: ${e.title}${e.location ? ` @ ${e.location}` : ''}`).join('\n') : 'No events scheduled'}
+${events.length > 0 ? events.map(e => `- ${eventTimeLabel(e, tzInfo.user_timezone)}: ${e.title}${e.location ? ` @ ${e.location}` : ''}`).join('\n') : 'No events scheduled'}
 
 ## Tasks Due Today
 ${tasks.length > 0 ? tasks.map(t => `- [${t.priority || 'medium'}] ${t.title}`).join('\n') : 'No tasks due'}
@@ -906,7 +906,7 @@ Based on this information, help me:
       }
 
       case 'weekly_review': {
-        await ensureSyncForType(db, 'tasks');
+        await syncForRead(db, 'tasks');
 
         const today = getTodayDate();
         const weekAgo = new Date();
@@ -956,7 +956,7 @@ Please help me:
       }
 
       case 'task_triage': {
-        await ensureSyncForType(db, 'tasks');
+        await syncForRead(db, 'tasks');
 
         const tasks = db.prepare(`
           SELECT id, title, priority, due_date, metadata, source

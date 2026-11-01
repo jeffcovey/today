@@ -8,6 +8,7 @@ import {
   phaseLabel, phaseMinutes, PHASE_WORK, NUDGE_INTERVAL_MS, MAX_NUDGES
 } from './pomodoro.js';
 import { loadTimerState, writeTimerState } from './timer-state-store.js';
+import { getRecentTimerDescriptions, renderRecentTimers } from './recent-timers.js';
 import express from 'express';
 import session from 'express-session';
 import Database from 'better-sqlite3';
@@ -67,6 +68,7 @@ import {
 } from './ai-chat/index.js';
 import { getNavbar, getThemeBootstrapScript, getDisplayMenuHtml, getToolLinksHtml, getSearchToggleHtml, getSearchFormHtml, getSearchRowHtml, THEME_COOKIE_NAME } from './web/navbar.js';
 import { attachConsole, getConsoleConfig, CONSOLE_PATH, CONSOLE_SOCKET_PATH } from './web-console.js';
+import { attachMcp, getMcpConfig, getOrCreateMcpToken, MCP_PATH, MCP_TOKEN_ENV } from './web-mcp.js';
 import { getStoredThemeMode, setStoredThemeMode, isThemeMode, THEME_MODES,
   getStoredThemeName, setStoredThemeName, isThemeName, readWebPreferences } from './web-preferences.js';
 import { listThemes, getThemeStylesheet, BUILT_IN_THEME_ID } from './web/themes.js';
@@ -714,8 +716,20 @@ function getFloatingToggleBtn() {
       </button>`;
 }
 
+// Recent timer descriptions for the idle focus card, newest first. Only
+// looked up when no timer is running, since only the idle card shows them.
+function getRecentTimersFor(timer) {
+  if (timer) return [];
+  try {
+    return getRecentTimerDescriptions(getDatabase());
+  } catch (error) {
+    console.error('Could not read recent timers:', error.message);
+    return [];
+  }
+}
+
 // Helper to get timer widget (active or idle state)
-function getTimerWidget(timer) {
+function getTimerWidget(timer, recentTimers = []) {
   if (timer) {
     return timerCard({
       key: 'focus',
@@ -760,17 +774,20 @@ function getTimerWidget(timer) {
               const text = btn.querySelector('.btn-text');
               const desc = document.getElementById('timerDescription').value;
               if (!desc.trim()) return;
+              const recents = document.querySelectorAll('.timer-recent');
               btn.disabled = true;
+              recents.forEach(b => { b.disabled = true; });
               icon.className = 'fas fa-spinner fa-spin';
               text.textContent = ' Starting...';
               fetch('/api/track/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({description: desc})}).then(() => location.reload()).catch(() => {
                 btn.disabled = false;
+                recents.forEach(b => { b.disabled = false; });
                 icon.className = 'fas fa-play';
                 text.textContent = ' Start';
               })">
               <i class="fas fa-play"></i><span class="btn-text"> Start</span>
             </button>
-          </div>`
+          </div>${renderRecentTimers(recentTimers)}`
     });
   }
 }
@@ -1685,7 +1702,7 @@ async function getActivityBar({ timer }) {
   // looks the same whether it is running or not. There is no banner/pill split
   // to decide any more: the state is in the text and the clock, not in two
   // different shapes.
-  const rowed = [getTimerWidget(timer), taskTimerHtml, pomodoroHtml].filter(Boolean);
+  const rowed = [getTimerWidget(timer, getRecentTimersFor(timer)), taskTimerHtml, pomodoroHtml].filter(Boolean);
 
   return `
     <div class="activity-bar mb-3">
@@ -2824,7 +2841,7 @@ async function renderToml(filePath, urlPath) {
         </nav>
 
         <!-- Time Tracking -->
-        ${getTimerWidget(currentTimer)}
+        ${getTimerWidget(currentTimer, getRecentTimersFor(currentTimer))}
 
         <div class="row">
           <!-- Content column (order-2 on mobile so AI chat appears first) -->
@@ -6108,6 +6125,10 @@ for (const [name, pkg] of Object.entries({
 }
 app.use(`${CONSOLE_PATH}/vendor`, (req, res, next) => (getConsoleConfig().enabled ? next() : res.status(404).end()), consoleVendor);
 
+// The MCP endpoint has its own bearer token rather than the session login, so
+// a connector holds a secret that can be revoked without changing the password.
+attachMcp(app, { token: () => process.env[MCP_TOKEN_ENV] });
+
 app.get(CONSOLE_PATH, authMiddleware, async (req, res) => {
   if (!getConsoleConfig().enabled) {
     res.status(404).send(await renderError(404,
@@ -8844,6 +8865,10 @@ const server = app.listen(PORT, '127.0.0.1', () => {
   console.log(`Web server running on http://localhost:${PORT}`);
   console.log(`Username: ${process.env.WEB_USER || 'admin'}`);
   console.log(`Password: ${process.env.WEB_PASSWORD || '(set WEB_PASSWORD in .env)'}`);
+  if (getMcpConfig().enabled) {
+    getOrCreateMcpToken();
+    console.log(`MCP endpoint: http://localhost:${PORT}${MCP_PATH} (bearer token in .env as ${MCP_TOKEN_ENV})`);
+  }
   // Build the vault file index now so the first dataview page doesn't wait for it
   DataviewAPI.getCachedAllFiles(VAULT_PATH).catch((error) => {
     console.error('Initial vault file index build failed:', error.message);

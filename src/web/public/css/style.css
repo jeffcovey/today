@@ -424,6 +424,7 @@ details.task-section summary::-webkit-details-marker {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
+  align-content: center;
   gap: 0.25rem 0.75rem;
   margin: 2rem 0 0.75rem;
 }
@@ -2198,6 +2199,75 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
 
 .timer-detail {
   margin-top: 0.5rem;
+}
+
+/* Recent timers under "What are you working on?". Plain rows rather than
+   buttons that look like buttons: they are a list to pick from, and five
+   outlined buttons would outweigh the Start beside the field. */
+.timer-recents {
+  margin-top: 0.5rem;
+}
+
+.timer-recents-heading {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.85;
+  margin-bottom: 0.125rem;
+}
+
+.timer-recents-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.timer-recent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  /* Tags that don't fit beside the words drop under them rather than
+     squeezing into a column of their own. */
+  gap: 0 0.5rem;
+  width: 100%;
+  /* 44px is the touch target the rest of the card's controls meet. */
+  min-height: 2.75rem;
+  padding: 0.375rem 0.25rem;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.timer-recent:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.timer-recent:focus-visible {
+  outline: 2px solid var(--today-accent);
+  outline-offset: 1px;
+}
+
+.timer-recent:disabled {
+  cursor: progress;
+}
+
+.timer-recent > i {
+  flex: 0 0 auto;
+  font-size: 0.8em;
+}
+
+.timer-recent-label {
+  overflow-wrap: anywhere;
+}
+
+.timer-recent-tags {
+  font-size: 0.8em;
+  opacity: 0.85;
+  overflow-wrap: anywhere;
 }
 
 /* The timer emoji. They bring their own colour, so no ink token applies;
