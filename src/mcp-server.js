@@ -430,31 +430,45 @@ export function createMCPServer({ readOnly = false } = {}) {
         }
 
         case 'list_projects': {
-          await ensureSyncForType(db, 'projects');
+          const sync = await syncForRead(db, 'projects');
           const { summary, projects } = listProjectsTool(db, args || {}, { today: getTodayDate() });
+          const note = staleNote('projects', sync);
           return {
-            content: [{ type: 'text', text: `${summary}\n${JSON.stringify(projects, null, 2)}` }],
+            content: [
+              ...(note ? [{ type: 'text', text: note }] : []),
+              { type: 'text', text: `${summary}\n${JSON.stringify(projects, null, 2)}` },
+            ],
           };
         }
 
         case 'get_project': {
-          await ensureSyncForType(db, 'projects');
           // markdown-projects' items are rows in the tasks table.
-          await ensureSyncForType(db, 'tasks');
+          const [projectSync, taskSync] = await Promise.all([
+            syncForRead(db, 'projects'),
+            syncForRead(db, 'tasks'),
+          ]);
+          const notes = [staleNote('projects', projectSync), staleNote('tasks', taskSync)].filter(Boolean);
           const project = getProjectTool(db, args, { today: getTodayDate() });
           if (!project) {
             return {
-              content: [{ type: 'text', text: `Error: Project not found: ${args.id}` }],
+              content: [
+                ...notes.map(text => ({ type: 'text', text })),
+                { type: 'text', text: `Error: Project not found: ${args.id}` },
+              ],
               isError: true,
             };
           }
           return {
-            content: [{ type: 'text', text: JSON.stringify(project, null, 2) }],
+            content: [
+              ...notes.map(text => ({ type: 'text', text })),
+              { type: 'text', text: JSON.stringify(project, null, 2) },
+            ],
           };
         }
 
         case 'mark_project_reviewed': {
-          await ensureSyncForType(db, 'projects');
+          // Only to find the project; the write syncs its own source afterwards.
+          await syncForRead(db, 'projects');
           const result = await markProjectReviewed(db, args, { today: getTodayDate() });
           if (!result.success) {
             return {
