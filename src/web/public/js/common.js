@@ -810,6 +810,29 @@ function initializeTimerCards() {
   }
 }
 
+// A recent timer under "What are you working on?": start a new timer with that
+// description, tags and all. Every recent button is disabled while it starts,
+// so a second tap cannot start a second timer.
+function restartRecentTimer(button) {
+  const description = button.dataset.description;
+  if (!description) return;
+  const buttons = Array.from(document.querySelectorAll('.timer-recent'));
+  const icon = button.querySelector('i');
+  buttons.forEach(b => { b.disabled = true; });
+  if (icon) icon.className = 'fas fa-spinner fa-spin';
+  fetch('/api/track/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ description })
+  }).then(response => {
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    location.reload();
+  }).catch(() => {
+    buttons.forEach(b => { b.disabled = false; });
+    if (icon) icon.className = 'fas fa-rotate-right';
+  });
+}
+
 // ── The home page's tabbed card ─────────────────────────────────────────────
 // Driven here rather than through MDB's tab plugin, which arrives from a CDN:
 // the vault listing lives inside a tab panel, and the page's main content

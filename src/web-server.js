@@ -8,6 +8,7 @@ import {
   phaseLabel, phaseMinutes, PHASE_WORK, NUDGE_INTERVAL_MS, MAX_NUDGES
 } from './pomodoro.js';
 import { loadTimerState, writeTimerState } from './timer-state-store.js';
+import { getRecentTimerDescriptions, renderRecentTimers } from './recent-timers.js';
 import express from 'express';
 import session from 'express-session';
 import Database from 'better-sqlite3';
@@ -715,8 +716,20 @@ function getFloatingToggleBtn() {
       </button>`;
 }
 
+// Recent timer descriptions for the idle focus card, newest first. Only
+// looked up when no timer is running, since only the idle card shows them.
+function getRecentTimersFor(timer) {
+  if (timer) return [];
+  try {
+    return getRecentTimerDescriptions(getDatabase());
+  } catch (error) {
+    console.error('Could not read recent timers:', error.message);
+    return [];
+  }
+}
+
 // Helper to get timer widget (active or idle state)
-function getTimerWidget(timer) {
+function getTimerWidget(timer, recentTimers = []) {
   if (timer) {
     return timerCard({
       key: 'focus',
@@ -771,7 +784,7 @@ function getTimerWidget(timer) {
               })">
               <i class="fas fa-play"></i><span class="btn-text"> Start</span>
             </button>
-          </div>`
+          </div>${renderRecentTimers(recentTimers)}`
     });
   }
 }
@@ -1686,7 +1699,7 @@ async function getActivityBar({ timer }) {
   // looks the same whether it is running or not. There is no banner/pill split
   // to decide any more: the state is in the text and the clock, not in two
   // different shapes.
-  const rowed = [getTimerWidget(timer), taskTimerHtml, pomodoroHtml].filter(Boolean);
+  const rowed = [getTimerWidget(timer, getRecentTimersFor(timer)), taskTimerHtml, pomodoroHtml].filter(Boolean);
 
   return `
     <div class="activity-bar mb-3">
@@ -2825,7 +2838,7 @@ async function renderToml(filePath, urlPath) {
         </nav>
 
         <!-- Time Tracking -->
-        ${getTimerWidget(currentTimer)}
+        ${getTimerWidget(currentTimer, getRecentTimersFor(currentTimer))}
 
         <div class="row">
           <!-- Content column (order-2 on mobile so AI chat appears first) -->
