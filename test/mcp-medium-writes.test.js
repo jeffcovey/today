@@ -311,6 +311,9 @@ describe('time entries', () => {
     for (const args of [
       { duration: '25h', description: 'Marathon' },
       { duration: 'a while', description: 'Something' },
+      { duration: '-1h30m', description: 'Negative' },
+      { duration: '1.5h30m', description: 'Compound decimal' },
+      { duration: '1h30m15s', description: 'Trailing seconds' },
       { duration: '20m', description: 'Later', start: '2026-11-01T11:50' },
       { duration: '20m', description: 'a | b' },
       { duration: '20m', description: 'two\nlines' },
@@ -320,6 +323,14 @@ describe('time entries', () => {
       const result = await call('add_time_entry', args, ctx);
       expect(result.isError).toBe(true);
       expect(ctx.writeEntryAndSync.calls).toHaveLength(0);
+    }
+  });
+
+  test('add_time_entry takes each whole duration form parseDuration documents', async () => {
+    for (const [duration, minutes] of [['20m', 20], ['35 minutes', 35], ['5min', 5], ['2h', 120], ['2 hours', 120],
+      ['1.5h', 90], ['0.5hours', 30], ['2h30m', 150], ['1H 30M', 90], ['1hours30minutes', 90]]) {
+      const out = json(await call('add_time_entry', { duration, description: 'Work' }, ctxFor(timeDb())));
+      expect([duration, out.entry.duration_minutes]).toEqual([duration, minutes]);
     }
   });
 
@@ -379,8 +390,22 @@ describe('time entries', () => {
 
       expect(JSON.parse(run(done).stdout).success).toBe(true);
       expect(await fs.readFile(timerFile, 'utf8')).toBe('');
-      const month = await fs.readFile(path.join(root, 'vault/logs/time-tracking/2026-11.md'), 'utf8');
+      const monthFile = path.join(root, 'vault/logs/time-tracking/2026-11.md');
+      const month = await fs.readFile(monthFile, 'utf8');
       expect(month.trim().split('\n')).toHaveLength(2);
+
+      // A stop that can't take the timer's lock changes nothing: no entry is
+      // appended, so a retry doesn't record the interval twice.
+      await fs.writeFile(timerFile, 'Writing\n2026-11-01T11:30:00-05:00');
+      await fs.writeFile(`${timerFile}.lock`, `${process.pid}\n${Date.now()}`);
+      const locked = run(done);
+      expect(JSON.parse(locked.stdout).error).toMatch(/Timed out acquiring file lock/);
+      expect(await fs.readFile(monthFile, 'utf8')).toBe(month);
+      expect(await fs.readFile(timerFile, 'utf8')).toBe('Writing\n2026-11-01T11:30:00-05:00');
+
+      // keep_current_timer takes no lock, so past work is still recorded.
+      expect(JSON.parse(run({ ...done, keep_current_timer: true }).stdout).success).toBe(true);
+      expect((await fs.readFile(monthFile, 'utf8')).trim().split('\n')).toHaveLength(3);
     } finally {
       await fs.rm(root, { recursive: true, force: true });
     }

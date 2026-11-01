@@ -55,6 +55,17 @@ function savedNote(result) {
   };
 }
 
+// The whole of each form parseDuration documents, after the same lower-casing
+// and whitespace removal. parseDuration's hours-and-minutes branch matches
+// anywhere in the input, so "-1h30m" or "1.5h30m" would otherwise read as a
+// number of minutes nobody asked for.
+const DURATION_FORM = /^(?:\d+(?:\.\d*)?h(?:ours?)?|\d+h(?:ours?)?\d+m(?:inutes?|ins?)?|\d+m(?:inutes?|ins?)?)$/;
+
+function readDuration(input) {
+  const normalized = String(input ?? '').toLowerCase().replace(/\s+/g, '');
+  return DURATION_FORM.test(normalized) ? parseDuration(normalized) : 0;
+}
+
 /** A description is one line in a pipe-separated file. */
 function descriptionProblem(description) {
   if (!description) return 'description is required';
@@ -120,7 +131,7 @@ async function addTimeEntry(args, ctx) {
   const problem = descriptionProblem(description);
   if (problem) return errorResult(problem);
 
-  const minutes = parseDuration(args.duration);
+  const minutes = readDuration(args.duration);
   if (!minutes) {
     return errorResult(`Could not read duration "${args.duration ?? ''}". Use forms like 20m, 1.5h, 2h or 1h30m.`);
   }

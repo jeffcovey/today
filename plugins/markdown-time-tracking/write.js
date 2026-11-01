@@ -100,13 +100,20 @@ try {
     // atomic at the syscall level, so a single short log line cannot be torn by
     // concurrent appends. Switching to read-modify-write here would *introduce*
     // a clobber race instead of preventing one.
-    fs.appendFileSync(monthFile, line);
-
-    // Clear current-timer.md (keep file but empty for Apple Shortcuts compatibility),
-    // unless the caller is recording past work alongside a running timer
-    // (keep_current_timer: true), which leaves the timer as it is.
-    if (entry.keep_current_timer !== true) {
-      withFileLocks([currentTimerFile], () => writeFileAtomic(currentTimerFile, ''));
+    //
+    // A caller recording past work alongside a running timer
+    // (keep_current_timer: true) leaves the timer as it is and needs no lock.
+    // Otherwise current-timer.md is cleared (kept but empty for Apple Shortcuts
+    // compatibility), and its lock is taken before the append and held through
+    // the clear: a lock that can't be had then changes nothing, rather than
+    // saving the entry and leaving the timer running for a retry to record again.
+    if (entry.keep_current_timer === true) {
+      fs.appendFileSync(monthFile, line);
+    } else {
+      withFileLocks([currentTimerFile], () => {
+        fs.appendFileSync(monthFile, line);
+        writeFileAtomic(currentTimerFile, '');
+      });
     }
 
     console.log(JSON.stringify({
