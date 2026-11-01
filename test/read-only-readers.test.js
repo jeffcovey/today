@@ -288,6 +288,16 @@ describe('trusted-housesitters', () => {
     expect(output.entries.map(e => e.id)).toEqual(['l1']);
     expect(snapshot(root)).toEqual(before);
   });
+
+  test('READ_ONLY with no cache reports no change, so the stored listings stay', () => {
+    // Only a scrape writes the cache; an empty full snapshot would delete them.
+    const root = tempRoot();
+    const before = snapshot(root);
+    const { status, output } = runReader('trusted-housesitters', root, { readOnly: true });
+    expect(status).toBe(0);
+    expect(output).toEqual({ entries: [], incremental: true });
+    expect(snapshot(root)).toEqual(before);
+  });
 });
 
 describe('apple-health-auto-export', () => {
@@ -319,23 +329,56 @@ describe('ynab-finance', () => {
   const plan = 'Month,Category Group/Category,Category Group,Category,Assigned,Activity,Available\n'
     + '"Dec 2026","Food: Groceries","Food","Groceries","$100.00","-$10.00","$90.00"\n';
 
-  async function setup() {
+  async function setup({ csvs = true, zipped = true } = {}) {
     const root = tempRoot();
-    write(root, 'vault/logs/Budget as of 2026-11-01 09-00 - Register.csv', register);
-    write(root, 'vault/logs/Budget as of 2026-11-01 09-00 - Plan.csv', plan);
-    // A newer export, still zipped.
-    const AdmZip = (await import('adm-zip')).default;
-    const zip = new AdmZip();
-    zip.addFile('Budget as of 2026-12-01 09-00 - Register.csv', Buffer.from(register));
-    zip.addFile('Budget as of 2026-12-01 09-00 - Plan.csv', Buffer.from(plan));
     fs.mkdirSync(path.join(root, '.data'));
-    zip.writeZip(path.join(root, 'vault/logs/Budget as of 2026-12-01 09-00.zip'));
+    if (csvs) {
+      write(root, 'vault/logs/Budget as of 2026-11-01 09-00 - Register.csv', register);
+      write(root, 'vault/logs/Budget as of 2026-11-01 09-00 - Plan.csv', plan);
+    }
+    if (zipped) {
+      // A newer export, still zipped.
+      const AdmZip = (await import('adm-zip')).default;
+      const zip = new AdmZip();
+      zip.addFile('Budget as of 2026-12-01 09-00 - Register.csv', Buffer.from(register));
+      zip.addFile('Budget as of 2026-12-01 09-00 - Plan.csv', Buffer.from(plan));
+      fs.mkdirSync(path.join(root, 'vault/logs'), { recursive: true });
+      zip.writeZip(path.join(root, 'vault/logs/Budget as of 2026-12-01 09-00.zip'));
+    }
     return root;
   }
   const config = { logs_directory: 'vault/logs' };
+  const noChange = { entries: [], incremental: true, metadata: { message: 'Budget as of 2026-12-01 09-00.zip awaits extraction by the next full sync' } };
 
-  test('READ_ONLY reads the extracted CSVs and leaves the ZIP and older files alone', async () => {
+  test('READ_ONLY with a newer ZIP to extract reports no change and leaves the files alone', async () => {
+    // The older CSVs are at best what the last full sync stored already.
     const root = await setup();
+    const before = snapshot(root);
+    const { status, output } = runReader('ynab-finance', root, { config, readOnly: true });
+    expect(status).toBe(0);
+    expect(output).toEqual(noChange);
+    expect(snapshot(root)).toEqual(before);
+  });
+
+  test('READ_ONLY with only a ZIP reports no change, so the stored transactions stay', async () => {
+    // Not an empty snapshot, which would delete them.
+    const root = await setup({ csvs: false });
+    const before = snapshot(root);
+    const { status, output } = runReader('ynab-finance', root, { config, readOnly: true });
+    expect(status).toBe(0);
+    expect(output).toEqual(noChange);
+    expect(snapshot(root)).toEqual(before);
+  });
+
+  test('READ_ONLY reads the newest CSVs when no newer ZIP waits, and leaves older files alone', async () => {
+    const root = await setup({ zipped: false });
+    write(root, 'vault/logs/Budget as of 2026-10-01 09-00 - Register.csv', register);
+    write(root, 'vault/logs/Budget as of 2026-10-01 09-00 - Plan.csv', plan);
+    // Exports are ordered newest first by mtime.
+    const old = new Date('2026-10-01T13:00:00Z');
+    for (const kind of ['Register', 'Plan']) {
+      fs.utimesSync(path.join(root, `vault/logs/Budget as of 2026-10-01 09-00 - ${kind}.csv`), old, old);
+    }
     // The vault only: the reader also caches budget allocations in .data/today.db.
     const vault = path.join(root, 'vault');
     const before = snapshot(vault);

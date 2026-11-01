@@ -824,15 +824,15 @@ function updateSyncMetadata(db, sourceId, filesProcessed, entriesCount, extraDat
  * "no changes" when it couldn't look (its directory is missing, #508), and
  * moving the cursor then would skip files restored with older mtimes. The
  * file list, row count and plugin state stay as the last full sync left
- * them, except write_hooks_pending, which is set or cleared as writeHooksPending
- * says. A filtered re-read (keepWatermark) records nothing.
+ * them, except the owed-hook markers (write_hooks_pending, auto_tag_pending),
+ * which are set or cleared as owed says. A filtered re-read (keepWatermark)
+ * records nothing.
  */
-function recordNoChangeSync(db, sourceId, syncStartedAt, { keepWatermark = false, writeHooksPending = false } = {}) {
+function recordNoChangeSync(db, sourceId, syncStartedAt, { keepWatermark = false, owed = {} } = {}) {
   if (keepWatermark) return;
   const stamp = syncStartedAt || db.prepare(`SELECT datetime('now') AS t`).get().t;
-  const { write_hooks_pending: _owed, ...previous } = parseExtraData(getSyncMetadata(db, sourceId)?.extra_data) || {};
-  const next = { ...previous, checked_at: stamp };
-  if (writeHooksPending) next.write_hooks_pending = true;
+  const { write_hooks_pending: _hooks, auto_tag_pending: _tag, ...previous } = parseExtraData(getSyncMetadata(db, sourceId)?.extra_data) || {};
+  const next = withOwedHooks({ ...previous, checked_at: stamp }, owed);
   db.prepare(`INSERT OR IGNORE INTO sync_metadata (source) VALUES (?)`).run(sourceId);
   db.prepare(`UPDATE sync_metadata SET extra_data = ? WHERE source = ?`)
     .run(JSON.stringify(next), sourceId);
@@ -1106,13 +1106,14 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
     const fingerprint = fileFilter ? previousFingerprint : configFingerprint;
     if (fingerprint) extraData = { ...(extraData || {}), config_fingerprint: fingerprint };
   }
-  // Write hooks a read-only sync skipped stay owed, as write_hooks_pending in
-  // extra_data, until a writable sync runs them. The read-only sync still
-  // moves the cursor, so the next read may well find no changes; the hooks
-  // act on the whole source, not on what that read returns, so they run
-  // then anyway.
+  // Write hooks a sync skipped stay owed in extra_data until a writable sync
+  // runs them: write_hooks_pending for the file hooks a read-only sync
+  // skipped, auto_tag_pending for the auto-tagger, which skipAutoTag skips
+  // too. The skipping sync still moves the cursor, so the next read may well
+  // find no changes; the hooks act on the whole source, not on what that
+  // read returns, so they run then anyway.
   const hooksOwed = previousExtraData.write_hooks_pending === true;
-  const withHooksPending = (extra, pending) => (pending ? { ...(extra || {}), write_hooks_pending: true } : extra);
+  const tagOwed = previousExtraData.auto_tag_pending === true;
   const pluginPurgedRows = Number(pluginMetadata?.rows_purged || 0);
   const metadataMsg = pluginMetadata?.message ? `\n    ${pluginMetadata.message}` : '';
   const hintMsg = pluginMetadata?.hint ? `\n    Hint: ${pluginMetadata.hint}` : '';
@@ -1155,13 +1156,18 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
 
   if (entries.length === 0 && isIncremental) {
     db.transaction(reconcileFiles)();
-    // A writable sync of the whole source runs the hooks still owed.
-    const runOwedHooks = hooksOwed && !skipWriteHooks && !fileFilter;
-    const stillOwed = hooksOwed && !runOwedHooks;
+    // A writable sync of the whole source runs the hooks still owed; the
+    // tagger stays owed while this sync skips it.
+    const canRun = !skipWriteHooks && !fileFilter;
+    const runOwedHooks = canRun && (hooksOwed || (tagOwed && !skipAutoTag));
+    const owed = {
+      hooks: hooksOwed && !runOwedHooks,
+      tag: tagOwed && !(runOwedHooks && !skipAutoTag),
+    };
     let message;
     if (reconciledDeletions > 0 || pluginPurgedRows > 0) {
       const count = db.prepare(`SELECT COUNT(*) as count FROM ${tableName} WHERE source = ?`).get(sourceId).count;
-      updateSyncMetadata(db, sourceId, filesProcessed || [], count, withHooksPending(extraData, stillOwed), syncStartedAt, { keepWatermark });
+      updateSyncMetadata(db, sourceId, filesProcessed || [], count, withOwedHooks(extraData, owed), syncStartedAt, { keepWatermark });
       const messages = [];
       if (reconciledDeletions > 0) messages.push(`Removed ${reconciledDeletions} row(s) for deleted, moved, or excluded file(s)`);
       if (pluginPurgedRows > 0) messages.push(`Removed ${pluginPurgedRows} row(s) for plugin-managed deletions`);
@@ -1169,7 +1175,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
     } else {
       // Nothing changed, but the read succeeded: the source is fresh as of
       // this sync, or readSyncNeeded keeps taking it as stale.
-      recordNoChangeSync(db, sourceId, syncStartedAt, { keepWatermark, writeHooksPending: stillOwed });
+      recordNoChangeSync(db, sourceId, syncStartedAt, { keepWatermark, owed });
       message = `${pluginMetadata?.message || 'No changes since last sync'}${hintMsg}${warningMsg}${reconcileMsg}`;
     }
     if (runOwedHooks) {
@@ -1192,8 +1198,12 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
   reconcileMsg = buildReconcileMsg(reconcileReport);
 
   // Update sync metadata (including plugin-specific state like folder_state for IMAP)
-  const hooksPending = skipWriteHooks && (hooksOwed || writeHooksConfigured(plugin, sourceConfig));
-  updateSyncMetadata(db, sourceId, filesProcessed || [], count, withHooksPending(extraData, hooksPending), syncStartedAt, { keepWatermark });
+  const tagRuns = !skipWriteHooks && !skipAutoTag;
+  const owed = {
+    hooks: skipWriteHooks && (hooksOwed || fileHooksConfigured(plugin, sourceConfig)),
+    tag: !tagRuns && (tagOwed || autoTagConfigured(plugin, sourceConfig)),
+  };
+  updateSyncMetadata(db, sourceId, filesProcessed || [], count, withOwedHooks(extraData, owed), syncStartedAt, { keepWatermark });
 
   const hooks = skipWriteHooks ? {} : await runSyncWriteHooks({ db, plugin, sourceName, sourceConfig, sourceId, tableName, skipAutoTag });
 
@@ -1484,19 +1494,38 @@ function writeHooksMessage({ taggingResult, archiveResult, dateCreatedResult, cl
 }
 
 /**
- * Whether a sync of this source would run any write hook (see
- * runSyncWriteHooks), so whether a read-only sync leaves any owed.
+ * Whether a sync of this source would run the auto-tagger (see
+ * runSyncWriteHooks), so whether a sync that skips it leaves it owed.
  */
-function writeHooksConfigured(plugin, sourceConfig) {
-  if (getPluginAccess(plugin) !== 'read-write') return false;
+function autoTagConfigured(plugin, sourceConfig) {
   const taggableField = sourceConfig.taggable_field || plugin.settings?.taggable_field?.default;
+  return Boolean(sourceConfig.auto_add_topics && taggableField && getPluginAccess(plugin) === 'read-write');
+}
+
+/**
+ * Whether a sync of this source would run any write hook but the auto-tagger
+ * (see runSyncWriteHooks), so whether a read-only sync leaves any owed.
+ */
+function fileHooksConfigured(plugin, sourceConfig) {
+  if (getPluginAccess(plugin) !== 'read-write') return false;
   return Boolean(
-    (sourceConfig.auto_add_topics && taggableField)
-    || sourceConfig.auto_archive_completed
+    sourceConfig.auto_archive_completed
     || sourceConfig.auto_add_date_created
     || (sourceConfig.auto_classify_stages && plugin.settings?.supports_stage_classification?.default !== false)
     || (sourceConfig.auto_add_priority && plugin.settings?.supports_priority_classification?.default !== false)
   );
+}
+
+/**
+ * extra_data with the owed-hook markers set as owed says ({ hooks, tag }).
+ */
+function withOwedHooks(extra, { hooks = false, tag = false } = {}) {
+  if (!hooks && !tag) return extra;
+  return {
+    ...(extra || {}),
+    ...(hooks ? { write_hooks_pending: true } : {}),
+    ...(tag ? { auto_tag_pending: true } : {}),
+  };
 }
 
 function parseExtraData(raw) {

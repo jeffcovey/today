@@ -463,13 +463,23 @@ if (readOnly) {
 
 const ynabZipFiles = zipExtraction.zipFiles;
 const ynabFiles = findYnabFiles(logsDir);
-let latestZip = ynabZipFiles.length > 0 ? ynabZipFiles[0] : null;
+const latestZip = ynabZipFiles.length > 0 ? ynabZipFiles[0] : null;
 // Read-only: a ZIP that hasn't been extracted yet is left for the next full
-// sync, and the newest CSVs already there are read instead.
+// sync. Report no change, which keeps the transactions the last full sync
+// stored. Reading the CSVs already here instead would at best store the same
+// export again, and with only the ZIP here it would be an empty snapshot that
+// deletes them all.
 const isExtracted = zip => ['register', 'plan'].every(kind =>
   ynabFiles[kind].some(f => f.budgetName === zip.budgetName && f.timestamp === zip.timestamp));
 if (readOnly && latestZip && !isExtracted(latestZip)) {
-  latestZip = null;
+  console.log(JSON.stringify({
+    entries: [],
+    incremental: true,
+    metadata: {
+      message: `${latestZip.filename} awaits extraction by the next full sync`
+    }
+  }));
+  process.exit(0);
 }
 const latestRegisterFile = latestZip
   ? ynabFiles.register.find(file => file.budgetName === latestZip.budgetName && file.timestamp === latestZip.timestamp) || null

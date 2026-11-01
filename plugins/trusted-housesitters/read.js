@@ -863,6 +863,17 @@ function loadCache() {
 }
 
 /**
+ * Whether the cache exists and holds a list of listings
+ */
+function cacheReadable() {
+  try {
+    return Array.isArray(JSON.parse(fs.readFileSync(cacheFile, 'utf8')));
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Save listings to cache
  */
 function saveCache(listings) {
@@ -1037,6 +1048,15 @@ async function checkCachedListingStatus(page, listings, alreadyCheckedIds) {
 async function main() {
   try {
     let allListings;
+
+    if (readOnly && !cacheReadable()) {
+      // No cache to read (only a scrape writes it): report no change, which
+      // keeps the listings the last full sync stored, rather than an empty
+      // snapshot that deletes them.
+      console.error('READ_ONLY mode - no readable cache, reporting no change');
+      console.log(JSON.stringify({ entries: [], incremental: true }));
+      return;
+    }
 
     if (contextOnly || readOnly) {
       // Just read from cache for AI context gathering, or for a read-only sync
