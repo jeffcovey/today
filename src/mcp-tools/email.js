@@ -185,6 +185,7 @@ export async function getEmail(args, ctx) {
   if (!id) return errorResult('email_id is required');
   const tz = getConfiguredTimezone();
   const maxChars = clampInt(args.max_chars, BODY_MAX_CHARS, 500, 100000);
+  const note = await freshen(ctx, 'email', 'email');
 
   let row;
   try {
@@ -208,7 +209,7 @@ export async function getEmail(args, ctx) {
     }
   }
   if (!row) {
-    return errorResult(`No synced email has id ${id}. Use list_emails or search_email for ids; mail outside the sync window can only be fetched with bin/email download on the CLI.`);
+    return errorResult(lead(`No synced email has id ${id}. Use list_emails or search_email for ids; mail outside the sync window can only be fetched with bin/email download on the CLI.`, note));
   }
 
   // The body fetcher stores '' for a message with no text or html part (an
@@ -274,7 +275,7 @@ export async function getEmail(args, ctx) {
   if (truncatedAtSync) {
     text += ' The sync stored only the start of this body (the plugin\'s max_body_size), so the rest is not in the local copy; bin/email download can fetch it on the CLI.';
   }
-  return jsonResult(value, `${text} ${DATA_NOTE}`);
+  return jsonResult(value, lead(`${text} ${DATA_NOTE}`, note));
 }
 
 const sourceProp = { type: 'string', description: 'Only this email source, e.g. "icloud" or "imap-email/icloud".' };

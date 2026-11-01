@@ -15,6 +15,9 @@ import {
 } from './_medium-reads-helpers.js';
 
 // The metrics bin/health today and summary lead with.
+export const HISTORY_DEFAULT_LIMIT = 100;
+export const HISTORY_MAX_LIMIT = 1000;
+
 export const KEY_METRICS = [
   'step_count',
   'active_energy',
@@ -25,14 +28,35 @@ export const KEY_METRICS = [
   'heart_rate_variability_sdnn',
 ];
 
-// METRIC_DISPLAY formats weight and distance in US units, but the value is
-// stored in whatever unit the source exported (70 kg stays 70, units "kg").
+// METRIC_DISPLAY labels each value with a fixed unit (lbs, mi, L, bpm...),
+// but the value is stored in whatever unit the source exported (70 kg stays
+// 70, units "kg"; 500 mL stays 500, units "mL"). The formatter's unit is used
+// only when the stored unit is one of its spellings below, or the same word;
+// otherwise the value is shown with the unit it was stored in.
 const DISPLAY_UNITS = {
   lbs: /^(lb|lbs|pound|pounds)$/i,
   mi: /^(mi|mile|miles)$/i,
   in: /^(in|inch|inches)$/i,
   mph: /^(mph|mi\/h|mi\/hr)$/i,
+  kcal: /^(kcal|cal|kilocalories?)$/i,
+  min: /^(min|mins|minutes?)$/i,
+  hrs: /^(h|hr|hrs|hours?)$/i,
+  bpm: /^(bpm|count\/min|beats\/min)$/i,
+  '/min': /^(\/min|count\/min|breaths\/min)$/i,
+  ms: /^(ms|milliseconds?)$/i,
+  dB: /^(db|dbaspl|dbspl|db\s?spl)$/i,
+  L: /^(l|liters?|litres?)$/i,
+  mg: /^mg$/i,
+  mcg: /^(mcg|µg|μg|ug)$/i,
+  g: /^(g|grams?)$/i,
+  drinks: /^(drinks?|count)$/i,
+  '%': /^(%|percent)$/i,
 };
+
+function storedUnitFits(shown, stored) {
+  const known = DISPLAY_UNITS[shown];
+  return known ? known.test(stored) : shown.toLowerCase() === stored.toLowerCase();
+}
 
 function display(name, value, units = null) {
   const d = METRIC_DISPLAY[name];
@@ -43,10 +67,13 @@ function display(name, value, units = null) {
   } catch {
     return { label: d.label, formatted: null };
   }
-  const shown = / (\S+)$/.exec(formatted)?.[1];
+  // The formatter's unit: the last word after a space, or a glued-on %.
+  const m = / (\S+)$|\d(%)$/.exec(formatted);
+  const shown = m ? (m[1] ?? m[2]) : null;
   const stored = units ? String(units).trim() : '';
-  if (stored && DISPLAY_UNITS[shown] && !DISPLAY_UNITS[shown].test(stored)) {
-    formatted = `${round(value, 1)} ${stored}`;
+  if (stored && shown && !storedUnitFits(shown, stored)) {
+    const v = Number(value);
+    formatted = `${Math.abs(v) >= 1 ? round(v, 1) : Number(v.toPrecision(3))} ${stored}`;
   }
   return { label: d.label, formatted };
 }
@@ -110,15 +137,24 @@ export async function healthToday(args, ctx) {
   }, lead(text, note));
 }
 
-/** Resolve a metric argument to one stored metric name, or candidates. */
-function resolveMetric(db, wanted) {
-  const exact = db.prepare('SELECT DISTINCT metric_name FROM health_metrics WHERE LOWER(metric_name) = LOWER(?)').all(wanted);
+/**
+ * Resolve a metric argument to one stored metric name, or candidates. Only
+ * metrics the source filter (if any) keeps are considered, so a metric that
+ * exists only in another source neither matches nor makes the name ambiguous.
+ */
+function resolveMetric(db, wanted, args = {}) {
+  const srcWhere = [];
+  const srcParams = [];
+  sourceClause(args, srcWhere, srcParams);
+  const and = srcWhere.length ? ` AND ${srcWhere.join(' AND ')}` : '';
+  const exact = db.prepare(`SELECT DISTINCT metric_name FROM health_metrics WHERE LOWER(metric_name) = LOWER(?)${and}`).all(wanted, ...srcParams);
   if (exact.length === 1) return { name: exact[0].metric_name };
   const label = Object.entries(METRIC_DISPLAY).filter(([, d]) => d.label.toLowerCase() === wanted.toLowerCase()).map(([k]) => k);
-  const like = db.prepare("SELECT DISTINCT metric_name FROM health_metrics WHERE metric_name LIKE ? ESCAPE '\\' ORDER BY metric_name")
-    .all(likeTerm(wanted.replace(/\s+/g, '_'))).map(r => r.metric_name);
+  const like = db.prepare(`SELECT DISTINCT metric_name FROM health_metrics WHERE metric_name LIKE ? ESCAPE '\\'${and} ORDER BY metric_name`)
+    .all(likeTerm(wanted.replace(/\s+/g, '_')), ...srcParams).map(r => r.metric_name);
   const candidates = [...new Set([...label, ...like])];
-  const present = new Set(db.prepare('SELECT DISTINCT metric_name FROM health_metrics').all().map(r => r.metric_name));
+  const present = new Set(db.prepare(`SELECT DISTINCT metric_name FROM health_metrics${srcWhere.length ? ` WHERE ${srcWhere.join(' AND ')}` : ''}`)
+    .all(...srcParams).map(r => r.metric_name));
   const stored = candidates.filter(c => present.has(c));
   if (stored.length === 1) return { name: stored[0] };
   return { candidates: stored, available: [...present].sort() };
@@ -132,11 +168,12 @@ export async function healthSummary(args, ctx) {
   try {
     if (args.metric) {
       const days = clampInt(args.days, 14, 1, 366);
-      const found = resolveMetric(ctx.db, String(args.metric).trim());
+      const limit = clampInt(args.limit, HISTORY_DEFAULT_LIMIT, 1, HISTORY_MAX_LIMIT);
+      const found = resolveMetric(ctx.db, String(args.metric).trim(), args);
       if (!found.name) {
         const msg = found.candidates.length > 1
           ? `"${args.metric}" matches several metrics: ${found.candidates.join(', ')}. Pass one of them.`
-          : `No metric matches "${args.metric}". Metrics with data: ${found.available.slice(0, 40).join(', ') || 'none'}.`;
+          : `No metric matches "${args.metric}"${args.source ? ` in source "${args.source}"` : ''}. Metrics with data: ${found.available.slice(0, 40).join(', ') || 'none'}.`;
         return errorResult(msg);
       }
       const first = addDays(today, -(days - 1));
@@ -148,6 +185,7 @@ export async function healthSummary(args, ctx) {
         WHERE ${where.join(' AND ')} ORDER BY date DESC, source
       `).all(...params);
       const label = display(found.name, null).label;
+      const page = rows.slice(0, limit);
       const statsOf = list => {
         const values = list.map(r => Number(r.value));
         return { average: round(values.reduce((a, b) => a + b, 0) / values.length), min: round(Math.min(...values)), max: round(Math.max(...values)) };
@@ -166,12 +204,17 @@ export async function healthSummary(args, ctx) {
         from: first,
         to: today,
         days,
+        // count and the stats cover every reading in the window; history is
+        // the newest `limit` of them.
         count: rows.length,
         stats,
         stats_by_units: statsByUnits,
-        history: rows.map(r => ({ date: r.date, value: round(r.value), formatted: display(found.name, r.value, r.units).formatted, units: r.units || null, source: r.source })),
+        returned: page.length,
+        limit,
+        has_more: page.length < rows.length,
+        history: page.map(r => ({ date: r.date, value: round(r.value), formatted: display(found.name, r.value, r.units).formatted, units: r.units || null, source: r.source })),
       }, lead(rows.length
-        ? `${label}: ${rows.length} reading(s) from ${first} through ${today}, newest first.`
+        ? `${label}: ${rows.length} reading(s) from ${first} through ${today}, newest first${page.length < rows.length ? `; history shows the newest ${page.length} (raise limit, up to ${HISTORY_MAX_LIMIT}, or narrow days for more; the stats cover all of them)` : ''}.`
         : `No ${label} readings from ${first} through ${today}.`, note));
     }
 
@@ -378,6 +421,7 @@ export const tools = [
       properties: {
         days: { type: 'number', description: 'Days back, today included (default 7 for the summary, 14 for one metric; max 366).' },
         metric: { type: 'string', description: 'One metric, by stored name (resting_heart_rate) or label (Resting HR).' },
+        limit: { type: 'number', description: `With metric: max readings in the history, newest first (default ${HISTORY_DEFAULT_LIMIT}, max ${HISTORY_MAX_LIMIT}); the stats cover every reading.` },
         all: { type: 'boolean', description: 'Summary of every metric, not only the key ones.' },
         source: sourceProp,
       },

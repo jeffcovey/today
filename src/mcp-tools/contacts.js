@@ -129,14 +129,18 @@ export async function searchContacts(args, ctx) {
   let total;
   let rows;
   try {
-    total = ctx.db.prepare(`SELECT COUNT(*) AS n FROM contacts WHERE ${where}`).get(...params).n;
-    rows = ctx.db.prepare(`
-      SELECT id, source, full_name, nickname, organization, job_title, primary_email, primary_phone,
-             birthday, notes, metadata, location_city, location_state, location_country
-      FROM contacts WHERE ${where}
-      ORDER BY full_name, id
-      LIMIT ?
-    `).all(...params, limit);
+    // One read transaction, so a sync that commits mid-read can't make the
+    // count and the page disagree.
+    ({ total, rows } = ctx.db.transaction(() => ({
+      total: ctx.db.prepare(`SELECT COUNT(*) AS n FROM contacts WHERE ${where}`).get(...params).n,
+      rows: ctx.db.prepare(`
+        SELECT id, source, full_name, nickname, organization, job_title, primary_email, primary_phone,
+               birthday, notes, metadata, location_city, location_state, location_country
+        FROM contacts WHERE ${where}
+        ORDER BY full_name, id
+        LIMIT ?
+      `).all(...params, limit),
+    }))());
   } catch (error) {
     if (isMissingTable(error)) return jsonResult({ query, total: 0, contacts: [] }, 'No contacts have been synced yet.');
     throw error;

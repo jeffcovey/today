@@ -110,7 +110,8 @@ function tableExists(db, name) {
  * scheduled (include upcoming scheduled rows in the transaction stats).
  */
 export function getAccountList(db, { source = null, scheduled = false } = {}) {
-  const sourceLike = source ? `%${source}%` : null;
+  // A substring match: % and _ in the source are literal, not wildcards.
+  const sourceLike = source ? `%${String(source).replace(/[\\%_]/g, c => `\\${c}`)}%` : null;
 
   // Per-account transaction stats from the local cache
   let txSql = `
@@ -122,7 +123,7 @@ export function getAccountList(db, { source = null, scheduled = false } = {}) {
   const txParams = [];
   if (!scheduled) txSql += ` AND date <= DATE('now') AND IFNULL(scheduled, 0) = 0`;
   if (sourceLike) {
-    txSql += ` AND source LIKE ?`;
+    txSql += ` AND source LIKE ? ESCAPE '\\'`;
     txParams.push(sourceLike);
   }
   txSql += ` GROUP BY account`;
@@ -141,7 +142,7 @@ export function getAccountList(db, { source = null, scheduled = false } = {}) {
     `;
     const upParams = [];
     if (sourceLike) {
-      upSql += ` AND source LIKE ?`;
+      upSql += ` AND source LIKE ? ESCAPE '\\'`;
       upParams.push(sourceLike);
     }
     upSql += ` GROUP BY account`;
@@ -153,7 +154,7 @@ export function getAccountList(db, { source = null, scheduled = false } = {}) {
     let balSql = `SELECT * FROM account_balances`;
     const balParams = [];
     if (sourceLike) {
-      balSql += ` WHERE source LIKE ?`;
+      balSql += ` WHERE source LIKE ? ESCAPE '\\'`;
       balParams.push(sourceLike);
     }
     balances = db.prepare(balSql).all(...balParams);
@@ -172,6 +173,8 @@ export function getAccountList(db, { source = null, scheduled = false } = {}) {
       type: b.type,
       on_budget: b.on_budget,
       budget_name: b.budget_name,
+      budget_id: b.budget_id,
+      account_id: b.account_id,
       source: b.source,
       as_of: b.as_of,
       partial: false,
@@ -192,6 +195,8 @@ export function getAccountList(db, { source = null, scheduled = false } = {}) {
       type: null,
       on_budget: null,
       budget_name: null,
+      budget_id: null,
+      account_id: null,
       source: null,
       as_of: null,
       partial: true,

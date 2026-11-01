@@ -20,6 +20,7 @@ export const RECENT_DEFAULT_LIMIT = 20;
 export const MAX_LIMIT = 200;
 export const UNCATEGORIZED_DEFAULT_LIMIT = 40;
 export const UPCOMING_DEFAULT_LIMIT = 50;
+export const BUDGET_LIST_DEFAULT_LIMIT = 10;
 
 function filters(args, where, params, { account = true, category = true } = {}) {
   if (args.source) {
@@ -55,41 +56,74 @@ function txRecord(r) {
  * getAccountList's per-account transaction stats cut at SQLite's UTC
  * DATE('now'). Recount them up to today in the configured zone, and rebuild
  * the partial (summed) accounts from that count.
+ *
+ * A name is not an account: two budgets can each have a "Checking", and a
+ * CSV source can too. Stats are grouped by source and by the YNAB budget and
+ * account ids the transaction metadata carries, and a group counts toward a
+ * stored balance only from the same source, by account id when both sides
+ * have one, otherwise by name within a compatible budget. A group that fits
+ * two balances is counted toward neither; one that fits none is a partial
+ * account of its own source.
  */
 function withLocalDayStats(db, accounts, source, today) {
+  const meta = key => `CASE WHEN json_valid(metadata) THEN json_extract(metadata, '$.${key}') END`;
   let sql = `
-    SELECT account, COUNT(*) AS count, SUM(amount) AS total, MAX(date) AS last_transaction
+    SELECT source, account, ${meta('budget_id')} AS budget_id, ${meta('account_id')} AS account_id,
+           MAX(${meta('budget_name')}) AS budget_name,
+           COUNT(*) AS count, SUM(amount) AS total, MAX(date) AS last_transaction
     FROM financial_transactions
     WHERE superseded_by IS NULL AND date <= ? AND IFNULL(scheduled, 0) = 0
   `;
   const params = [today];
   if (source) {
-    sql += ' AND source LIKE ?';
-    params.push(`%${source}%`);
+    sql += " AND source LIKE ? ESCAPE '\\'";
+    params.push(likeTerm(source));
   }
   let stats;
   try {
-    stats = db.prepare(`${sql} GROUP BY account`).all(...params);
+    stats = db.prepare(`${sql} GROUP BY source, account, budget_id, account_id`).all(...params);
   } catch (error) {
     if (isMissingTable(error)) return accounts;
     throw error;
   }
-  const byAccount = new Map(stats.map(s => [s.account, s]));
-  const stored = accounts.filter(a => !a.partial).map(a => {
-    const s = byAccount.get(a.account);
-    return { ...a, count: s?.count ?? 0, last_transaction: s?.last_transaction ?? null };
-  });
-  const covered = new Set(stored.map(a => a.account));
-  const partial = stats.filter(s => !covered.has(s.account)).map(s => ({
-    account: s.account, balance: s.total, cleared_balance: null, uncleared_balance: null,
-    type: null, on_budget: null, budget_name: null, as_of: null, partial: true,
-    count: s.count, last_transaction: s.last_transaction,
-  }));
-  return [...stored, ...partial].sort((a, b) => a.account.localeCompare(b.account));
+  const budgetFits = (s, b) => !s.budget_id || !b.budget_id || s.budget_id === b.budget_id;
+  const fits = (s, b) => s.source === b.source && budgetFits(s, b) && (s.account_id && b.account_id
+    ? s.account_id === b.account_id
+    : s.account === b.account);
+  const stored = accounts.filter(a => !a.partial).map(a => ({ ...a, count: 0, last_transaction: null }));
+  const unmatched = [];
+  for (const s of stats) {
+    const owners = stored.filter(b => fits(s, b));
+    if (owners.length === 1) {
+      const b = owners[0];
+      b.count += s.count;
+      if (!b.last_transaction || s.last_transaction > b.last_transaction) b.last_transaction = s.last_transaction;
+    } else if (owners.length === 0) {
+      unmatched.push(s);
+    }
+  }
+  const partialByKey = new Map();
+  for (const s of unmatched) {
+    const key = JSON.stringify([s.source, s.budget_id ?? null, s.account]);
+    const p = partialByKey.get(key) || {
+      account: s.account, balance: 0, cleared_balance: null, uncleared_balance: null,
+      type: null, on_budget: null, budget_name: s.budget_name ?? null, source: s.source, as_of: null, partial: true,
+      count: 0, last_transaction: null,
+    };
+    p.balance += s.total;
+    p.count += s.count;
+    if (!p.last_transaction || s.last_transaction > p.last_transaction) p.last_transaction = s.last_transaction;
+    partialByKey.set(key, p);
+  }
+  return [...stored, ...partialByKey.values()]
+    .sort((a, b) => a.account.localeCompare(b.account) || String(a.source ?? '').localeCompare(String(b.source ?? '')));
 }
 
 function accountsView(args, ctx, tz, today) {
-  let accounts = withLocalDayStats(ctx.db, getAccountList(ctx.db, { source: args.source || null }), args.source || null, today);
+  // One read transaction, so balances and their transaction stats agree.
+  let accounts = ctx.db.transaction(() => withLocalDayStats(
+    ctx.db, getAccountList(ctx.db, { source: args.source || null }), args.source || null, today,
+  ))();
   if (args.account) {
     const needle = String(args.account).toLowerCase();
     accounts = accounts.filter(a => String(a.account).toLowerCase().includes(needle));
@@ -100,8 +134,9 @@ function accountsView(args, ctx, tz, today) {
     cleared_balance: money(a.cleared_balance),
     uncleared_balance: money(a.uncleared_balance),
     type: a.type,
-    on_budget: a.on_budget === null ? null : Boolean(a.on_budget),
-    budget_name: a.budget_name,
+    on_budget: a.on_budget === null || a.on_budget === undefined ? null : Boolean(a.on_budget),
+    budget_name: a.budget_name ?? null,
+    source: a.source ?? null,
     // partial: the balance is a sum of cached transactions, which cover only
     // the retention window, not a balance the source reported.
     partial: a.partial,
@@ -183,6 +218,7 @@ function recentView(args, ctx, today) {
 }
 
 function budgetView(args, ctx, today) {
+  const listLimit = clampInt(args.limit, BUDGET_LIST_DEFAULT_LIMIT, 1, MAX_LIMIT);
   let month = args.month ? String(args.month) : today.slice(0, 7);
   if (!/^\d{4}-\d{2}$/.test(month)) return { error: 'month must be YYYY-MM' };
   const monthKey = `${month}-01`;
@@ -225,15 +261,17 @@ function budgetView(args, ctx, today) {
   }, { assigned: 0, activity: 0, available: 0 });
   // Overspent is a negative available, whether or not anything was assigned;
   // with nothing assigned there is no percent, so those lead, most negative first.
-  const over = rows.filter(r => r.available < 0)
+  const overAll = rows.filter(r => r.available < 0)
     .sort((a, b) => {
       const pa = pct(a);
       const pb = pct(b);
       if ((pa === null) !== (pb === null)) return pa === null ? -1 : 1;
       return (pb ?? 0) - (pa ?? 0) || a.available - b.available;
-    }).slice(0, 10).map(cat);
-  const under = rows.filter(r => r.assigned > 0 && r.available > 0 && r.activity !== 0)
-    .sort((a, b) => b.available - a.available).slice(0, 10).map(cat);
+    });
+  const underAll = rows.filter(r => r.assigned > 0 && r.available > 0 && r.activity !== 0)
+    .sort((a, b) => b.available - a.available);
+  const over = overAll.slice(0, listLimit).map(cat);
+  const under = underAll.slice(0, listLimit).map(cat);
   const groups = new Map();
   for (const r of rows) {
     const key = r.category_group || 'Uncategorized';
@@ -247,17 +285,26 @@ function budgetView(args, ctx, today) {
     .filter(g => g.assigned !== 0 || g.activity !== 0 || g.available !== 0)
     .sort((a, b) => b.assigned - a.assigned)
     .map(g => ({ category_group: g.category_group, assigned: money(g.assigned), activity: money(g.activity), available: money(g.available) }));
-  const overspent = rows.filter(r => r.available < 0).length;
+  const overspent = overAll.length;
+  const cut = [
+    over.length < overAll.length ? `${over.length} of ${overAll.length} over budget` : null,
+    under.length < underAll.length ? `${under.length} of ${underAll.length} under budget` : null,
+  ].filter(Boolean);
   const text = rows.length === 0
     ? `No budget data for ${month}. Budgets come from the ynab-finance plugin's sync.`
-    : `Budget for ${month}: ${rows.length} categories, ${overspent} overspent.`;
+    : `Budget for ${month}: ${rows.length} categories, ${overspent} overspent.${cut.length ? ` Showing ${cut.join(' and ')} (raise limit, up to ${MAX_LIMIT}, for the rest).` : ''}`;
   return {
     value: {
       view: 'budget',
       month,
       category_count: rows.length,
       totals: { assigned: money(totals.assigned), activity: money(totals.activity), available: money(totals.available) },
+      list_limit: listLimit,
+      over_budget_count: overAll.length,
+      over_budget_truncated: over.length < overAll.length,
       over_budget: over,
+      under_budget_count: underAll.length,
+      under_budget_truncated: under.length < underAll.length,
       under_budget: under,
       by_group: byGroup,
     },
@@ -312,12 +359,15 @@ export async function uncategorizedTransactions(args, ctx) {
   let total;
   let rows;
   try {
-    total = ctx.db.prepare(`SELECT COUNT(*) AS n FROM financial_transactions WHERE ${where.join(' AND ')}`).get(...params).n;
-    rows = ctx.db.prepare(`
-      SELECT id, date, account, payee, amount, memo, metadata
-      FROM financial_transactions WHERE ${where.join(' AND ')}
-      ORDER BY date DESC, id LIMIT ?
-    `).all(...params, limit);
+    // One read transaction, as in recentView, so the total and the page agree.
+    ({ total, rows } = ctx.db.transaction(() => ({
+      total: ctx.db.prepare(`SELECT COUNT(*) AS n FROM financial_transactions WHERE ${where.join(' AND ')}`).get(...params).n,
+      rows: ctx.db.prepare(`
+        SELECT id, date, account, payee, amount, memo, metadata
+        FROM financial_transactions WHERE ${where.join(' AND ')}
+        ORDER BY date DESC, id LIMIT ?
+      `).all(...params, limit),
+    }))());
   } catch (error) {
     if (isMissingTable(error)) return jsonResult({ user_timezone: tz, total: 0, transactions: [] }, lead('No finance data has been synced yet.', note));
     throw error;
@@ -355,7 +405,7 @@ export const tools = [
       properties: {
         view: { type: 'string', enum: VIEWS, description: 'Which view.' },
         days: { type: 'number', description: 'upcoming: days ahead (default 30). recent: days back (default 30). Max 366.' },
-        limit: { type: 'number', description: `recent and upcoming: max transactions (default ${RECENT_DEFAULT_LIMIT} recent, ${UPCOMING_DEFAULT_LIMIT} upcoming; max ${MAX_LIMIT}).` },
+        limit: { type: 'number', description: `recent and upcoming: max transactions (default ${RECENT_DEFAULT_LIMIT} recent, ${UPCOMING_DEFAULT_LIMIT} upcoming). budget: max categories in each of the over and under lists (default ${BUDGET_LIST_DEFAULT_LIMIT}). Max ${MAX_LIMIT}.` },
         month: { type: 'string', description: 'budget: YYYY-MM, default this month.' },
         account: { type: 'string', description: 'accounts, upcoming, recent: account name contains this.' },
         category: { type: 'string', description: 'upcoming, recent, budget: category name contains this.' },

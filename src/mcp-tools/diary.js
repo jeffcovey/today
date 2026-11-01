@@ -119,22 +119,28 @@ function rowsRecent(db, args, fetchLimit, tz) {
     params.push(likeTerm(args.query));
   }
   const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
-  const total = db.prepare(`SELECT COUNT(*) AS n FROM diary ${whereClause}`).get(...params).n;
-  // The raw strings mix UTC and local wall time, which differ by at most a
-  // day, so take every row from the day before the fetchLimit-th string on
-  // and sort by the real moment before cutting to the limit.
-  const edge = db.prepare(`SELECT date FROM diary ${whereClause} ORDER BY date DESC LIMIT 1 OFFSET ?`)
-    .get(...params, fetchLimit - 1);
-  const floorWhere = [...where];
-  const floorParams = [...params];
-  if (edge && String(edge.date).length >= 10) {
-    floorWhere.push('substr(date, 1, 10) >= ?');
-    floorParams.push(addDays(String(edge.date).slice(0, 10), -1));
-  }
-  const rows = db.prepare(`
-    SELECT id, date, text, metadata, source FROM diary
-    ${floorWhere.length ? `WHERE ${floorWhere.join(' AND ')}` : ''}
-  `).all(...floorParams);
+  // One read transaction: the count, the cutoff and the rows come from the
+  // same snapshot even if a diary sync commits meanwhile.
+  const read = db.transaction(() => {
+    const total = db.prepare(`SELECT COUNT(*) AS n FROM diary ${whereClause}`).get(...params).n;
+    // The raw strings mix UTC and local wall time, which differ by at most a
+    // day, so take every row from the day before the fetchLimit-th string on
+    // and sort by the real moment before cutting to the limit.
+    const edge = db.prepare(`SELECT date FROM diary ${whereClause} ORDER BY date DESC LIMIT 1 OFFSET ?`)
+      .get(...params, fetchLimit - 1);
+    const floorWhere = [...where];
+    const floorParams = [...params];
+    if (edge && String(edge.date).length >= 10) {
+      floorWhere.push('substr(date, 1, 10) >= ?');
+      floorParams.push(addDays(String(edge.date).slice(0, 10), -1));
+    }
+    const rows = db.prepare(`
+      SELECT id, date, text, metadata, source FROM diary
+      ${floorWhere.length ? `WHERE ${floorWhere.join(' AND ')}` : ''}
+    `).all(...floorParams);
+    return { total, rows };
+  });
+  const { total, rows } = read();
   return { total, rows: sortNewest(rows, tz).slice(0, fetchLimit) };
 }
 

@@ -105,6 +105,16 @@ describe('account balances (issue #608)', () => {
     expect(getAccountList(db, { source: 'ynab-finance' }).map(a => a.account)).toEqual(['CSV Card']);
   });
 
+  test('% and _ in the source filter are literal characters', () => {
+    replaceBudgetBalances(db, 'work_1', 'b1', [ynab('a1', 'Payroll', 1000)]);
+    replaceBudgetBalances(db, 'workA1', 'b1', [ynab('a2', 'Other', 2000)]);
+    addTx('t1', 'Stray', -5, { source: 'workA1' });
+
+    expect(getAccountList(db, { source: 'work_1' }).map(a => a.account)).toEqual(['Payroll']);
+    expect(getAccountList(db, { source: 'work%' })).toEqual([]);
+    expect(getAccountList(db, { source: 'work_1' })[0]).toMatchObject({ source: 'work_1', budget_id: 'b1', account_id: 'a1' });
+  });
+
   test('replace swaps a budget snapshot; remove drops a budget', () => {
     replaceBudgetBalances(db, 'ynab-api/default', 'b1', [ynab('a1', 'Checking', 1000), ynab('a2', 'Savings', 2000)]);
     replaceBudgetBalances(db, 'ynab-api/default', 'b1', [ynab('a1', 'Checking', 3000)]);

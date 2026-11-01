@@ -59,6 +59,36 @@ function ctxFor(db, extra = {}) {
   return { db, now: NOW, ...extra };
 }
 
+/**
+ * The db, wrapped so every statement read records whether it ran inside a
+ * transaction: reads that must agree have to share one snapshot.
+ */
+function trackReads(db) {
+  const log = [];
+  const wrapStatement = stmt => new Proxy(stmt, {
+    get(target, prop) {
+      const value = Reflect.get(target, prop);
+      if (prop === 'get' || prop === 'all' || prop === 'iterate') {
+        return (...args) => {
+          log.push(db.inTransaction);
+          return value.apply(target, args);
+        };
+      }
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+  const proxy = new Proxy(db, {
+    get(target, prop) {
+      if (prop === 'prepare') return sql => wrapStatement(target.prepare(sql));
+      const value = Reflect.get(target, prop);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+  return { db: proxy, log };
+}
+
+const STALE_SYNC = async () => ({ complete: false, lastSync: new Date('2026-11-01T12:00:00Z') });
+
 function parse(result) {
   expect(result.isError).toBeFalsy();
   const texts = result.content.map(c => c.text);
@@ -168,6 +198,18 @@ describe('email', () => {
     expect(parse(await getEmail({ email_id: 'imap-email/icloud:INBOX:1' }, ctxFor(db))).data.body_truncated_at_sync).toBe(false);
   });
 
+  test('get_email freshens the email cache and passes on a stale-sync note, found or not', async () => {
+    const db = emailDb();
+    const asked = [];
+    const syncForRead = async (_db, type) => { asked.push(type); return STALE_SYNC(); };
+    const found = parse(await getEmail({ email_id: 'imap-email/icloud:INBOX:1' }, ctxFor(db, { syncForRead })));
+    expect(asked).toEqual(['email']);
+    expect(found.lead).toMatch(/email sync is still running/);
+    const missing = await getEmail({ email_id: 'nope' }, ctxFor(db, { syncForRead }));
+    expect(missing.isError).toBe(true);
+    expect(missing.content[0].text).toMatch(/No synced email[\s\S]*email sync is still running/);
+  });
+
   test('a missing table is reported, not thrown', async () => {
     const result = await listEmails({}, ctxFor(new Database(':memory:')));
     expect(result.isError).toBe(true);
@@ -236,6 +278,13 @@ describe('contacts', () => {
     expect(parse(await searchContacts({ query: 'broken' }, ctxFor(db))).data.total).toBe(1);
   });
 
+  test('search_contacts: the count and the page are read in one transaction', async () => {
+    const { db, log } = trackReads(contactsDb());
+    const { data } = parse(await searchContacts({ query: 'o', limit: 1 }, ctxFor(db)));
+    expect(data).toMatchObject({ returned: 1, has_more: true });
+    expect(log).toEqual([true, true]);
+  });
+
   test('search_contacts: name, organization, notes; other emails; long notes cut', async () => {
     const db = contactsDb();
     const robin = parse(await searchContacts({ query: 'conference' }, ctxFor(db))).data;
@@ -293,6 +342,13 @@ describe('diary', () => {
     expect(recent).toMatchObject({ total: 3, has_more: true });
     expect(parse(await listDiary({ range: 'recent', limit: 3 }, ctxFor(db))).data.entries.map(e => e.id)).toEqual(['m1', 'j1', 'm0']);
     expect(parse(await listDiary({ date: '2026-11-01' }, ctxFor(db))).data.entries.map(e => e.id)).toEqual(['m1', 'j1']);
+  });
+
+  test('recent: the count, the cutoff and the rows are read in one transaction', async () => {
+    const { db, log } = trackReads(diaryDb());
+    const { data } = parse(await listDiary({ range: 'recent', limit: 2 }, ctxFor(db)));
+    expect(data).toMatchObject({ total: 7, returned: 2, has_more: true });
+    expect(log).toEqual([true, true, true]);
   });
 
   test('on_this_day in a non-leap year finds a Day One entry stored on Feb 29 UTC', async () => {
@@ -366,6 +422,52 @@ describe('health', () => {
     expect(one.stats).toBeNull();
     expect(one.stats_by_units).toEqual({ kg: { average: 70.5, min: 70, max: 71 }, lb: { average: 154.3, min: 154.3, max: 154.3 } });
     expect(one.history.map(h => h.formatted)).toEqual(['70 kg', '154.3 lbs', '71 kg']);
+  });
+
+  test('any formatter unit the stored unit does not match is replaced by the stored one', async () => {
+    const db = healthDb();
+    const add = (id, date, metric, value, units) => insert(db, 'health_metrics', { id, source: 'apple-health-auto-export/default', date, metric_name: metric, value, units });
+    add('u1', '2026-11-01', 'dietary_water', 500, 'mL');
+    add('u2', '2026-11-01', 'active_energy', 1200, 'kJ');
+    add('u3', '2026-11-01', 'sleep_analysis', 7.5, 'hr');
+    add('u4', '2026-11-01', 'respiratory_rate', 14.2, 'count/min');
+    add('u5', '2026-11-01', 'dietary_caffeine', 0.25, 'g');
+    const today = parse(await healthToday({ all: true }, ctxFor(db))).data.metrics;
+    const shown = name => today.filter(m => m.metric === name).map(m => m.formatted);
+    expect(shown('dietary_water').sort()).toEqual(['1.5 L', '500 mL']);
+    expect(shown('active_energy')).toEqual(['1200 kJ']);
+    expect(shown('sleep_analysis')).toEqual(['7.5 hrs']);
+    expect(shown('respiratory_rate')).toEqual(['14.2 /min']);
+    expect(shown('dietary_caffeine')).toEqual(['0.25 g']);
+    expect(shown('resting_heart_rate')).toEqual(['58 bpm']);
+    const summary = parse(await healthSummary({ days: 1, all: true }, ctxFor(db))).data.metrics.filter(m => m.metric === 'dietary_water');
+    expect(summary.map(m => [m.units, m.average_formatted]).sort()).toEqual([['L', '1.5 L'], ['mL', '500 mL']]);
+  });
+
+  test('health_summary with metric: only the requested source\'s metrics are candidates', async () => {
+    const db = makeDb('health');
+    insert(db, 'health_metrics', { id: 'a', source: 'watch/default', date: '2026-11-01', metric_name: 'heart_rate', value: 70, units: 'bpm' });
+    insert(db, 'health_metrics', { id: 'b', source: 'ring/default', date: '2026-11-01', metric_name: 'resting_heart_rate', value: 55, units: 'bpm' });
+    expect((await healthSummary({ metric: 'heart' }, ctxFor(db))).isError).toBe(true);
+    const watch = parse(await healthSummary({ metric: 'heart', source: 'watch' }, ctxFor(db))).data;
+    expect(watch).toMatchObject({ metric: 'heart_rate', count: 1 });
+    const ring = parse(await healthSummary({ metric: 'heart', source: 'ring' }, ctxFor(db))).data;
+    expect(ring.metric).toBe('resting_heart_rate');
+    const none = await healthSummary({ metric: 'resting', source: 'watch' }, ctxFor(db));
+    expect(none.isError).toBe(true);
+    expect(none.content[0].text).toMatch(/in source "watch"\. Metrics with data: heart_rate\.$/);
+  });
+
+  test('health_summary with metric: history is capped, count and stats cover every reading', async () => {
+    const db = makeDb('health');
+    for (let i = 0; i < 5; i++) {
+      insert(db, 'health_metrics', { id: `s${i}`, source: 'apple-health-auto-export/default', date: addDays('2026-11-01', -i), metric_name: 'step_count', value: 1000 * (i + 1), units: 'count' });
+    }
+    const { lead, data } = parse(await healthSummary({ metric: 'step_count', limit: 2 }, ctxFor(db)));
+    expect(data).toMatchObject({ count: 5, returned: 2, limit: 2, has_more: true, stats: { average: 3000, min: 1000, max: 5000 } });
+    expect(data.history.map(h => h.date)).toEqual(['2026-11-01', '2026-10-31']);
+    expect(lead).toMatch(/history shows the newest 2/);
+    expect(parse(await healthSummary({ metric: 'step_count' }, ctxFor(db))).data).toMatchObject({ returned: 5, limit: 100, has_more: false });
   });
 
   test('health_summary with metric: exact name wins over a substring, labels work, unknowns list what exists', async () => {
@@ -517,6 +619,53 @@ describe('finance', () => {
     expect(data.accounts[0]).toMatchObject({ balance: 1234.5, partial: false, last_transaction: '2026-11-01' });
   });
 
+  test('accounts: the same name in two budgets or two sources is kept apart', async () => {
+    const db = makeDb('finance');
+    ensureAccountBalancesTable(db);
+    const src = 'ynab-api/default';
+    insert(db, 'account_balances', { id: 'b1:c', source: src, budget_id: 'b1', budget_name: 'Home', account_id: 'c1', account: 'Checking', balance: 100, as_of: '2026-11-01T20:00:00Z' });
+    insert(db, 'account_balances', { id: 'b2:c', source: src, budget_id: 'b2', budget_name: 'Work', account_id: 'c2', account: 'Checking', balance: 200, as_of: '2026-11-01T20:00:00Z' });
+    const tx = (id, date, meta, source = src) => insert(db, 'financial_transactions', { id, source, account: 'Checking', date, payee: 'x', amount: -1, metadata: meta && JSON.stringify(meta) });
+    tx('h1', '2026-10-30', { budget_id: 'b1', account_id: 'c1' });
+    tx('h2', '2026-10-31', { budget_id: 'b1', account_id: 'c1' });
+    tx('w1', '2026-10-20', { budget_id: 'b2', account_id: 'c2' });
+    tx('k1', '2026-11-01', null, 'csv-bank/default');
+    tx('k2', '2026-10-15', null, 'csv-bank/default');
+    const { data } = parse(await financeOverview({ view: 'accounts' }, ctxFor(db)));
+    const rows = data.accounts.map(a => [a.source, a.budget_name, a.balance, a.partial, a.transactions_cached, a.last_transaction]);
+    expect(rows).toEqual(expect.arrayContaining([
+      [src, 'Home', 100, false, 2, '2026-10-31'],
+      [src, 'Work', 200, false, 1, '2026-10-20'],
+      ['csv-bank/default', null, -2, true, 2, '2026-11-01'],
+    ]));
+    expect(rows).toHaveLength(3);
+  });
+
+  test('accounts: % and _ in source are literal, not wildcards', async () => {
+    const db = makeDb('finance');
+    ensureAccountBalancesTable(db);
+    insert(db, 'account_balances', { id: 'one', source: 'work_1', account: 'Payroll', balance: 10, as_of: '2026-11-01T20:00:00Z' });
+    insert(db, 'account_balances', { id: 'other', source: 'workA1', account: 'Other', balance: 20, as_of: '2026-11-01T20:00:00Z' });
+    insert(db, 'financial_transactions', { id: 'o1', source: 'workA1', account: 'Stray', date: '2026-11-01', payee: 'x', amount: -3 });
+    const { data } = parse(await financeOverview({ view: 'accounts', source: 'work_1' }, ctxFor(db)));
+    expect(data.accounts.map(a => a.account)).toEqual(['Payroll']);
+    expect(parse(await financeOverview({ view: 'accounts', source: 'work%' }, ctxFor(db))).data.accounts).toEqual([]);
+  });
+
+  test('budget: over and under lists report their full counts and can be raised past ten', async () => {
+    const db = financeDb();
+    for (let i = 0; i < 10; i++) {
+      insert(db, 'budget_allocations', { id: `o${i}`, source: 'ynab-finance/default', month: '2026-11-01', category: `Over ${i}`, category_group: 'Extra', assigned: 10, activity: -20 - i, available: -10 - i });
+    }
+    const { lead, data } = parse(await financeOverview({ view: 'budget' }, ctxFor(db)));
+    expect(data).toMatchObject({ list_limit: 10, over_budget_count: 11, over_budget_truncated: true, under_budget_count: 1, under_budget_truncated: false });
+    expect(data.over_budget).toHaveLength(10);
+    expect(lead).toMatch(/11 overspent\. Showing 10 of 11 over budget \(raise limit/);
+    const all = parse(await financeOverview({ view: 'budget', limit: 50 }, ctxFor(db))).data;
+    expect(all).toMatchObject({ list_limit: 50, over_budget_count: 11, over_budget_truncated: false });
+    expect(all.over_budget).toHaveLength(11);
+  });
+
   test('budget: a category overspent with nothing assigned counts as over budget', async () => {
     const db = financeDb();
     insert(db, 'budget_allocations', { id: 'a5', source: 'ynab-finance/default', month: '2026-11-01', category: 'Gifts', category_group: 'Everyday', assigned: 0, activity: -30, available: -30 });
@@ -562,6 +711,12 @@ describe('finance', () => {
     expect(data.transactions.map(t => [t.payee, t.writable])).toEqual([['Mystery', true], ['Cash', false]]);
     expect(data).toMatchObject({ total: 2, from: '2026-09-02', to: '2026-11-01' });
     expect(parse(await uncategorizedTransactions({ days: 12 }, ctxFor(financeDb()))).data.total).toBe(1);
+  });
+
+  test('uncategorized_transactions: the total and the page are read in one transaction', async () => {
+    const { db, log } = trackReads(financeDb());
+    expect(parse(await uncategorizedTransactions({ limit: 1 }, ctxFor(db))).data).toMatchObject({ total: 2, returned: 1, has_more: true });
+    expect(log).toEqual([true, true]);
   });
 });
 
