@@ -43,6 +43,15 @@ import {
 } from './plugin-loader.js';
 import { schemas, getTableName } from './plugin-schemas.js';
 import { getTodayDate, sqlLocalDate } from './date-utils.js';
+import {
+  syncForRead,
+  waitForReadSyncs,
+  staleNote,
+  listTasks,
+  formatTaskList,
+  LIST_TASKS_DEFAULT_LIMIT,
+  LIST_TASKS_MAX_LIMIT,
+} from './mcp-reads.js';
 import { getAbsoluteVaultPath } from './config.js';
 import { execSync } from 'child_process';
 import path from 'path';
@@ -132,7 +141,7 @@ export function createMCPServer({ readOnly = false } = {}) {
 
       tools.push({
         name: 'list_tasks',
-        description: 'List tasks with optional filters',
+        description: 'List tasks with optional filters. The reply starts with a line giving how many tasks matched and whether more pages exist; when has_more is true, call again with next_offset as offset to get the rest.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -140,7 +149,8 @@ export function createMCPServer({ readOnly = false } = {}) {
             include_completed: { type: 'boolean', description: 'Include completed tasks' },
             stage: { type: 'string', description: 'Filter by stage (front-stage, back-stage, off-stage)' },
             priority: { type: 'string', description: 'Filter by priority' },
-            limit: { type: 'number', description: 'Maximum number of tasks to return' },
+            limit: { type: 'number', description: `Maximum number of tasks to return (default: ${LIST_TASKS_DEFAULT_LIMIT}, max: ${LIST_TASKS_MAX_LIMIT})` },
+            offset: { type: 'number', description: 'Number of matching tasks to skip, for paging (default: 0)' },
           },
         },
       });
@@ -314,58 +324,14 @@ export function createMCPServer({ readOnly = false } = {}) {
         }
 
         case 'list_tasks': {
-          await ensureSyncForType(db, 'tasks');
-
-          const conditions = [];
-          const params = [];
-
-          if (!args.include_completed) {
-            conditions.push("status = 'open'");
-          }
-
-          if (args.today_only) {
-            const today = getTodayDate();
-            conditions.push("(due_date <= ? OR json_extract(metadata, '$.scheduled_date') <= ?)");
-            params.push(today, today);
-          }
-
-          if (args.stage) {
-            conditions.push("json_extract(metadata, '$.stage') = ?");
-            params.push(args.stage);
-          }
-
-          if (args.priority) {
-            conditions.push('priority = ?');
-            params.push(args.priority);
-          }
-
-          const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-          const limit = args.limit || 50;
-
-          const sql = `
-            SELECT id, title, status, priority, due_date, metadata, source
-            FROM tasks
-            ${whereClause}
-            ORDER BY
-              CASE priority
-                WHEN 'highest' THEN 1
-                WHEN 'high' THEN 2
-                WHEN 'medium' THEN 3
-                WHEN 'low' THEN 4
-                WHEN 'lowest' THEN 5
-                ELSE 6
-              END,
-              due_date NULLS LAST
-            LIMIT ?
-          `;
-
-          const tasks = db.prepare(sql).all(...params, limit);
-
+          const sync = await syncForRead(db, 'tasks');
+          const result = listTasks(db, args);
+          const note = staleNote('tasks', sync);
           return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify(tasks, null, 2),
-            }],
+            content: [
+              ...(note ? [{ type: 'text', text: note }] : []),
+              { type: 'text', text: formatTaskList(result) },
+            ],
           };
         }
 
@@ -403,7 +369,7 @@ export function createMCPServer({ readOnly = false } = {}) {
         }
 
         case 'list_events': {
-          await ensureSyncForType(db, 'events');
+          const sync = await syncForRead(db, 'events');
 
           const targetDate = args.date || getTodayDate();
           const days = args.days || 1;
@@ -419,11 +385,12 @@ export function createMCPServer({ readOnly = false } = {}) {
             ORDER BY start_date
           `).all(targetDate, endDateStr);
 
+          const note = staleNote('calendar', sync);
           return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify(events, null, 2),
-            }],
+            content: [
+              ...(note ? [{ type: 'text', text: note }] : []),
+              { type: 'text', text: JSON.stringify(events, null, 2) },
+            ],
           };
         }
 
@@ -480,6 +447,10 @@ export function createMCPServer({ readOnly = false } = {}) {
           try {
             const vaultPath = getAbsoluteVaultPath();
             const context = { db, vaultPath };
+
+            // A read that timed out may still be syncing in the background
+            // and holding source locks; this sync would skip those sources.
+            await waitForReadSyncs(args.plugin_type);
 
             if (args.plugin_type) {
               await ensureSyncForType(db, args.plugin_type, { force: true, skipAutoTag: false });
@@ -631,7 +602,7 @@ export function createMCPServer({ readOnly = false } = {}) {
 
     try {
       if (uri === 'today://tasks') {
-        await ensureSyncForType(db, 'tasks');
+        await syncForRead(db, 'tasks');
         const tasks = db.prepare(`
           SELECT id, title, status, priority, due_date, metadata, source
           FROM tasks
@@ -652,7 +623,7 @@ export function createMCPServer({ readOnly = false } = {}) {
       }
 
       if (uri === 'today://tasks/today') {
-        await ensureSyncForType(db, 'tasks');
+        await syncForRead(db, 'tasks');
         const today = getTodayDate();
         const tasks = db.prepare(`
           SELECT id, title, status, priority, due_date, metadata, source
@@ -674,7 +645,7 @@ export function createMCPServer({ readOnly = false } = {}) {
       }
 
       if (uri === 'today://events') {
-        await ensureSyncForType(db, 'events');
+        await syncForRead(db, 'events');
         const today = getTodayDate();
         const events = db.prepare(`
           SELECT id, title, start_date, end_date, location, calendar_name, source
@@ -694,7 +665,7 @@ export function createMCPServer({ readOnly = false } = {}) {
       }
 
       if (uri === 'today://events/today') {
-        await ensureSyncForType(db, 'events');
+        await syncForRead(db, 'events');
         const today = getTodayDate();
         const events = db.prepare(`
           SELECT id, title, start_date, end_date, location, calendar_name, source
@@ -713,7 +684,7 @@ export function createMCPServer({ readOnly = false } = {}) {
       }
 
       if (uri === 'today://time-logs') {
-        await ensureSyncForType(db, 'time-logs');
+        await syncForRead(db, 'time-logs');
         const today = getTodayDate();
         const logs = db.prepare(`
           SELECT id, start_time, end_time, duration_minutes, description, source
@@ -733,7 +704,7 @@ export function createMCPServer({ readOnly = false } = {}) {
       }
 
       if (uri === 'today://diary') {
-        await ensureSyncForType(db, 'diary');
+        await syncForRead(db, 'diary');
         const logs = db.prepare(`
           SELECT id, date, content, metadata, source
           FROM diary
@@ -856,8 +827,8 @@ export function createMCPServer({ readOnly = false } = {}) {
     switch (name) {
       case 'daily_planning': {
         // Gather context for daily planning
-        await ensureSyncForType(db, 'tasks');
-        await ensureSyncForType(db, 'events');
+        await syncForRead(db, 'tasks');
+        await syncForRead(db, 'events');
 
         const today = getTodayDate();
 
@@ -919,7 +890,7 @@ Based on this information, help me:
       }
 
       case 'weekly_review': {
-        await ensureSyncForType(db, 'tasks');
+        await syncForRead(db, 'tasks');
 
         const today = getTodayDate();
         const weekAgo = new Date();
@@ -969,7 +940,7 @@ Please help me:
       }
 
       case 'task_triage': {
-        await ensureSyncForType(db, 'tasks');
+        await syncForRead(db, 'tasks');
 
         const tasks = db.prepare(`
           SELECT id, title, priority, due_date, metadata, source
