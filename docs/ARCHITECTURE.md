@@ -400,6 +400,14 @@ Tools that take a task, event or contact ID require the item's `title` and refus
 - `src/mcp-tools/day-reads.js` (read): `get_plan` (a day, week, month, quarter or year plan file), `timer_status`, `list_time_entries`, `habits_today`, `list_issues` and `search_tasks`, mirroring `bin/track`, `bin/habits`, `bin/issues` and `bin/tasks`.
 - `src/mcp-tools/task-writes.js` (write): `postpone_task` and `update_task`. Each rewrites one line of a markdown task file (`src/task-postpone.js`, `src/task-line-edit.js`), checked against the task's title and the synced line, under the file's lock (`src/file-lock.js`), then re-reads that file with `syncPluginSource`'s `skipWriteHooks`, so no auto-archive, dating, stage or priority hook runs.
 
+Day-to-day write tools (issue #686):
+
+- `src/mcp-tools/diary-writes.js`: `add_diary_entry` (write), like `bin/diary add`, through `src/diary-add.js`.
+- `src/mcp-tools/timer-writes.js`: `restart_timer` and `add_time_entry` (write), like `bin/track restart` and `bin/track add`.
+- `src/mcp-tools/role-replies.js`: `reply_to_role` (write), the web plan's role reply form; takes only the user's own words.
+- `src/mcp-tools/calendar-writes.js`: `update_event` and `delete_event` (destructive), like `bin/calendar update` and `delete`; writable calendars only.
+- `src/mcp-tools/finance-writes.js`: `categorize_transaction` (destructive), like `bin/finance categorize`; writes to YNAB.
+
 Callers get the same guidance `bin/today` gives its own AI (`src/mcp-guidance.js`):
 
 - Each tool's description carries its plugin type's description, the enabled sources, and the user's `ai_instructions` for each source. Types without a tool of their own go on `query_database`.
