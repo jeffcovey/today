@@ -53,6 +53,17 @@ import {
   LIST_TASKS_DEFAULT_LIMIT,
   LIST_TASKS_MAX_LIMIT,
 } from './mcp-reads.js';
+import {
+  listEventsForDays,
+  listUpcomingEvents,
+  formatEventList,
+  eventTimeLabel,
+  buildCreateEvent,
+  isoInZone,
+  timeZoneInfo,
+  timeZoneLine,
+  LIST_EVENTS_MAX_DAYS,
+} from './mcp-events.js';
 import { getAbsoluteVaultPath } from './config.js';
 import { addGuidanceToTools, buildServerInstructions, buildContextText } from './mcp-guidance.js';
 import { readLiveContext } from './mcp-live-context.js';
@@ -172,13 +183,14 @@ export function createMCPServer({ readOnly = false } = {}) {
     if (pluginTypes.has('events')) {
       tools.push({
         name: 'create_event',
-        description: 'Create a new calendar event',
+        description: `Create a new calendar event. Times without an offset are read in the user's configured time zone (currently ${timeZoneInfo().user_timezone}) unless timezone is given.`,
         inputSchema: {
           type: 'object',
           properties: {
             title: { type: 'string', description: 'Event title' },
-            start_date: { type: 'string', description: 'Start datetime in ISO format (YYYY-MM-DDTHH:MM:SS)' },
-            end_date: { type: 'string', description: 'End datetime in ISO format' },
+            start_date: { type: 'string', description: 'Start, ISO 8601. With Z or an offset (2026-11-05T14:00:00-05:00) it is used as given; without one (2026-11-05T14:00:00) it is a local time in timezone, or in the user\'s configured zone. YYYY-MM-DD for an all-day event.' },
+            end_date: { type: 'string', description: 'End, in the same form as start_date (default: start_date). For all-day events, the day after the last day.' },
+            timezone: { type: 'string', description: 'IANA time zone for start/end times given without an offset, e.g. Europe/London when booking something in another city (default: the user\'s configured zone)' },
             location: { type: 'string', description: 'Event location' },
             description: { type: 'string', description: 'Event description' },
             all_day: { type: 'boolean', description: 'Whether this is an all-day event' },
@@ -190,12 +202,12 @@ export function createMCPServer({ readOnly = false } = {}) {
 
       tools.push({
         name: 'list_events',
-        description: 'List calendar events',
+        description: 'List calendar events overlapping one or more days in the user\'s configured time zone. The reply starts with that zone, its UTC offset, the current time and today\'s date. Timed events give start/end in the user\'s zone with offset plus start_utc/end_utc; all-day events give start_date and an exclusive end_date.',
         inputSchema: {
           type: 'object',
           properties: {
-            date: { type: 'string', description: 'Date to show events for (YYYY-MM-DD), defaults to today' },
-            days: { type: 'number', description: 'Number of days to show (default: 1)' },
+            date: { type: 'string', description: 'First local day to show (YYYY-MM-DD), defaults to today in the user\'s zone' },
+            days: { type: 'number', description: `Number of days to show (default: 1, max: ${LIST_EVENTS_MAX_DAYS})` },
           },
         },
       });
@@ -357,6 +369,7 @@ export function createMCPServer({ readOnly = false } = {}) {
           const note = staleNote('tasks', sync);
           return {
             content: [
+              { type: 'text', text: timeZoneLine(timeZoneInfo()) },
               ...(note ? [{ type: 'text', text: note }] : []),
               { type: 'text', text: formatTaskList(result) },
             ],
@@ -364,17 +377,8 @@ export function createMCPServer({ readOnly = false } = {}) {
         }
 
         case 'create_event': {
-          const entry = {
-            action: 'create',
-            event: {
-              title: args.title,
-              start_date: args.start_date,
-              end_date: args.end_date || args.start_date,
-              location: args.location,
-              description: args.description,
-              all_day: args.all_day,
-            },
-          };
+          const created = buildCreateEvent(args);
+          const entry = { action: 'create', event: created.event };
 
           const result = await writeEntryAndSync('events', entry, {
             db,
@@ -391,7 +395,9 @@ export function createMCPServer({ readOnly = false } = {}) {
           return {
             content: [{
               type: 'text',
-              text: `Created event: ${args.title}`,
+              text: `Created event: ${args.title}` + (created.startInstant
+                ? ` at ${isoInZone(created.startInstant, created.timezone)} (${created.timezone})`
+                : ` on ${String(args.start_date).slice(0, 10)} (all day)`),
             }],
           };
         }
@@ -399,25 +405,13 @@ export function createMCPServer({ readOnly = false } = {}) {
         case 'list_events': {
           const sync = await syncForRead(db, 'events');
 
-          const targetDate = args.date || getTodayDate();
-          const days = args.days || 1;
-
-          const endDate = new Date(targetDate);
-          endDate.setDate(endDate.getDate() + days);
-          const endDateStr = endDate.toISOString().split('T')[0];
-
-          const events = db.prepare(`
-            SELECT id, title, start_date, end_date, location, calendar_name, source
-            FROM events
-            WHERE date(start_date) >= ? AND date(start_date) < ?
-            ORDER BY start_date
-          `).all(targetDate, endDateStr);
+          const result = listEventsForDays(db, args);
 
           const note = staleNote('calendar', sync);
           return {
             content: [
               ...(note ? [{ type: 'text', text: note }] : []),
-              { type: 'text', text: JSON.stringify(events, null, 2) },
+              { type: 'text', text: formatEventList(result) },
             ],
           };
         }
@@ -684,39 +678,26 @@ export function createMCPServer({ readOnly = false } = {}) {
 
       if (uri === 'today://events') {
         await syncForRead(db, 'events');
-        const today = getTodayDate();
-        const events = db.prepare(`
-          SELECT id, title, start_date, end_date, location, calendar_name, source
-          FROM events
-          WHERE date(start_date) >= ?
-          ORDER BY start_date
-          LIMIT 50
-        `).all(today);
+        const { info, total, has_more, events } = listUpcomingEvents(db, { limit: 50 });
 
         return {
           contents: [{
             uri,
             mimeType: 'application/json',
-            text: JSON.stringify(events, null, 2),
+            text: JSON.stringify({ ...info, total, has_more, events }, null, 2),
           }],
         };
       }
 
       if (uri === 'today://events/today') {
         await syncForRead(db, 'events');
-        const today = getTodayDate();
-        const events = db.prepare(`
-          SELECT id, title, start_date, end_date, location, calendar_name, source
-          FROM events
-          WHERE date(start_date) = ?
-          ORDER BY start_date
-        `).all(today);
+        const { info, from, to, events } = listEventsForDays(db, {});
 
         return {
           contents: [{
             uri,
             mimeType: 'application/json',
-            text: JSON.stringify(events, null, 2),
+            text: JSON.stringify({ ...info, from, to, events }, null, 2),
           }],
         };
       }
@@ -879,12 +860,7 @@ export function createMCPServer({ readOnly = false } = {}) {
           LIMIT 20
         `).all(today, today);
 
-        const events = db.prepare(`
-          SELECT title, start_date, end_date, location
-          FROM events
-          WHERE date(start_date) = ?
-          ORDER BY start_date
-        `).all(today);
+        const { info: tzInfo, events } = listEventsForDays(db, {});
 
         let context = '';
         try {
@@ -907,8 +883,10 @@ export function createMCPServer({ readOnly = false } = {}) {
                 type: 'text',
                 text: `Help me plan my day.${focusArea}
 
+${timeZoneLine(tzInfo)}
+
 ## Today's Events
-${events.length > 0 ? events.map(e => `- ${e.start_date.substring(11, 16)}: ${e.title}${e.location ? ` @ ${e.location}` : ''}`).join('\n') : 'No events scheduled'}
+${events.length > 0 ? events.map(e => `- ${eventTimeLabel(e, tzInfo.user_timezone)}: ${e.title}${e.location ? ` @ ${e.location}` : ''}`).join('\n') : 'No events scheduled'}
 
 ## Tasks Due Today
 ${tasks.length > 0 ? tasks.map(t => `- [${t.priority || 'medium'}] ${t.title}`).join('\n') : 'No tasks due'}
