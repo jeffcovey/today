@@ -7,6 +7,7 @@ import { getConfig } from '../src/config.js';
 import { program } from 'commander';
 import { colors } from '../src/cli-utils.js';
 import { execSync } from 'child_process';
+import { getProjectsDueForReview, getProjectItemCounts, getProjectItems, findProject } from '../src/projects.js';
 
 function getProjectSourceConfig(project) {
   const [pluginName, sourceName] = project.source.split('/');
@@ -29,73 +30,6 @@ const STATUS_EMOJI = {
   completed: '✅',
   cancelled: '❌'
 };
-
-// Generic helper to get item counts from project metadata
-// Supports both inline items (github-projects) and item_query (markdown-projects)
-function getProjectItemCounts(db, metadata) {
-  // Inline items (e.g., github-projects stores items directly)
-  if (metadata.items && metadata.items.length > 0) {
-    const open = metadata.items.filter(i => i.state === 'open').length;
-    const closed = metadata.items.filter(i => i.state === 'closed' || i.state === 'merged').length;
-    return { open, closed };
-  }
-
-  // Query-based items (e.g., markdown-projects references tasks table)
-  if (metadata.item_query) {
-    const q = metadata.item_query;
-    const result = db.prepare(`
-      SELECT
-        SUM(CASE WHEN ${q.status_field} = ? THEN 1 ELSE 0 END) as open,
-        SUM(CASE WHEN ${q.status_field} = ? THEN 1 ELSE 0 END) as closed
-      FROM ${q.table}
-      WHERE id LIKE ?
-    `).get(q.status_open, q.status_closed, q.id_pattern);
-
-    if (result) {
-      return { open: result.open || 0, closed: result.closed || 0 };
-    }
-  }
-
-  return null;
-}
-
-// Generic helper to get items for a project
-// Returns array of { title, state, number?, repository?, url? }
-function getProjectItems(db, metadata, includeAll = false) {
-  // Inline items
-  if (metadata.items && metadata.items.length > 0) {
-    let items = metadata.items;
-    if (!includeAll) {
-      items = items.filter(i => i.state === 'open');
-    }
-    return items.map(i => ({
-      title: i.title,
-      state: i.state,
-      number: i.number,
-      repository: i.repository,
-      url: i.url || null
-    }));
-  }
-
-  // Query-based items
-  if (metadata.item_query) {
-    const q = metadata.item_query;
-    let sql = `SELECT id, ${q.title_field} as title, ${q.status_field} as status FROM ${q.table} WHERE id LIKE ?`;
-    if (!includeAll) {
-      sql += ` AND ${q.status_field} = '${q.status_open}'`;
-    }
-    sql += ` ORDER BY ${q.status_field}, ${q.title_field}`;
-
-    const rows = db.prepare(sql).all(q.id_pattern);
-    return rows.map(r => ({
-      title: r.title,
-      state: r.status === q.status_open ? 'open' : 'closed',
-      id: r.id
-    }));
-  }
-
-  return [];
-}
 
 program
   .name('projects')
@@ -313,11 +247,7 @@ program
     await ensureSyncForType(db, 'projects');
 
     // Try exact match first, then partial match on title or id
-    let project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
-
-    if (!project) {
-      project = db.prepare('SELECT * FROM projects WHERE title LIKE ? OR id LIKE ?').get(`%${id}%`, `%${id}%`);
-    }
+    const project = findProject(db, id);
 
     if (!project) {
       console.log(colors.red('✗') + ` Project not found: ${id}`);
@@ -447,29 +377,8 @@ program
 
     const today = getTodayDate();
 
-    // Get projects with review tracking that are overdue
-    const sql = `
-      SELECT id, title, status, priority, review_frequency, last_reviewed, url,
-             julianday(?) - julianday(last_reviewed) as days_since
-      FROM projects
-      WHERE status IN ('active', 'planning')
-        AND review_frequency IS NOT NULL
-        AND (
-          last_reviewed IS NULL
-          OR (review_frequency = 'daily' AND julianday(?) - julianday(last_reviewed) >= 1)
-          OR (review_frequency = 'weekly' AND julianday(?) - julianday(last_reviewed) >= 7)
-          OR (review_frequency = 'monthly' AND julianday(?) - julianday(last_reviewed) >= 30)
-          OR (review_frequency = 'quarterly' AND julianday(?) - julianday(last_reviewed) >= 90)
-          OR (review_frequency = 'yearly' AND julianday(?) - julianday(last_reviewed) >= 365)
-        )
-      ORDER BY
-        CASE
-          WHEN last_reviewed IS NULL THEN 0
-          ELSE julianday(?) - julianday(last_reviewed)
-        END DESC
-    `;
-
-    const projects = db.prepare(sql).all(today, today, today, today, today, today, today);
+    // Projects with review tracking that are overdue
+    const projects = getProjectsDueForReview(db, today);
 
     if (projects.length === 0) {
       console.log(colors.green('✓') + ' All projects are up to date on reviews!');

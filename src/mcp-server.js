@@ -64,6 +64,13 @@ import {
   timeZoneLine,
   LIST_EVENTS_MAX_DAYS,
 } from './mcp-events.js';
+import {
+  PROJECT_TOOL_DEFINITIONS,
+  PROJECT_WRITE_TOOLS,
+  listProjectsTool,
+  getProjectTool,
+  markProjectReviewed,
+} from './mcp-projects.js';
 import { getAbsoluteVaultPath } from './config.js';
 import { addGuidanceToTools, buildServerInstructions, buildContextText } from './mcp-guidance.js';
 import { readLiveContext } from './mcp-live-context.js';
@@ -86,6 +93,7 @@ async function aiInstructionsByType() {
 // Tools that change something: hidden and refused on a read-only connection.
 export const WRITE_TOOLS = new Set([
   'create_task', 'complete_task', 'create_event', 'start_timer', 'stop_timer', 'sync_data',
+  ...PROJECT_WRITE_TOOLS,
 ]);
 
 /**
@@ -211,6 +219,11 @@ export function createMCPServer({ readOnly = false } = {}) {
           },
         },
       });
+    }
+
+    // Project tools (if projects plugin enabled)
+    if (pluginTypes.has('projects')) {
+      tools.push(...PROJECT_TOOL_DEFINITIONS);
     }
 
     // Time tracking tools (if time-logs plugin enabled)
@@ -414,6 +427,42 @@ export function createMCPServer({ readOnly = false } = {}) {
               { type: 'text', text: formatEventList(result) },
             ],
           };
+        }
+
+        case 'list_projects': {
+          await ensureSyncForType(db, 'projects');
+          const { summary, projects } = listProjectsTool(db, args || {}, { today: getTodayDate() });
+          return {
+            content: [{ type: 'text', text: `${summary}\n${JSON.stringify(projects, null, 2)}` }],
+          };
+        }
+
+        case 'get_project': {
+          await ensureSyncForType(db, 'projects');
+          const project = getProjectTool(db, args, { today: getTodayDate() });
+          if (!project) {
+            return {
+              content: [{ type: 'text', text: `Error: Project not found: ${args.id}` }],
+              isError: true,
+            };
+          }
+          return {
+            content: [{ type: 'text', text: JSON.stringify(project, null, 2) }],
+          };
+        }
+
+        case 'mark_project_reviewed': {
+          await ensureSyncForType(db, 'projects');
+          const result = await markProjectReviewed(db, args, { today: getTodayDate() });
+          if (!result.success) {
+            return {
+              content: [{ type: 'text', text: `Error: ${result.error}` }],
+              isError: true,
+            };
+          }
+          const text = `Marked "${result.project.title}" reviewed. Next review: ${result.next_review_date} (${result.frequency}).`
+            + (result.warning ? `\n${result.warning}` : '');
+          return { content: [{ type: 'text', text }] };
         }
 
         case 'start_timer': {

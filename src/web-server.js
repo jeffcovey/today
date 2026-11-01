@@ -96,6 +96,7 @@ import { readTasks, withLazyTasks } from './dataview-tasks.js';
 import { isPostponable, postponeTaskLine } from './task-postpone.js';
 import { injectRoleReplyForms, saveRoleReply, ROLE_REPLY_ENDPOINT } from '../plugins/roles/web-reply.js';
 import { roleBlocksToCards } from '../plugins/roles/web-cards.js';
+import { getProjectsDueForReview } from './projects.js';
 import {
   formatInlineDataviewValue,
   generateTableOfContentsHtml,
@@ -894,26 +895,7 @@ async function getTodayTaskTimerItems() {
     ORDER BY category, title
   `).all(today);
 
-  const projects = db.prepare(`
-    SELECT id, title, priority, review_frequency, last_reviewed,
-           julianday(?) - julianday(last_reviewed) as days_since
-    FROM projects
-    WHERE status IN ('active', 'planning')
-      AND review_frequency IS NOT NULL
-      AND (
-        last_reviewed IS NULL
-        OR (review_frequency = 'daily' AND julianday(?) - julianday(last_reviewed) >= 1)
-        OR (review_frequency = 'weekly' AND julianday(?) - julianday(last_reviewed) >= 7)
-        OR (review_frequency = 'monthly' AND julianday(?) - julianday(last_reviewed) >= 30)
-        OR (review_frequency = 'quarterly' AND julianday(?) - julianday(last_reviewed) >= 90)
-        OR (review_frequency = 'yearly' AND julianday(?) - julianday(last_reviewed) >= 365)
-      )
-    ORDER BY
-      CASE
-        WHEN last_reviewed IS NULL THEN 0
-        ELSE julianday(?) - julianday(last_reviewed)
-      END DESC
-  `).all(today, today, today, today, today, today, today);
+  const projects = getProjectsDueForReview(db, today);
 
   // Filter out tasks from excluded files (vault-relative paths)
   const excludeFiles = getConfig('task_timer.exclude_files') || [];
