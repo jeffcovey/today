@@ -7,8 +7,8 @@
 // Requires: gh CLI installed and authenticated with read:project scope
 //   gh auth refresh -s read:project
 
-import { execSync } from 'child_process';
-import { reviewFields } from './review-schedule.js';
+import { execSync, execFileSync } from 'child_process';
+import { reviewFields, findReviewMetadataItem } from './review-schedule.js';
 
 // Clear environment tokens so gh uses its own OAuth session from `gh auth login`
 delete process.env.GH_TOKEN;
@@ -368,6 +368,10 @@ function buildQuery() {
     }
     items(first: 100) {
       totalCount
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
       nodes {
         id
         type
@@ -397,7 +401,6 @@ function buildQuery() {
             title
             state
             url
-            body
             repository {
               nameWithOwner
             }
@@ -517,6 +520,23 @@ if (createStageField) {
   for (const project of projects) {
     ensureStageField(project);
   }
+}
+
+/**
+ * Run a GraphQL query with variables through gh and return its data.
+ * Arguments go straight to gh, with no shell in between.
+ */
+function ghGraphql(query, variables = {}) {
+  const args = ['api', 'graphql', '-f', `query=${query}`];
+  for (const [name, value] of Object.entries(variables)) {
+    args.push('-f', `${name}=${value}`);
+  }
+  const output = execFileSync('gh', args, {
+    encoding: 'utf8',
+    maxBuffer: 10 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  return JSON.parse(output).data;
 }
 
 /**
@@ -717,8 +737,15 @@ const entries = projects.map(project => {
 
   // A schedule saved by set-review-date wins. Otherwise: frequency from the
   // project's status and GitHub project activity as the last review.
+  let reviewItem = null;
+  try {
+    reviewItem = findReviewMetadataItem(project, ghGraphql);
+  } catch {
+    // Fall back to the activity-based schedule; mark_project_reviewed reads
+    // the result back and says when it differs from what was saved.
+  }
   const { review_frequency: reviewFrequency, last_reviewed: lastReviewed } = reviewFields(
-    project.items?.nodes,
+    reviewItem ? [reviewItem] : [],
     {
       review_frequency: project.closed ? closedReviewFrequency : defaultReviewFrequency,
       last_reviewed: project.updatedAt ? project.updatedAt.split('T')[0] : null,

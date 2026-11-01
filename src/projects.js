@@ -28,13 +28,15 @@ const DUE_FOR_REVIEW_CONDITION = `
   status IN (${REVIEWABLE_STATUSES.map(s => `'${s}'`).join(', ')})
   AND review_frequency IS NOT NULL
   AND (
-    last_reviewed IS NULL
+    julianday(last_reviewed) IS NULL
     ${REVIEW_FREQUENCIES.map(f => `OR (review_frequency = '${f}' AND julianday(@today) - julianday(last_reviewed) >= ${REVIEW_FREQUENCY_DAYS[f]})`).join('\n    ')}
   )`;
 
 /**
  * Projects overdue for review, longest since review first, never-reviewed last.
- * The rule bin/projects review has always used.
+ * The rule bin/projects review has always used, except that an unreadable
+ * last_reviewed (such as the string "null") counts as never reviewed, as it
+ * does in nextReviewDate, instead of hiding the project.
  */
 export function getProjectsDueForReview(db, today) {
   return db.prepare(`
@@ -44,7 +46,7 @@ export function getProjectsDueForReview(db, today) {
     WHERE ${DUE_FOR_REVIEW_CONDITION}
     ORDER BY
       CASE
-        WHEN last_reviewed IS NULL THEN 0
+        WHEN julianday(last_reviewed) IS NULL THEN 0
         ELSE julianday(@today) - julianday(last_reviewed)
       END DESC
   `).all({ today });
@@ -68,13 +70,16 @@ export function addDays(date, days) {
 
 /**
  * When a project is next due for review, or null if it has no schedule.
- * A project never reviewed is due now.
+ * A project never reviewed, or with no readable last review date, is due now.
  */
 export function nextReviewDate(project, today) {
   const days = REVIEW_FREQUENCY_DAYS[project.review_frequency];
   if (!days) return null;
-  if (!project.last_reviewed) return today;
-  return addDays(String(project.last_reviewed).slice(0, 10), days);
+  const lastReviewed = project.last_reviewed ? String(project.last_reviewed).slice(0, 10) : null;
+  // A missing or unreadable date (frontmatter such as `last_reviewed: null`
+  // arrives as the string "null") counts as never reviewed, so due now.
+  if (!isCalendarDate(lastReviewed)) return today;
+  return addDays(lastReviewed, days);
 }
 
 /**
@@ -124,9 +129,18 @@ export function listProjects(db, filters = {}, { today } = {}) {
  * text, as bin/projects show has always matched.
  */
 export function findProject(db, idOrTitle) {
+  const pattern = containsPattern(idOrTitle);
   return db.prepare('SELECT * FROM projects WHERE id = ?').get(idOrTitle)
-    || db.prepare('SELECT * FROM projects WHERE title LIKE ? OR id LIKE ?').get(`%${idOrTitle}%`, `%${idOrTitle}%`)
+    || db.prepare(`SELECT * FROM projects WHERE title LIKE ? ESCAPE '\\' OR id LIKE ? ESCAPE '\\'`).get(pattern, pattern)
     || null;
+}
+
+/**
+ * A LIKE pattern (used with ESCAPE '\') matching text that contains the given
+ * text literally, so a _ or % in it is not a wildcard.
+ */
+export function containsPattern(text) {
+  return `%${String(text).replace(/[\\%_]/g, '\\$&')}%`;
 }
 
 export function parseMetadata(project) {

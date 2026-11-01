@@ -76,6 +76,26 @@ describe('due for review', () => {
   });
 });
 
+describe('an unreadable last review date', () => {
+  // markdown frontmatter `last_reviewed: null` arrives as the string "null".
+  const withBadDate = () => {
+    const db = projectDb();
+    db.prepare(`INSERT INTO projects (id, source, title, status, review_frequency, last_reviewed)
+      VALUES ('vault/projects/blog.md', 'markdown-projects/local', 'Blog', 'active', 'weekly', 'null')`).run();
+    return db;
+  };
+
+  test('counts as never reviewed instead of breaking the list', () => {
+    expect(nextReviewDate({ review_frequency: 'weekly', last_reviewed: 'null' }, TODAY)).toBe(TODAY);
+    const { projects } = listProjectsTool(withBadDate(), {}, { today: TODAY });
+    expect(projects.find(p => p.title === 'Blog')).toMatchObject({ next_review: TODAY, due_for_review: true });
+  });
+
+  test('and is due for review, listed with the never-reviewed', () => {
+    expect(getProjectsDueForReview(withBadDate(), TODAY).map(p => p.title)).toEqual(['Garden', 'Novel', 'Blog']);
+  });
+});
+
 describe('review eligibility in list and get', () => {
   test('an overdue project that is on hold is not marked due', () => {
     const db = projectDb();
@@ -201,6 +221,20 @@ describe('mark_project_reviewed', () => {
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/matches 2 projects/);
     expect(write).not.toHaveBeenCalled();
+  });
+
+  test('treats _ and % in a partial id as plain text', async () => {
+    const db = projectDb();
+    db.prepare(`INSERT INTO projects (id, source, title, status, review_frequency)
+      VALUES ('vault/projects/planxa.md', 'markdown-projects/local', 'PlanXA', 'active', 'weekly')`).run();
+    const write = jest.fn();
+    for (const id of ['Plan_A', 'Plan%A']) {
+      const result = await markProjectReviewed(db, { id }, { today: TODAY, write });
+      expect(result).toEqual({ success: false, error: `Project not found: ${id}` });
+    }
+    expect(write).not.toHaveBeenCalled();
+    expect(getProjectTool(db, { id: 'Plan_A' }, { today: TODAY })).toBeNull();
+    expect(getProjectTool(db, { id: 'PlanX' }, { today: TODAY })).toMatchObject({ title: 'PlanXA' });
   });
 
   test('needs a frequency for a project without one', async () => {

@@ -7,6 +7,7 @@ import {
   buildMetadataIssueBody,
   savedReviewSchedule,
   reviewFields,
+  findReviewMetadataItem,
 } from '../plugins/github-projects/review-schedule.js';
 import { nextReviewDate } from '../src/projects.js';
 
@@ -74,5 +75,55 @@ describe('reviewFields', () => {
     expect(reviewFields([ordinaryItem], activityFallback)).toBe(activityFallback);
     const closed = { review_frequency: 'never', last_reviewed: '2026-10-01' };
     expect(reviewFields([metadataItem({ date: '2026-11-08', body: '' })], closed)).toBe(closed);
+  });
+});
+
+describe('findReviewMetadataItem', () => {
+  const body = buildMetadataIssueBody('Big board', '2027-01-15', 'monthly');
+  // A fake gh: item pages by cursor, and the body of the metadata item.
+  const fakeGraphql = (pages) => {
+    const calls = [];
+    const graphql = (query, variables) => {
+      calls.push(variables);
+      if (variables.after) return { node: { items: pages[variables.after] } };
+      return { node: { content: { body } } };
+    };
+    return { graphql, calls };
+  };
+  const withoutBody = ({ content: { body: _body, ...content }, ...item }) => ({ ...item, content });
+  const meta = withoutBody(metadataItem({ date: '2027-01-15' }));
+  const plain = withoutBody(ordinaryItem);
+
+  test('on the first page: fetches only that issue body', () => {
+    const { graphql, calls } = fakeGraphql({});
+    const project = { id: 'P', items: { nodes: [plain, meta], pageInfo: { hasNextPage: true, endCursor: 'c1' } } };
+    const item = findReviewMetadataItem(project, graphql);
+    expect(calls).toEqual([{ id: 'PVTI_meta' }]);
+    expect(reviewFields([item], activityFallback)).toEqual({ review_frequency: 'monthly', last_reviewed: '2026-12-16' });
+  });
+
+  test('past the first page: pages by title, then fetches the body', () => {
+    const { graphql, calls } = fakeGraphql({
+      c1: { nodes: [plain], pageInfo: { hasNextPage: true, endCursor: 'c2' } },
+      c2: { nodes: [meta], pageInfo: { hasNextPage: false, endCursor: 'c3' } },
+    });
+    const project = { id: 'P', items: { nodes: [plain], pageInfo: { hasNextPage: true, endCursor: 'c1' } } };
+    const item = findReviewMetadataItem(project, graphql);
+    expect(calls).toEqual([{ id: 'P', after: 'c1' }, { id: 'P', after: 'c2' }, { id: 'PVTI_meta' }]);
+    expect(savedReviewSchedule([item])).toEqual({ nextReviewDate: '2027-01-15', frequency: 'monthly' });
+  });
+
+  test('no metadata issue: null, after at most maxPages extra pages', () => {
+    const { graphql, calls } = fakeGraphql({
+      c1: { nodes: [plain], pageInfo: { hasNextPage: true, endCursor: 'c2' } },
+      c2: { nodes: [plain], pageInfo: { hasNextPage: true, endCursor: 'c3' } },
+    });
+    const project = { id: 'P', items: { nodes: [plain], pageInfo: { hasNextPage: true, endCursor: 'c1' } } };
+    expect(findReviewMetadataItem(project, graphql, { maxPages: 2 })).toBeNull();
+    expect(calls).toHaveLength(2);
+
+    const single = fakeGraphql({});
+    expect(findReviewMetadataItem({ id: 'P', items: { nodes: [plain], pageInfo: { hasNextPage: false } } }, single.graphql)).toBeNull();
+    expect(single.calls).toHaveLength(0);
   });
 });

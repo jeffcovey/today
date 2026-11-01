@@ -34,6 +34,69 @@ export function isReviewMetadataContent(content) {
   );
 }
 
+// How far findReviewMetadataItem looks past the sync query's first page:
+// about the 1,000 items write.js searches before it gives up.
+export const REVIEW_METADATA_PAGE_SIZE = 100;
+export const MAX_REVIEW_METADATA_PAGES = 10;
+
+const ITEM_PAGE_QUERY = `
+  query($id: ID!, $after: String!) {
+    node(id: $id) {
+      ... on ProjectV2 {
+        items(first: ${REVIEW_METADATA_PAGE_SIZE}, after: $after) {
+          pageInfo { hasNextPage endCursor }
+          nodes {
+            id
+            fieldValues(first: 10) {
+              nodes {
+                ... on ProjectV2ItemFieldDateValue {
+                  date
+                  field { ... on ProjectV2Field { name } }
+                }
+              }
+            }
+            content { ... on Issue { title } }
+          }
+        }
+      }
+    }
+  }`;
+
+const ITEM_BODY_QUERY = `
+  query($id: ID!) {
+    node(id: $id) {
+      ... on ProjectV2Item {
+        content { ... on Issue { body } }
+      }
+    }
+  }`;
+
+/**
+ * The project's review metadata item with its issue body, or null.
+ *
+ * The sync query fetches one page of items and no issue bodies, since a body
+ * for every item could overrun the reader's output buffer. So this finds the
+ * metadata issue by title, on later pages too, and then fetches only its body.
+ *
+ * @param {object} project - a project node from the sync query, with id and
+ *   items { nodes, pageInfo }
+ * @param {(query: string, variables: object) => object} graphql - runs a
+ *   query and returns its data; may throw
+ */
+export function findReviewMetadataItem(project, graphql, { maxPages = MAX_REVIEW_METADATA_PAGES } = {}) {
+  let item = (project.items?.nodes || []).find(node => isReviewMetadataContent(node?.content));
+  let pageInfo = project.items?.pageInfo;
+  for (let page = 0; !item && pageInfo?.hasNextPage && page < maxPages; page++) {
+    const items = graphql(ITEM_PAGE_QUERY, { id: project.id, after: pageInfo.endCursor })?.node?.items;
+    item = (items?.nodes || []).find(node => isReviewMetadataContent(node?.content));
+    pageInfo = items?.pageInfo;
+  }
+  if (!item) return null;
+
+  const body = graphql(ITEM_BODY_QUERY, { id: item.id })?.node?.content?.body ?? null;
+  return { ...item, content: { ...item.content, body } };
+}
+
 /**
  * Find the saved schedule among a project's item nodes.
  * @returns {{nextReviewDate: string, frequency: string|null}|null}

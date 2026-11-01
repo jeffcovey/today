@@ -9,6 +9,7 @@ import { getAbsoluteVaultPath } from './config.js';
 import {
   listProjects,
   findProject,
+  containsPattern,
   nextReviewDate,
   addDays,
   isCalendarDate,
@@ -144,8 +145,9 @@ export async function markProjectReviewed(db, args, {
   // it is the only one.
   let project = db.prepare('SELECT * FROM projects WHERE id = ?').get(args.id);
   if (!project) {
-    const matches = db.prepare('SELECT * FROM projects WHERE title LIKE ? OR id LIKE ? ORDER BY title')
-      .all(`%${args.id}%`, `%${args.id}%`);
+    const pattern = containsPattern(args.id);
+    const matches = db.prepare(`SELECT * FROM projects WHERE title LIKE ? ESCAPE '\\' OR id LIKE ? ESCAPE '\\' ORDER BY title`)
+      .all(pattern, pattern);
     if (matches.length > 1) {
       return {
         success: false,
