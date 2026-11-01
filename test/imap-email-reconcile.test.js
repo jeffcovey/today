@@ -5,6 +5,7 @@ import Database from 'better-sqlite3';
 import {
   findStaleIds,
   isTrustworthyUidList,
+  isWithinSyncWindow,
   reconcileFolder,
   searchSince,
   WINDOW_SLACK_DAYS
@@ -217,5 +218,27 @@ describe('reconcileFolder', () => {
 
     expect(reconcileFolder(dbPath, SOURCE, 'INBOX', [1, 2], { messageCount: 2 })).toBe(0);
     expect(remainingUids(dbPath)).toEqual([1, 2]);
+  });
+});
+
+describe('isWithinSyncWindow', () => {
+  const since = daysAgo(30);
+
+  test('keeps a message that arrived inside the window', () => {
+    expect(isWithinSyncWindow(daysAgo(29), since)).toBe(true);
+  });
+
+  test('keeps a message that arrived exactly at the boundary', () => {
+    expect(isWithinSyncWindow(since, since)).toBe(true);
+  });
+
+  test('skips old mail delivered under a new UID, such as a bulk import', () => {
+    expect(isWithinSyncWindow(new Date('2007-01-04T00:00:00Z'), since)).toBe(false);
+  });
+
+  test('keeps a message whose date is missing or unreadable', () => {
+    expect(isWithinSyncWindow(null, since)).toBe(true);
+    expect(isWithinSyncWindow(undefined, since)).toBe(true);
+    expect(isWithinSyncWindow('not a date', since)).toBe(true);
   });
 });

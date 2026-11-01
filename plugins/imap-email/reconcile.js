@@ -24,6 +24,14 @@ export function searchSince(sinceDate, slackDays = WINDOW_SLACK_DAYS) {
   return padded;
 }
 
+// Whether a message's server-side arrival date falls inside the sync window. A
+// message without a usable date is kept: its age can't be shown to be too old.
+export function isWithinSyncWindow(internalDate, sinceDate) {
+  if (!internalDate) return true;
+  const arrived = new Date(internalDate).getTime();
+  return Number.isNaN(arrived) || arrived >= new Date(sinceDate).getTime();
+}
+
 // A UID is a positive integer. Anything else -- null, '', a non-numeric string
 // -- is not a UID. Number() alone will not do: Number(null) and Number('') are
 // both 0, which would make an unidentifiable row look like UID 0 and be deleted.
