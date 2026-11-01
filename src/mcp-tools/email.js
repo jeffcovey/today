@@ -134,11 +134,14 @@ export async function searchEmail(args, ctx) {
   const note = await freshen(ctx, 'email', 'email');
 
   const term = likeTerm(query);
+  // An html-only message has no text_content, so its html body is searched
+  // instead (get_email shows that body as text).
   const where = [
-    "(subject LIKE ? ESCAPE '\\' OR from_address LIKE ? ESCAPE '\\' OR from_name LIKE ? ESCAPE '\\' OR text_content LIKE ? ESCAPE '\\')",
+    "(subject LIKE ? ESCAPE '\\' OR from_address LIKE ? ESCAPE '\\' OR from_name LIKE ? ESCAPE '\\' OR text_content LIKE ? ESCAPE '\\'"
+      + " OR (IFNULL(text_content, '') = '' AND html_content LIKE ? ESCAPE '\\'))",
     ...NOT_TRASH,
   ];
-  const params = [term, term, term, term];
+  const params = [term, term, term, term, term];
   if (args.source) addExactSourceCondition(where, params, args.source);
 
   let result;

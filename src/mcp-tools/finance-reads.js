@@ -12,7 +12,7 @@ import { jsonResult, errorResult } from '../mcp-safeguards.js';
 import { getAccountList } from '../account-balances.js';
 import {
   getConfiguredTimezone, clampInt, todayIn, addDays, parseJson, likeTerm,
-  isMissingTable, freshen, lead, money, toLocal,
+  isMissingTable, freshen, lead, money, moneyText, toLocal,
 } from './_medium-reads-helpers.js';
 
 export const VIEWS = ['accounts', 'upcoming', 'recent', 'budget'];
@@ -63,7 +63,8 @@ function txRecord(r) {
  * stored balance only from the same source, by account id when both sides
  * have one, otherwise by name within a compatible budget. A group that fits
  * two balances is counted toward neither; one that fits none is a partial
- * account of its own source.
+ * account of its own source, keyed by its account id when it has one (two
+ * unmatched accounts can share a name) and by its name otherwise.
  */
 function withLocalDayStats(db, accounts, source, today) {
   const meta = key => `CASE WHEN json_valid(metadata) THEN json_extract(metadata, '$.${key}') END`;
@@ -104,9 +105,11 @@ function withLocalDayStats(db, accounts, source, today) {
   }
   const partialByKey = new Map();
   for (const s of unmatched) {
-    const key = JSON.stringify([s.source, s.budget_id ?? null, s.account]);
+    const key = JSON.stringify(s.account_id
+      ? [s.source, s.budget_id ?? null, 'id', s.account_id]
+      : [s.source, s.budget_id ?? null, 'name', s.account]);
     const p = partialByKey.get(key) || {
-      account: s.account, balance: 0, cleared_balance: null, uncleared_balance: null,
+      account: s.account, account_id: s.account_id ?? null, balance: 0, cleared_balance: null, uncleared_balance: null,
       type: null, on_budget: null, budget_name: s.budget_name ?? null, source: s.source, as_of: null, partial: true,
       count: 0, last_transaction: null,
     };
@@ -116,7 +119,8 @@ function withLocalDayStats(db, accounts, source, today) {
     partialByKey.set(key, p);
   }
   return [...stored, ...partialByKey.values()]
-    .sort((a, b) => a.account.localeCompare(b.account) || String(a.source ?? '').localeCompare(String(b.source ?? '')));
+    .sort((a, b) => a.account.localeCompare(b.account) || String(a.source ?? '').localeCompare(String(b.source ?? ''))
+      || String(a.account_id ?? '').localeCompare(String(b.account_id ?? '')));
 }
 
 function accountsView(args, ctx, tz, today) {
@@ -130,6 +134,7 @@ function accountsView(args, ctx, tz, today) {
   }
   const rows = accounts.map(a => ({
     account: a.account,
+    account_id: a.account_id ?? null,
     balance: money(a.balance),
     cleared_balance: money(a.cleared_balance),
     uncleared_balance: money(a.uncleared_balance),
@@ -168,7 +173,7 @@ function upcomingView(args, ctx, today) {
   const total = money(rows.reduce((sum, r) => sum + Number(r.amount || 0), 0));
   const text = rows.length === 0
     ? `Nothing scheduled from ${today} through ${until}.`
-    : `${rows.length} scheduled transaction(s) from ${today} through ${until}, net ${total}${items.length < rows.length ? `; showing the first ${items.length}` : ''}.`;
+    : `${rows.length} scheduled transaction(s) from ${today} through ${until}, net ${moneyText(total)}${items.length < rows.length ? `; showing the first ${items.length}` : ''}.`;
   return {
     value: {
       view: 'upcoming', from: today, to: until, days, total_count: rows.length, net_total: total,
@@ -229,11 +234,23 @@ function budgetView(args, ctx, today) {
     params.push(likeTerm(args.source));
   }
   const whereClause = `WHERE ${where.join(' AND ')}`;
-  const rows = ctx.db.prepare(`
-    SELECT category, category_group, assigned, activity, available
-    FROM budget_allocations ${whereClause}
-    ORDER BY category_group, category
-  `).all(...params);
+  let rows;
+  try {
+    rows = ctx.db.prepare(`
+      SELECT category, category_group, assigned, activity, available
+      FROM budget_allocations ${whereClause}
+      ORDER BY category_group, category
+    `).all(...params);
+  } catch (error) {
+    if (!isMissingTable(error)) throw error;
+    // No migration creates budget_allocations, and the ynab-finance plugin
+    // writes to it without creating it, so on a database where nothing else
+    // made the table there is no budget to read.
+    return {
+      value: { view: 'budget', month, budget_table_missing: true, category_count: 0 },
+      text: `No budget data for ${month}: this database has no budget_allocations table. The ynab-finance plugin writes budgets to that table but does not create it, so its budget import fails until the table exists.`,
+    };
+  }
   const pct = r => (r.assigned > 0 ? Math.round((Math.abs(r.activity) / r.assigned) * 1000) / 10 : null);
   const cat = r => ({
     category: r.category || 'Uncategorized',
@@ -246,11 +263,19 @@ function budgetView(args, ctx, today) {
 
   if (args.category) {
     const needle = String(args.category).toLowerCase();
-    const matches = rows.filter(r => String(r.category || '').toLowerCase().includes(needle)).map(cat);
-    const text = matches.length === 0
+    const matching = rows.filter(r => String(r.category || '').toLowerCase().includes(needle));
+    const matches = matching.slice(0, listLimit).map(cat);
+    const truncated = matches.length < matching.length;
+    const text = matching.length === 0
       ? `No budget category for ${month} matches "${args.category}".`
-      : `${matches.length} budget categor${matches.length === 1 ? 'y' : 'ies'} for ${month} match "${args.category}".`;
-    return { value: { view: 'budget', month, categories: matches }, text };
+      : `${matching.length} budget categor${matching.length === 1 ? 'y' : 'ies'} for ${month} match "${args.category}"${truncated ? `; showing the first ${matches.length} (raise limit, up to ${MAX_LIMIT}, for the rest)` : ''}.`;
+    return {
+      value: {
+        view: 'budget', month, category_count: matching.length, returned: matches.length, list_limit: listLimit,
+        truncated, categories: matches,
+      },
+      text,
+    };
   }
 
   const totals = rows.reduce((acc, r) => {
@@ -405,7 +430,7 @@ export const tools = [
       properties: {
         view: { type: 'string', enum: VIEWS, description: 'Which view.' },
         days: { type: 'number', description: 'upcoming: days ahead (default 30). recent: days back (default 30). Max 366.' },
-        limit: { type: 'number', description: `recent and upcoming: max transactions (default ${RECENT_DEFAULT_LIMIT} recent, ${UPCOMING_DEFAULT_LIMIT} upcoming). budget: max categories in each of the over and under lists (default ${BUDGET_LIST_DEFAULT_LIMIT}). Max ${MAX_LIMIT}.` },
+        limit: { type: 'number', description: `recent and upcoming: max transactions (default ${RECENT_DEFAULT_LIMIT} recent, ${UPCOMING_DEFAULT_LIMIT} upcoming). budget: max categories in each of the over and under lists, or in the category matches (default ${BUDGET_LIST_DEFAULT_LIMIT}). Max ${MAX_LIMIT}.` },
         month: { type: 'string', description: 'budget: YYYY-MM, default this month.' },
         account: { type: 'string', description: 'accounts, upcoming, recent: account name contains this.' },
         category: { type: 'string', description: 'upcoming, recent, budget: category name contains this.' },

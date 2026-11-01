@@ -11,12 +11,14 @@ import { jsonResult, errorResult } from '../mcp-safeguards.js';
 import { METRIC_DISPLAY } from '../health-metrics.js';
 import {
   getConfiguredTimezone, clampInt, todayIn, isDay, addDays, parseJson,
-  likeTerm, isMissingTable, freshen, lead,
+  likeTerm, isMissingTable, freshen, lead, exact,
 } from './_medium-reads-helpers.js';
 
 // The metrics bin/health today and summary lead with.
 export const HISTORY_DEFAULT_LIMIT = 100;
 export const HISTORY_MAX_LIMIT = 1000;
+export const STREAKS_DEFAULT_LIMIT = 50;
+export const STREAKS_MAX_LIMIT = 500;
 
 export const KEY_METRICS = [
   'step_count',
@@ -78,6 +80,7 @@ function display(name, value, units = null) {
   return { label: d.label, formatted };
 }
 
+/** Rounding for display text only; machine-readable fields use exact(). */
 function round(n, places = 2) {
   if (n === null || n === undefined) return null;
   const f = 10 ** places;
@@ -121,7 +124,7 @@ export async function healthToday(args, ctx) {
   }
 
   const all = rows
-    .map(r => ({ metric: r.metric_name, ...display(r.metric_name, r.value, r.units), value: round(r.value), units: r.units || null, key: KEY_METRICS.includes(r.metric_name), source: r.source }))
+    .map(r => ({ metric: r.metric_name, ...display(r.metric_name, r.value, r.units), value: exact(r.value), units: r.units || null, key: KEY_METRICS.includes(r.metric_name), source: r.source }))
     .sort((a, b) => sortKeyFirst(a.metric, b.metric));
   const metrics = args.all ? all : all.filter(m => m.key);
   const otherNames = [...new Set(all.filter(m => !m.key).map(m => m.metric))];
@@ -174,7 +177,8 @@ export async function healthSummary(args, ctx) {
         const msg = found.candidates.length > 1
           ? `"${args.metric}" matches several metrics: ${found.candidates.join(', ')}. Pass one of them.`
           : `No metric matches "${args.metric}"${args.source ? ` in source "${args.source}"` : ''}. Metrics with data: ${found.available.slice(0, 40).join(', ') || 'none'}.`;
-        return errorResult(msg);
+        // A sync that is still running may yet bring the metric in.
+        return errorResult(lead(msg, note));
       }
       const first = addDays(today, -(days - 1));
       const where = ['metric_name = ?', 'date >= ?', 'date <= ?'];
@@ -188,7 +192,7 @@ export async function healthSummary(args, ctx) {
       const page = rows.slice(0, limit);
       const statsOf = list => {
         const values = list.map(r => Number(r.value));
-        return { average: round(values.reduce((a, b) => a + b, 0) / values.length), min: round(Math.min(...values)), max: round(Math.max(...values)) };
+        return { average: exact(values.reduce((a, b) => a + b, 0) / values.length), min: exact(Math.min(...values)), max: exact(Math.max(...values)) };
       };
       // Readings in different units (kg from one source, lb from another)
       // are not averaged together.
@@ -212,7 +216,7 @@ export async function healthSummary(args, ctx) {
         returned: page.length,
         limit,
         has_more: page.length < rows.length,
-        history: page.map(r => ({ date: r.date, value: round(r.value), formatted: display(found.name, r.value, r.units).formatted, units: r.units || null, source: r.source })),
+        history: page.map(r => ({ date: r.date, value: exact(r.value), formatted: display(found.name, r.value, r.units).formatted, units: r.units || null, source: r.source })),
       }, lead(rows.length
         ? `${label}: ${rows.length} reading(s) from ${first} through ${today}, newest first${page.length < rows.length ? `; history shows the newest ${page.length} (raise limit, up to ${HISTORY_MAX_LIMIT}, or narrow days for more; the stats cover all of them)` : ''}.`
         : `No ${label} readings from ${first} through ${today}.`, note));
@@ -233,10 +237,10 @@ export async function healthSummary(args, ctx) {
       .map(r => ({
         metric: r.metric_name,
         label: display(r.metric_name, null).label,
-        average: round(r.avg_value),
+        average: exact(r.avg_value),
         average_formatted: display(r.metric_name, r.avg_value, r.units).formatted,
-        min: round(r.min_value),
-        max: round(r.max_value),
+        min: exact(r.min_value),
+        max: exact(r.max_value),
         units: r.units || null,
         days_with_data: r.days_with_data,
         key: KEY_METRICS.includes(r.metric_name),
@@ -267,33 +271,38 @@ export async function habitStreaks(args, ctx) {
   const tz = getConfiguredTimezone();
   const today = todayIn(tz, ctx.now ?? new Date());
   const min = clampInt(args.min, 1, 0, 100000);
+  const limit = clampInt(args.limit, STREAKS_DEFAULT_LIMIT, 1, STREAKS_MAX_LIMIT);
   const note = await freshen(ctx, 'habits', 'habits');
 
   try {
-    // Streaks live in each day's row metadata; read each source's newest day
-    // on or before today (today's rows may not exist yet early in the day,
-    // and a backup-based source can lag another by days).
+    // Streaks live in each day's row metadata; read each habit's newest row
+    // on or before today. Today's rows may not exist yet early in the day, a
+    // backup-based source can lag another by days, and a filtered sync can
+    // bring one routine up to today while the rest of its source stays on an
+    // older day.
     const dayWhere = ['date <= ?'];
     const dayParams = [today];
     sourceClause(args, dayWhere, dayParams);
-    const sourceDays = ctx.db.prepare(`
-      SELECT source, MAX(date) AS as_of FROM habits WHERE ${dayWhere.join(' AND ')}
-      GROUP BY source ORDER BY source
-    `).all(...dayParams);
-    if (sourceDays.length === 0) return jsonResult({ user_timezone: tz, as_of: null, sources: [], total: 0, streaks: [] }, lead('No habit data on or before today.', note));
-    const asOf = sourceDays.reduce((max, s) => (s.as_of > max ? s.as_of : max), sourceDays[0].as_of);
-
-    const where = [`(${sourceDays.map(() => '(source = ? AND date = ?)').join(' OR ')})`];
-    const params = sourceDays.flatMap(s => [s.source, s.as_of]);
+    const where = [];
+    const params = [...dayParams];
     if (args.habit) {
-      where.push("title LIKE ? ESCAPE '\\'");
+      where.push("h.title LIKE ? ESCAPE '\\'");
       params.push(likeTerm(args.habit));
     }
     const rows = ctx.db.prepare(`
-      SELECT habit_id, title, category, status, metadata, source, date FROM habits
-      WHERE ${where.join(' AND ')}
+      SELECT h.habit_id, h.title, h.category, h.status, h.metadata, h.source, h.date
+      FROM habits h
+      JOIN (
+        SELECT source, habit_id, MAX(date) AS newest FROM habits
+        WHERE ${dayWhere.join(' AND ')} GROUP BY source, habit_id
+      ) n ON h.source = n.source AND h.habit_id = n.habit_id AND h.date = n.newest
+      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
     `).all(...params);
-    const streaks = rows
+    if (rows.length === 0) {
+      return jsonResult({ user_timezone: tz, as_of: null, sources: [], min, limit, total: 0, returned: 0, has_more: false, streaks: [] },
+        lead(args.habit ? `No habit matching "${args.habit}" has data on or before today.` : 'No habit data on or before today.', note));
+    }
+    const all = rows
       .map(r => {
         const meta = parseJson(r.metadata, {});
         return {
@@ -308,17 +317,38 @@ export async function habitStreaks(args, ctx) {
       })
       .filter(s => s.streak >= min)
       .sort((a, b) => b.streak - a.streak || a.title.localeCompare(b.title));
+    const streaks = all.slice(0, limit);
 
-    const behind = sourceDays.filter(sd => sd.as_of !== today);
+    // Each source's newest day among the habits read, and every habit row
+    // older than today, grouped by source and day, for the freshness warning.
+    const sourceMap = new Map();
+    const behindMap = new Map();
+    for (const r of rows) {
+      const sd = sourceMap.get(r.source);
+      if (!sd || r.date > sd.as_of) sourceMap.set(r.source, { source: r.source, as_of: r.date });
+      if (r.date !== today) {
+        const key = JSON.stringify([r.source, r.date]);
+        const b = behindMap.get(key) || { source: r.source, as_of: r.date, habits: 0 };
+        b.habits += 1;
+        behindMap.set(key, b);
+      }
+    }
+    const sourceDays = [...sourceMap.values()].sort((a, b) => a.source.localeCompare(b.source));
+    const behind = [...behindMap.values()].sort((a, b) => a.source.localeCompare(b.source) || b.as_of.localeCompare(a.as_of));
+    const asOf = sourceDays.reduce((max, sd) => (sd.as_of > max ? sd.as_of : max), sourceDays[0].as_of);
     const asOfNote = behind.length === 0
       ? ''
-      : sourceDays.length === 1
-        ? ` (as of ${asOf}, the newest synced day)`
-        : ` (${behind.map(sd => `${sd.source} as of ${sd.as_of}`).join('; ')}, each source's newest synced day)`;
-    const text = streaks.length === 0
+      : behind.length === 1 && behind[0].habits === rows.length
+        ? ` (as of ${behind[0].as_of}, the newest synced day)`
+        : ` (not every habit is synced through today: ${behind.map(b => `${b.habits} habit(s) in ${b.source} as of ${b.as_of}`).join('; ')}; each habit is read at its own newest synced day)`;
+    const shown = streaks.length < all.length ? `; showing the longest ${streaks.length} (raise limit, up to ${STREAKS_MAX_LIMIT}, for the rest)` : '';
+    const text = all.length === 0
       ? `No habit has a streak of ${min}+ day(s)${asOfNote}.`
-      : `${streaks.length} habit(s) with a streak of ${min}+ day(s)${asOfNote}.`;
-    return jsonResult({ user_timezone: tz, as_of: asOf, sources: sourceDays, min, total: streaks.length, streaks }, lead(text, note));
+      : `${all.length} habit(s) with a streak of ${min}+ day(s)${asOfNote}${shown}.`;
+    return jsonResult({
+      user_timezone: tz, as_of: asOf, sources: sourceDays, behind_today: behind, min, limit,
+      total: all.length, returned: streaks.length, has_more: streaks.length < all.length, streaks,
+    }, lead(text, note));
   } catch (error) {
     if (isMissingTable(error)) return jsonResult({ user_timezone: tz, streaks: [] }, NO_HABITS);
     throw error;
@@ -344,7 +374,7 @@ export async function habitHistory(args, ctx) {
     }
     // habit_id is only unique within a source, so a habit is the pair.
     const pairs = [...new Map(matches.map(m => [JSON.stringify([m.source, m.habit_id]), m])).values()];
-    if (pairs.length === 0) return errorResult(`No habit matches "${wanted}".`);
+    if (pairs.length === 0) return errorResult(lead(`No habit matches "${wanted}".`, note));
     if (pairs.length > 1) {
       const labels = [...new Set(pairs.map(m => `${m.title} (${m.source})`))];
       return errorResult(`"${wanted}" matches ${pairs.length} habits: ${labels.slice(0, 20).join('; ')}. Pass a fuller title, or source.`);
@@ -432,11 +462,12 @@ export const tools = [
     name: 'habit_streaks',
     kind: 'read',
     pluginType: 'habits',
-    description: 'Current habit streaks (like bin/habits streaks), longest first, as of today or the newest synced day.',
+    description: 'Current habit streaks (like bin/habits streaks), longest first, each habit as of today or its newest synced day.',
     inputSchema: {
       type: 'object',
       properties: {
         min: { type: 'number', description: 'Only streaks at least this long (default 1; 0 lists every habit).' },
+        limit: { type: 'number', description: `Max habits, longest streaks first (default ${STREAKS_DEFAULT_LIMIT}, max ${STREAKS_MAX_LIMIT}); total counts them all.` },
         habit: { type: 'string', description: 'Only habits whose title contains this.' },
         source: sourceProp,
       },

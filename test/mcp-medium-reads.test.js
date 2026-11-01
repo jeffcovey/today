@@ -18,7 +18,7 @@ import { upcomingBirthdays, searchContacts } from '../src/mcp-tools/contacts.js'
 import { listDiary } from '../src/mcp-tools/diary.js';
 import { healthToday, healthSummary, habitStreaks, habitHistory } from '../src/mcp-tools/health-habits.js';
 import { financeOverview, uncategorizedTransactions } from '../src/mcp-tools/finance-reads.js';
-import { toLocal, addDays, isDay, clampInt, likeTerm } from '../src/mcp-tools/_medium-reads-helpers.js';
+import { toLocal, addDays, isDay, clampInt, likeTerm, exact, moneyText } from '../src/mcp-tools/_medium-reads-helpers.js';
 
 const NOW = new Date('2026-11-02T02:00:00Z'); // 2026-11-01 21:00 EST
 const TZ = 'America/New_York';
@@ -111,6 +111,18 @@ describe('shared helpers', () => {
     expect(clampInt('x', 10, 1, 100)).toBe(10);
     expect(likeTerm('50%_off')).toBe('%50\\%\\_off%');
   });
+
+  test('numbers keep their stored precision; only display text rounds, half away from zero', () => {
+    expect(exact(1.234)).toBe(1.234);
+    expect(exact(-1.125)).toBe(-1.125);
+    expect(exact(0.004)).toBe(0.004);
+    expect(exact(0.1 + 0.2)).toBe(0.3);
+    expect(exact(null)).toBeNull();
+    expect(moneyText(-1.125)).toBe('-1.13');
+    expect(moneyText(1.125)).toBe('1.13');
+    expect(moneyText(1.005)).toBe('1.01');
+    expect(moneyText(-0.001)).toBe('0.00');
+  });
 });
 
 describe('email', () => {
@@ -154,6 +166,17 @@ describe('email', () => {
     expect(miss.data.total).toBe(0);
     expect(miss.lead).toMatch(/--server/);
     expect((await searchEmail({ query: '  ' }, ctxFor(db))).isError).toBe(true);
+  });
+
+  test('search_email: an html-only message is found by its body', async () => {
+    const db = emailDb();
+    // "is ready" is only in message 2's html body, not its subject.
+    expect(parse(await searchEmail({ query: 'is ready' }, ctxFor(db))).data.emails.map(e => e.id))
+      .toEqual(['imap-email/icloud:INBOX:2']);
+    // A message with a text body is searched by that body, not its html.
+    insert(db, 'email', { id: 'imap-email/icloud:INBOX:6', source: 'imap-email/icloud', from_address: 'a@example.com', folder: 'INBOX', subject: 'Both', date: '2026-11-01T10:00:00.000Z', flags: '[]', text_content: 'plain words', html_content: '<p>only-in-html</p>' });
+    expect(parse(await searchEmail({ query: 'only-in-html' }, ctxFor(db))).data.total).toBe(0);
+    expect(parse(await searchEmail({ query: '100%' }, ctxFor(db))).data.total).toBe(0);
   });
 
   test('get_email: text body, html fallback, truncation, unsynced body and unknown id', async () => {
@@ -444,6 +467,26 @@ describe('health', () => {
     expect(summary.map(m => [m.units, m.average_formatted]).sort()).toEqual([['L', '1.5 L'], ['mL', '500 mL']]);
   });
 
+  test('values and stats keep their stored precision', async () => {
+    const db = makeDb('health');
+    const add = (id, date, value) => insert(db, 'health_metrics', { id, source: 'apple-health-auto-export/default', date, metric_name: 'dietary_caffeine', value, units: 'g' });
+    add('c1', '2026-11-01', 0.004);
+    add('c2', '2026-10-31', 0.0015);
+    const today = parse(await healthToday({ all: true }, ctxFor(db))).data.metrics;
+    expect(today[0].value).toBe(0.004);
+    const summary = parse(await healthSummary({ days: 7, all: true }, ctxFor(db))).data.metrics[0];
+    expect(summary).toMatchObject({ average: 0.00275, min: 0.0015, max: 0.004 });
+    const one = parse(await healthSummary({ metric: 'dietary_caffeine' }, ctxFor(db))).data;
+    expect(one.stats).toEqual({ average: 0.00275, min: 0.0015, max: 0.004 });
+    expect(one.history.map(h => h.value)).toEqual([0.004, 0.0015]);
+  });
+
+  test('a metric not found while a sync is still running carries the stale note', async () => {
+    const result = await healthSummary({ metric: 'blood sugar' }, ctxFor(healthDb(), { syncForRead: STALE_SYNC }));
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/No metric matches "blood sugar"[\s\S]*sync is still running/);
+  });
+
   test('health_summary with metric: only the requested source\'s metrics are candidates', async () => {
     const db = makeDb('health');
     insert(db, 'health_metrics', { id: 'a', source: 'watch/default', date: '2026-11-01', metric_name: 'heart_rate', value: 70, units: 'bpm' });
@@ -505,9 +548,12 @@ describe('habits', () => {
     const db = habitsDb();
     const all = parse(await habitStreaks({}, ctxFor(db))).data;
     expect(all.as_of).toBe('2026-11-01');
-    expect(all.streaks.map(s => [s.title, s.streak])).toEqual([['Walk 30 minutes', 12], ['Drink water', 3]]);
+    // "Read later list" was last synced on Oct 31, so it is read at that day.
+    expect(all.streaks.map(s => [s.title, s.streak, s.as_of])).toEqual([
+      ['Walk 30 minutes', 12, '2026-11-01'], ['Drink water', 3, '2026-11-01'], ['Read later list', 1, '2026-10-31'],
+    ]);
     expect(parse(await habitStreaks({ min: 5 }, ctxFor(db))).data.total).toBe(1);
-    expect(parse(await habitStreaks({ min: 0, habit: 'read' }, ctxFor(db))).data.streaks.map(s => s.title)).toEqual(['Read']);
+    expect(parse(await habitStreaks({ min: 0, habit: 'read' }, ctxFor(db))).data.streaks.map(s => s.title)).toEqual(['Read later list', 'Read']);
   });
 
   test('habit_streaks falls back to the newest synced day', async () => {
@@ -523,13 +569,43 @@ describe('habits', () => {
     insert(db, 'habits', { id: 'r1', source: 'markdown-routines/default', habit_id: 'morning', title: 'Morning routine', date: '2026-10-29', status: 'completed', metadata: '{"current_streak":4}' });
     const { lead, data } = parse(await habitStreaks({}, ctxFor(db)));
     expect(data.streaks.map(s => [s.title, s.streak, s.as_of])).toEqual([
-      ['Walk 30 minutes', 12, '2026-11-01'], ['Morning routine', 4, '2026-10-29'], ['Drink water', 3, '2026-11-01'],
+      ['Walk 30 minutes', 12, '2026-11-01'], ['Morning routine', 4, '2026-10-29'], ['Drink water', 3, '2026-11-01'], ['Read later list', 1, '2026-10-31'],
     ]);
     expect(data.sources).toEqual([
       { source: 'markdown-routines/default', as_of: '2026-10-29' },
       { source: 'streaks-habits/default', as_of: '2026-11-01' },
     ]);
-    expect(lead).toMatch(/markdown-routines\/default as of 2026-10-29/);
+    expect(lead).toMatch(/1 habit\(s\) in markdown-routines\/default as of 2026-10-29/);
+  });
+
+  test('habit_streaks reads each habit at its own newest day, in one statement', async () => {
+    // A filtered routines sync brought one routine to today and left the other on Oct 31.
+    const db = makeDb('habits');
+    const add = (id, habit, title, date, streak) => insert(db, 'habits', { id, source: 'markdown-routines/default', habit_id: habit, title, date, status: 'completed', metadata: JSON.stringify({ current_streak: streak }) });
+    add('m1', 'morning', 'Morning routine', '2026-11-01', 5);
+    add('m2', 'morning', 'Morning routine', '2026-10-31', 4);
+    add('e1', 'evening', 'Evening routine', '2026-10-31', 9);
+    add('e0', 'evening', 'Evening routine', '2026-10-30', 8);
+    const { db: tracked, log } = trackReads(db);
+    const { lead, data } = parse(await habitStreaks({}, ctxFor(tracked)));
+    expect(data.streaks.map(s => [s.title, s.streak, s.as_of])).toEqual([['Evening routine', 9, '2026-10-31'], ['Morning routine', 5, '2026-11-01']]);
+    expect(data.behind_today).toEqual([{ source: 'markdown-routines/default', as_of: '2026-10-31', habits: 1 }]);
+    expect(lead).toMatch(/not every habit is synced through today: 1 habit\(s\) in markdown-routines\/default as of 2026-10-31/);
+    expect(log).toHaveLength(1);
+  });
+
+  test('habit_streaks is capped, longest first, with the total', async () => {
+    const { lead, data } = parse(await habitStreaks({ limit: 1 }, ctxFor(habitsDb())));
+    expect(data).toMatchObject({ total: 3, returned: 1, limit: 1, has_more: true });
+    expect(data.streaks.map(s => s.title)).toEqual(['Walk 30 minutes']);
+    expect(lead).toMatch(/showing the longest 1 \(raise limit/);
+    expect(parse(await habitStreaks({}, ctxFor(habitsDb()))).data).toMatchObject({ limit: 50, returned: 3, has_more: false });
+  });
+
+  test('a habit not found while a sync is still running carries the stale note', async () => {
+    const result = await habitHistory({ habit: 'juggle' }, ctxFor(habitsDb(), { syncForRead: STALE_SYNC }));
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/No habit matches "juggle"[\s\S]*sync is still running/);
   });
 
   test('habit_history: one habit_id in two sources is ambiguous; source picks one', async () => {
@@ -607,6 +683,15 @@ describe('finance', () => {
     expect(lead).toMatch(/showing the first 2/);
   });
 
+  test('upcoming: the net total keeps its precision; only the text rounds it to cents', async () => {
+    const db = financeDb();
+    insert(db, 'financial_transactions', { id: 'h1', source: 'ynab-api/default', account: 'Checking', date: '2026-11-05', payee: 'Half cent', amount: -1.125, scheduled: 1 });
+    const { lead, data } = parse(await financeOverview({ view: 'upcoming' }, ctxFor(db)));
+    expect(data.net_total).toBe(-1501.125);
+    expect(data.transactions.map(t => t.amount)).toEqual([-1500, -1.125]);
+    expect(lead).toMatch(/net -1501\.13/);
+  });
+
   test('accounts: transaction stats and summed balances stop at local today, not the UTC day', async () => {
     const db = financeDb();
     // An account with no stored balance; one row dated local tomorrow.
@@ -641,6 +726,20 @@ describe('finance', () => {
     expect(rows).toHaveLength(3);
   });
 
+  test('accounts: unmatched accounts with one name but two account ids stay apart', async () => {
+    const db = makeDb('finance');
+    ensureAccountBalancesTable(db);
+    const tx = (id, accountId, amount) => insert(db, 'financial_transactions', { id, source: 'ynab-api/default', account: 'Card', date: '2026-10-30', payee: 'x', amount, metadata: JSON.stringify({ budget_id: 'b1', account_id: accountId }) });
+    tx('a1', 'card-1', -1);
+    tx('a2', 'card-1', -2);
+    tx('b1', 'card-2', -10);
+    const { data } = parse(await financeOverview({ view: 'accounts' }, ctxFor(db)));
+    expect(data.accounts.map(a => [a.account, a.account_id, a.balance, a.partial, a.transactions_cached])).toEqual([
+      ['Card', 'card-1', -3, true, 2],
+      ['Card', 'card-2', -10, true, 1],
+    ]);
+  });
+
   test('accounts: % and _ in source are literal, not wildcards', async () => {
     const db = makeDb('finance');
     ensureAccountBalancesTable(db);
@@ -664,6 +763,10 @@ describe('finance', () => {
     const all = parse(await financeOverview({ view: 'budget', limit: 50 }, ctxFor(db))).data;
     expect(all).toMatchObject({ list_limit: 50, over_budget_count: 11, over_budget_truncated: false });
     expect(all.over_budget).toHaveLength(11);
+    const some = parse(await financeOverview({ view: 'budget', category: 'over', limit: 3 }, ctxFor(db)));
+    expect(some.data).toMatchObject({ category_count: 10, returned: 3, list_limit: 3, truncated: true });
+    expect(some.data.categories).toHaveLength(3);
+    expect(some.lead).toMatch(/10 budget categories for 2026-11 match "over"; showing the first 3/);
   });
 
   test('budget: a category overspent with nothing assigned counts as over budget', async () => {
@@ -677,8 +780,9 @@ describe('finance', () => {
     const db = financeDb();
     const { data } = parse(await financeOverview({ view: 'recent' }, ctxFor(db)));
     expect(data.transactions.map(t => t.payee)).toEqual(['Grocer', 'Employer', 'Mystery', 'Cash', 'Savings']);
-    expect(data).toMatchObject({ total: 5, income: 2000, expenses: -106.32 });
-    expect(data.transactions[0].amount).toBe(-54.32);
+    // Amounts keep YNAB's milliunits.
+    expect(data).toMatchObject({ total: 5, income: 2000, expenses: -106.321 });
+    expect(data.transactions[0].amount).toBe(-54.321);
     expect(parse(await financeOverview({ view: 'recent', category: 'groc' }, ctxFor(db))).data.total).toBe(1);
     expect(parse(await financeOverview({ view: 'recent', limit: 2 }, ctxFor(db))).data).toMatchObject({ returned: 2, has_more: true });
   });
@@ -699,7 +803,9 @@ describe('finance', () => {
   test('budget with no budget table says so', async () => {
     const db = makeDb('finance');
     const { lead } = parse(await financeOverview({ view: 'budget' }, ctxFor(db)));
-    expect(lead).toMatch(/No budget data/);
+    const { data } = parse(await financeOverview({ view: 'budget' }, ctxFor(db)));
+    expect(lead).toMatch(/No budget data for 2026-11: this database has no budget_allocations table/);
+    expect(data).toMatchObject({ budget_table_missing: true, category_count: 0 });
   });
 
   test('an unknown view is refused', async () => {

@@ -109,7 +109,26 @@ export function lead(text, note) {
   return note ? `${text}\n${note}` : text;
 }
 
-export function money(n) {
-  if (n === null || n === undefined || Number.isNaN(Number(n))) return null;
-  return Math.round(Number(n) * 100) / 100;
+/**
+ * A stored or summed number for a machine-readable field, at the precision it
+ * was stored with (YNAB milliunits keep their third decimal; 0.004 stays
+ * 0.004). Only binary floating-point noise from a sum (0.1 + 0.2) is cleared,
+ * by keeping 15 significant digits, which every stored decimal fits in.
+ */
+export function exact(n) {
+  if (n === null || n === undefined || n === '' || !Number.isFinite(Number(n))) return null;
+  return Number(Number(n).toPrecision(15));
+}
+
+export const money = exact;
+
+/**
+ * An amount for display text only: cents, half away from zero in both
+ * directions (-1.125 shows as -1.13, as 1.125 shows as 1.13).
+ */
+export function moneyText(n) {
+  const v = exact(n);
+  if (v === null) return null;
+  const cents = Math.round(Math.abs(v) * 100 + 1e-9) / 100;
+  return `${v < 0 && cents !== 0 ? '-' : ''}${cents.toFixed(2)}`;
 }
