@@ -99,6 +99,26 @@ describe('addGuidanceToTools', () => {
     expect(tools[2].description).not.toContain('My own appointments.');
   });
 
+  test("a type whose own tools are hidden goes on query_database", () => {
+    const byType = new Map([
+      ['time-logs', { sources: ['markdown-time-tracking/local'], instructions: [
+        { sourceId: 'markdown-time-tracking/local', text: 'Tag every entry.' },
+      ] }],
+    ]);
+    // A read-only connection lists no start_timer or stop_timer.
+    const tools = [{ name: 'query_database', description: 'Run SQL' }];
+    addGuidanceToTools(tools, byType);
+    expect(tools[0].description).toContain('Tag every entry.');
+
+    const writable = [
+      { name: 'start_timer', description: 'Start' },
+      { name: 'query_database', description: 'Run SQL' },
+    ];
+    addGuidanceToTools(writable, byType);
+    expect(writable[0].description).toContain('Tag every entry.');
+    expect(writable[1].description).not.toContain('Tag every entry.');
+  });
+
   test('without instructions the tools are left alone', () => {
     const tools = [{ name: 'list_tasks', description: 'List tasks' }];
     addGuidanceToTools(tools, null);

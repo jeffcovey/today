@@ -55,40 +55,18 @@ import {
 } from './mcp-reads.js';
 import { getAbsoluteVaultPath } from './config.js';
 import { addGuidanceToTools, buildServerInstructions, buildContextText } from './mcp-guidance.js';
-import { execSync, execFile } from 'child_process';
-import { promisify } from 'util';
+import { readLiveContext } from './mcp-live-context.js';
+import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
-const execFileAsync = promisify(execFile);
-const LIVE_CONTEXT_TIMEOUT_MS = 30 * 1000;
 
 async function aiInstructionsByType() {
   try {
     return await getAIInstructionsByType();
-  } catch {
-    return null;
-  }
-}
-
-/** bin/context show, without colour, or null if it fails or runs long. */
-async function readLiveContext() {
-  try {
-    const { stdout } = await execFileAsync(path.join(PROJECT_ROOT, 'bin/context'), ['show'], {
-      cwd: PROJECT_ROOT,
-      encoding: 'utf8',
-      timeout: LIVE_CONTEXT_TIMEOUT_MS,
-      maxBuffer: 8 * 1024 * 1024,
-      env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0' },
-    });
-    return stdout
-      .replace(/\x1b\[[0-9;]*m/g, '')
-      .split('\n')
-      .filter(line => !line.includes('[dotenvx'))
-      .join('\n');
   } catch {
     return null;
   }
@@ -286,9 +264,12 @@ export function createMCPServer({ readOnly = false } = {}) {
       },
     });
 
-    addGuidanceToTools(tools, await aiInstructionsByType());
+    // Filter first, so guidance for a type whose tools are hidden here goes
+    // on query_database instead.
+    const visible = readOnly ? tools.filter(tool => !WRITE_TOOLS.has(tool.name)) : tools;
+    addGuidanceToTools(visible, await aiInstructionsByType());
 
-    return { tools: readOnly ? tools.filter(tool => !WRITE_TOOLS.has(tool.name)) : tools };
+    return { tools: visible };
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -522,7 +503,7 @@ export function createMCPServer({ readOnly = false } = {}) {
         case 'get_context': {
           const [instructionsByType, liveContext] = await Promise.all([
             aiInstructionsByType(),
-            args?.include_live === false ? Promise.resolve(null) : readLiveContext(),
+            args?.include_live === false ? Promise.resolve(null) : readLiveContext({ readOnly }),
           ]);
           return {
             content: [{ type: 'text', text: buildContextText({ instructionsByType, liveContext }) }],

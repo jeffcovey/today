@@ -46,7 +46,7 @@ const TOOL_TYPES = {
 
 // MCP-specific notes that replace the CLI-oriented queryInstructions.
 const MCP_NOTES = {
-  events: 'Event times in the events table are stored in UTC. Prefer list_events, which converts them, over reading times with query_database.',
+  events: "Event times in the events table are stored in UTC (ending in Z) unless they carry an offset or a start_timezone. Convert them to the user's time zone before presenting them as local times. Prefer list_events over reading times with query_database.",
 };
 
 function readConfig(config) {
@@ -139,7 +139,10 @@ export function addGuidanceToTools(tools, instructionsByType) {
   if (query) {
     const sections = [];
     for (const type of instructionsByType.keys()) {
-      if (TOOL_TYPES[type] || type === 'context' || !schemas[type]?.table) continue;
+      // A type whose own tools are all hidden (time-logs on a read-only
+      // connection) is read through this tool, so its guidance goes here.
+      const ownTools = TOOL_TYPES[type];
+      if ((ownTools && ownTools.some(name => byName.has(name))) || type === 'context' || !schemas[type]?.table) continue;
       const guidance = typeGuidance(type, instructionsByType);
       if (guidance) sections.push(`## ${schemas[type].ai?.name || type}\n${guidance}`);
     }
