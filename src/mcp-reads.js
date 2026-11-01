@@ -58,13 +58,28 @@ export async function syncForRead(db, pluginType, options = {}) {
 }
 
 /**
+ * Wait for any read syncs this process left running in the background, so an
+ * explicit sync doesn't skip their sources as locked and call itself done.
+ * With no type, waits for all of them.
+ */
+export async function waitForReadSyncs(pluginType) {
+  const pending = pluginType
+    ? [inflight.get(pluginType)].filter(Boolean)
+    : [...inflight.values()];
+  await Promise.all(pending);
+}
+
+/**
  * A line telling the client its data may be behind, or null when the sync
- * finished in time.
+ * finished in time. Sources sync one at a time, so the newest source's sync
+ * time says nothing about the others.
  */
 export function staleNote(label, syncResult) {
   if (syncResult.complete) return null;
-  const when = syncResult.lastSync ? syncResult.lastSync.toISOString() : 'an unknown time';
-  return `Note: the ${label} sync is still running, so this shows ${label} as of the last completed sync (${when}). Call again in a minute for fresher data.`;
+  const newest = syncResult.lastSync
+    ? `The most recent ${label} source sync started at ${syncResult.lastSync.toISOString()}; other sources may be older.`
+    : `No ${label} source has a recorded sync time.`;
+  return `Note: a ${label} sync is still running, so this comes from the database as it stood. ${newest} Call again in a minute for fresher data.`;
 }
 
 export const LIST_TASKS_DEFAULT_LIMIT = 100;
@@ -111,27 +126,32 @@ export function listTasks(db, args = {}, { today = getTodayDate() } = {}) {
   const limit = args.limit ? clampInt(args.limit, LIST_TASKS_DEFAULT_LIMIT, 1, LIST_TASKS_MAX_LIMIT) : LIST_TASKS_DEFAULT_LIMIT;
   const offset = clampInt(args.offset ?? 0, 0, 0, Number.MAX_SAFE_INTEGER);
 
-  const total = db.prepare(`SELECT COUNT(*) AS n FROM tasks ${whereClause}`).get(...params).n;
-
-  // id breaks ties so pages are stable and offset paging neither skips nor
-  // repeats a task.
-  const tasks = db.prepare(`
-    SELECT id, title, status, priority, due_date, metadata, source
-    FROM tasks
-    ${whereClause}
-    ORDER BY
-      CASE priority
-        WHEN 'highest' THEN 1
-        WHEN 'high' THEN 2
-        WHEN 'medium' THEN 3
-        WHEN 'low' THEN 4
-        WHEN 'lowest' THEN 5
-        ELSE 6
-      END,
-      due_date NULLS LAST,
-      id
-    LIMIT ? OFFSET ?
-  `).all(...params, limit, offset);
+  // One read transaction, so the count and the page come from the same
+  // snapshot even if another process's sync writes in between.
+  const read = db.transaction(() => {
+    const count = db.prepare(`SELECT COUNT(*) AS n FROM tasks ${whereClause}`).get(...params).n;
+    // id breaks ties so pages are stable and offset paging neither skips nor
+    // repeats a task.
+    const rows = db.prepare(`
+      SELECT id, title, status, priority, due_date, metadata, source
+      FROM tasks
+      ${whereClause}
+      ORDER BY
+        CASE priority
+          WHEN 'highest' THEN 1
+          WHEN 'high' THEN 2
+          WHEN 'medium' THEN 3
+          WHEN 'low' THEN 4
+          WHEN 'lowest' THEN 5
+          ELSE 6
+        END,
+        due_date NULLS LAST,
+        id
+      LIMIT ? OFFSET ?
+    `).all(...params, limit, offset);
+    return { count, rows };
+  });
+  const { count: total, rows: tasks } = read();
 
   const hasMore = offset + tasks.length < total;
   return {

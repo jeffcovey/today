@@ -9,6 +9,7 @@ import {
   listTasks,
   formatTaskList,
   syncForRead,
+  waitForReadSyncs,
   staleNote,
   LIST_TASKS_DEFAULT_LIMIT,
   LIST_TASKS_MAX_LIMIT,
@@ -98,15 +99,26 @@ describe('syncForRead', () => {
     const result = await syncForRead({}, 'events-slow', { sync, budgetMs: 50, lastSyncTime: () => lastSync });
     expect(Date.now() - started).toBeLessThan(1000);
     expect(result).toEqual({ complete: false, lastSync });
-    expect(staleNote('calendar', result)).toMatch(/calendar sync is still running.*2026-11-01T12:00:00\.000Z/);
+    expect(staleNote('calendar', result)).toBe(
+      'Note: a calendar sync is still running, so this comes from the database as it stood. '
+      + 'The most recent calendar source sync started at 2026-11-01T12:00:00.000Z; other sources may be older. '
+      + 'Call again in a minute for fresher data.'
+    );
 
     // A second read while the first sync runs joins it rather than starting another.
     const again = await syncForRead({}, 'events-slow', { sync, budgetMs: 20, lastSyncTime: () => lastSync });
     expect(again.complete).toBe(false);
     expect(sync).toHaveBeenCalledTimes(1);
 
+    // An explicit sync waits for the background one rather than skipping its
+    // locked sources.
+    let waited = false;
+    const waiting = waitForReadSyncs('events-slow').then(() => { waited = true; });
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(waited).toBe(false);
     finish(true);
-    await new Promise(resolve => setImmediate(resolve));
+    await waiting;
+    expect(waited).toBe(true);
     const after = await syncForRead({}, 'events-slow', { sync: async () => false, budgetMs: 50 });
     expect(after.complete).toBe(true);
   });

@@ -45,6 +45,7 @@ import { schemas, getTableName } from './plugin-schemas.js';
 import { getTodayDate, sqlLocalDate } from './date-utils.js';
 import {
   syncForRead,
+  waitForReadSyncs,
   staleNote,
   listTasks,
   formatTaskList,
@@ -446,6 +447,10 @@ export function createMCPServer({ readOnly = false } = {}) {
           try {
             const vaultPath = getAbsoluteVaultPath();
             const context = { db, vaultPath };
+
+            // A read that timed out may still be syncing in the background
+            // and holding source locks; this sync would skip those sources.
+            await waitForReadSyncs(args.plugin_type);
 
             if (args.plugin_type) {
               await ensureSyncForType(db, args.plugin_type, { force: true, skipAutoTag: false });
