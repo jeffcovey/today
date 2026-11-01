@@ -271,14 +271,16 @@ export function createMCPServer({ readOnly = false } = {}) {
     const kind = registered ? registered.kind : (WRITE_TOOLS.has(name) ? 'write' : 'read');
 
     if (!isKindAllowed(kind, policy)) {
-      return errorResult(refusalReason(name, kind, policy));
+      const refused = errorResult(refusalReason(name, kind, policy));
+      logWrite({ tool: name, kind, args, result: refused, policy });
+      return refused;
     }
 
     let result;
     if (registered) {
       try {
         const db = getDatabase();
-        result = await registered.handler(args, { db, policy, syncForRead });
+        result = await registered.handler(args, { db, policy, syncForRead, vaultPath: getAbsoluteVaultPath() });
       } catch (error) {
         result = errorResult(error.message);
       }
@@ -355,10 +357,12 @@ export function createMCPServer({ readOnly = false } = {}) {
           const check = verifyTitle(args.title, task.title, { what: 'task' });
           if (!check.ok) return errorResult(check.error);
 
+          // The writer matches titles exactly, so pass the task's own title,
+          // not the fragment the caller verified with.
           const entry = {
             action: 'complete',
             id: pluginId,
-            title: args.title,
+            title: task.title,
           };
 
           const result = await writeEntryAndSync('tasks', entry, {

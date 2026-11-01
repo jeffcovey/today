@@ -13,7 +13,7 @@
  *     handler: async (args, ctx) => ({ content: [...] }),
  *   }
  *
- * `ctx` is { db, policy, syncForRead }. Write and destructive
+ * `ctx` is { db, policy, syncForRead, vaultPath }. Write and destructive
  * handlers must verify titles and honor dry_run themselves where their
  * tool calls for it; the server enforces kinds and logs every write.
  *
