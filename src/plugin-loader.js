@@ -29,8 +29,15 @@ const FILE_BASED_TYPES = new Set(['tasks', 'time-logs']);
 const execFileAsync = promisify(execFile);
 const ENV_PATH = path.join(PROJECT_ROOT, '.env');
 const PLUGINS_DIR = path.join(PROJECT_ROOT, 'plugins');
-const PROCESS_ENV_MTIME_MS = getEnvFileMtimeMs();
-const refreshedEnvVarMtimes = new Map();
+// The .env modification time that the decrypted values in process.env came
+// from. A parent that started this process as a worker passes its own (see
+// envFreshnessForChild): the values are the parent's, and .env may have
+// changed since the parent read it.
+const INHERITED_ENV_MTIME_MS = inheritedEnvMtimeMs();
+const PROCESS_ENV_MTIME_MS = INHERITED_ENV_MTIME_MS === undefined ? getEnvFileMtimeMs() : INHERITED_ENV_MTIME_MS;
+const refreshedEnvVarMtimes = inheritedRefreshedEnvVarMtimes();
+delete process.env.TODAY_PROCESS_ENV_MTIME_MS;
+delete process.env.TODAY_REFRESHED_ENV_MTIMES;
 
 // ============================================================================
 // Encrypted settings helpers
@@ -42,6 +49,37 @@ function getEnvFileMtimeMs() {
   } catch {
     return null;
   }
+}
+
+// undefined when nothing was passed; null when the parent had no .env.
+function inheritedEnvMtimeMs() {
+  const raw = process.env.TODAY_PROCESS_ENV_MTIME_MS;
+  if (raw === 'none') return null;
+  const value = Number(raw);
+  return raw && Number.isFinite(value) ? value : undefined;
+}
+
+function inheritedRefreshedEnvVarMtimes() {
+  try {
+    const parsed = JSON.parse(process.env.TODAY_REFRESHED_ENV_MTIMES || '{}');
+    return new Map(Object.entries(parsed).filter(([, mtime]) => Number.isFinite(mtime)));
+  } catch {
+    return new Map();
+  }
+}
+
+/**
+ * Environment entries for a child process that runs plugin syncs with this
+ * process's environment (read-sync-worker.js). They tell the child which .env
+ * the decrypted values it inherits came from, so getDecryptedEnvVar there
+ * reloads them after .env changes, as it would here, instead of taking them as
+ * current because the file is no newer than the child.
+ */
+export function envFreshnessForChild() {
+  return {
+    TODAY_PROCESS_ENV_MTIME_MS: PROCESS_ENV_MTIME_MS === null ? 'none' : String(PROCESS_ENV_MTIME_MS),
+    TODAY_REFRESHED_ENV_MTIMES: JSON.stringify(Object.fromEntries(refreshedEnvVarMtimes)),
+  };
 }
 
 /**
@@ -568,6 +606,31 @@ export function getLatestSyncTimeForType(db, pluginType) {
 }
 
 /**
+ * Whether ensureSyncForType would sync this type now: false when its data is
+ * fresh or when CONTEXT_ONLY is set. A cheap check, for callers that want to
+ * skip starting a sync at all (see syncForRead in mcp-reads.js).
+ */
+export function readSyncNeeded(db, pluginType, options = {}) {
+  const { staleMinutes = getStaleMinutes(pluginType) } = options;
+
+  // Skip sync when CONTEXT_ONLY is set (during context gathering for AI prompts)
+  if (process.env.CONTEXT_ONLY === 'true') {
+    return false;
+  }
+
+  const lastSync = getLatestSyncTimeForType(db, pluginType);
+
+  // staleMinutes of 0 means always sync
+  if (staleMinutes > 0 && lastSync) {
+    const ageMinutes = (Date.now() - lastSync.getTime()) / 1000 / 60;
+    if (ageMinutes < staleMinutes) {
+      return false; // Data is fresh
+    }
+  }
+  return true;
+}
+
+/**
  * Ensure data for a plugin type is synced before read operations.
  * Silently syncs if data is stale or has never been synced.
  * @param {object} db - Database instance
@@ -580,21 +643,8 @@ export function getLatestSyncTimeForType(db, pluginType) {
 export async function ensureSyncForType(db, pluginType, options = {}) {
   const { staleMinutes = getStaleMinutes(pluginType), force = false, skipAutoTag = true } = options;
 
-  // Skip sync when CONTEXT_ONLY is set (during context gathering for AI prompts)
-  if (process.env.CONTEXT_ONLY === 'true' && !force) {
+  if (!force && !readSyncNeeded(db, pluginType, { staleMinutes })) {
     return false;
-  }
-
-  if (!force) {
-    const lastSync = getLatestSyncTimeForType(db, pluginType);
-
-    // staleMinutes of 0 means always sync
-    if (staleMinutes > 0 && lastSync) {
-      const ageMinutes = (Date.now() - lastSync.getTime()) / 1000 / 60;
-      if (ageMinutes < staleMinutes) {
-        return false; // Data is fresh
-      }
-    }
   }
 
   try {
