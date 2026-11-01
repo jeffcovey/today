@@ -10,6 +10,7 @@
 
 import { getDatabase } from './database-service.js';
 import { ensureSyncForType } from './plugin-loader.js';
+import { stopProcessGroupsBeforeExitOnSigterm } from './process-group.js';
 
 const pluginType = process.argv[2];
 
@@ -19,7 +20,12 @@ if (!pluginType) {
 }
 
 try {
-  await ensureSyncForType(getDatabase(), pluginType);
+  const db = getDatabase();
+  // runReadSyncInChild sends SIGTERM when the worker overruns. Stop the
+  // plugin commands' detached process groups before exiting, or they would
+  // keep running with no timeout left to end them.
+  stopProcessGroupsBeforeExitOnSigterm({ killGraceMs: 2000 });
+  await ensureSyncForType(db, pluginType);
   process.exit(0);
 } catch (error) {
   console.error(`read-sync-worker: ${pluginType} sync failed: ${error.message}`);

@@ -8,6 +8,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import Database from 'better-sqlite3';
+import { spawn, spawnSync } from 'child_process';
+import { fileURLToPath } from 'url';
 import {
   listTasks,
   formatTaskList,
@@ -171,6 +173,26 @@ describe('runReadSyncInChild', () => {
     await expect(runReadSyncInChild('events', { workerPath: hang, maxMs: 200 })).resolves.toBe(false);
   });
 
+  test('a worker that ignores SIGTERM is sent SIGKILL after the grace period', async () => {
+    // Like a worker stuck in a synchronous call, which can't run its handler.
+    const stuck = worker('stuck.mjs', "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);");
+    const started = Date.now();
+    await expect(runReadSyncInChild('events', { workerPath: stuck, maxMs: 200, killGraceMs: 200 }))
+      .resolves.toBe(false);
+    expect(Date.now() - started).toBeLessThan(5000);
+  });
+
+  test('passes on which .env its decrypted secrets came from', async () => {
+    const seen = path.join(dir, 'env.json');
+    await runReadSyncInChild('events', {
+      workerPath: worker('env.mjs', `import fs from 'fs'; fs.writeFileSync(${JSON.stringify(seen)}, JSON.stringify({
+        mtime: process.env.TODAY_PROCESS_ENV_MTIME_MS, refreshed: process.env.TODAY_REFRESHED_ENV_MTIMES }));`),
+    });
+    const { mtime, refreshed } = JSON.parse(fs.readFileSync(seen, 'utf8'));
+    expect(mtime).toMatch(/^(none|\d+(\.\d+)?)$/);
+    expect(JSON.parse(refreshed)).toEqual(expect.any(Object));
+  });
+
   test('a worker that blocks its own event loop does not block the read budget', async () => {
     // Two seconds of synchronous work, like a long better-sqlite3 write.
     const busy = worker('busy.mjs', 'const end = Date.now() + 2000; while (Date.now() < end) {} process.exit(0);');
@@ -201,6 +223,100 @@ describe('runReadSyncInChild', () => {
       if (previous === undefined) delete process.env.TODAY_CONFIG;
       else process.env.TODAY_CONFIG = previous;
       fs.rmSync(work, { recursive: true, force: true });
+    }
+  });
+});
+
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+describe('a worker started with envFreshnessForChild', () => {
+  // A child that imports plugin-loader with the given environment and prints
+  // what it would pass on to a child of its own.
+  const inherit = (env) => {
+    const script = `
+      import { envFreshnessForChild } from ${JSON.stringify(path.join(PROJECT_ROOT, 'src/plugin-loader.js'))};
+      console.log(JSON.stringify({
+        passes: envFreshnessForChild(),
+        leftInEnv: Object.keys(process.env).filter(k => k.startsWith('TODAY_') && k.includes('ENV_MTIME')),
+      }));
+    `;
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+      cwd: PROJECT_ROOT,
+      env: { ...process.env, ...env },
+      encoding: 'utf8',
+    });
+    if (result.status !== 0) throw new Error(result.stderr);
+    return JSON.parse(result.stdout.trim().split('\n').pop());
+  };
+
+  test("keeps the parent's .env time, not the file's, so a changed .env is reloaded", () => {
+    const out = inherit({ TODAY_PROCESS_ENV_MTIME_MS: '1000', TODAY_REFRESHED_ENV_MTIMES: '{"TODAY_X":2000}' });
+    expect(out.passes).toEqual({
+      TODAY_PROCESS_ENV_MTIME_MS: '1000',
+      TODAY_REFRESHED_ENV_MTIMES: '{"TODAY_X":2000}',
+    });
+    // Taken out of process.env, so plugin commands don't inherit them.
+    expect(out.leftInEnv).toEqual([]);
+  });
+
+  test('a parent with no .env passes that on', () => {
+    expect(inherit({ TODAY_PROCESS_ENV_MTIME_MS: 'none' }).passes.TODAY_PROCESS_ENV_MTIME_MS).toBe('none');
+  });
+});
+
+describe('read-sync-worker shutdown', () => {
+  // A zombie left for a parent that never reaps counts as gone.
+  const isAlive = (pid) => {
+    try {
+      process.kill(pid, 0);
+    } catch {
+      return false;
+    }
+    try {
+      return !/^\d+ \(.*\) Z/.test(fs.readFileSync(`/proc/${pid}/stat`, 'utf8'));
+    } catch {
+      return true;
+    }
+  };
+
+  test('SIGTERM stops plugin process groups, with SIGKILL, before the worker exits', async () => {
+    const script = `
+      import { execGroup, stopProcessGroupsBeforeExitOnSigterm } from ${JSON.stringify(path.join(PROJECT_ROOT, 'src/process-group.js'))};
+      // Stands in for database-service.js, whose handler exits at once.
+      process.on('SIGTERM', () => process.exit(1));
+      stopProcessGroupsBeforeExitOnSigterm({ killGraceMs: 200 });
+      execGroup('trap "" TERM; sleep 60; true', {
+        timeoutMs: 60000,
+        onSpawn: (handle) => console.log('GROUP_PID:' + handle.pid),
+      }).catch(() => {});
+      setInterval(() => {}, 1000);
+    `;
+    const child = spawn(process.execPath, ['--input-type=module', '-e', script], {
+      cwd: PROJECT_ROOT,
+      stdio: ['ignore', 'pipe', 'inherit'],
+    });
+    let groupPid;
+    try {
+      groupPid = await new Promise((resolve, reject) => {
+        let out = '';
+        const timer = setTimeout(() => reject(new Error('no group pid')), 5000);
+        child.stdout.on('data', (data) => {
+          out += data;
+          const match = out.match(/GROUP_PID:(\d+)/);
+          if (match) { clearTimeout(timer); resolve(Number(match[1])); }
+        });
+      });
+      // Let the group's shell set its trap before signalling.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const exited = new Promise((resolve) => child.on('exit', (code) => resolve(code)));
+      child.kill('SIGTERM');
+      expect(await exited).toBe(143);
+      expect(isAlive(groupPid)).toBe(false);
+    } finally {
+      if (child.exitCode === null) child.kill('SIGKILL');
+      if (groupPid && isAlive(groupPid)) {
+        try { process.kill(-groupPid, 'SIGKILL'); } catch { /* gone */ }
+      }
     }
   });
 });

@@ -29,8 +29,15 @@ const FILE_BASED_TYPES = new Set(['tasks', 'time-logs']);
 const execFileAsync = promisify(execFile);
 const ENV_PATH = path.join(PROJECT_ROOT, '.env');
 const PLUGINS_DIR = path.join(PROJECT_ROOT, 'plugins');
-const PROCESS_ENV_MTIME_MS = getEnvFileMtimeMs();
-const refreshedEnvVarMtimes = new Map();
+// The .env modification time that the decrypted values in process.env came
+// from. A parent that started this process as a worker passes its own (see
+// envFreshnessForChild): the values are the parent's, and .env may have
+// changed since the parent read it.
+const INHERITED_ENV_MTIME_MS = inheritedEnvMtimeMs();
+const PROCESS_ENV_MTIME_MS = INHERITED_ENV_MTIME_MS === undefined ? getEnvFileMtimeMs() : INHERITED_ENV_MTIME_MS;
+const refreshedEnvVarMtimes = inheritedRefreshedEnvVarMtimes();
+delete process.env.TODAY_PROCESS_ENV_MTIME_MS;
+delete process.env.TODAY_REFRESHED_ENV_MTIMES;
 
 // ============================================================================
 // Encrypted settings helpers
@@ -42,6 +49,37 @@ function getEnvFileMtimeMs() {
   } catch {
     return null;
   }
+}
+
+// undefined when nothing was passed; null when the parent had no .env.
+function inheritedEnvMtimeMs() {
+  const raw = process.env.TODAY_PROCESS_ENV_MTIME_MS;
+  if (raw === 'none') return null;
+  const value = Number(raw);
+  return raw && Number.isFinite(value) ? value : undefined;
+}
+
+function inheritedRefreshedEnvVarMtimes() {
+  try {
+    const parsed = JSON.parse(process.env.TODAY_REFRESHED_ENV_MTIMES || '{}');
+    return new Map(Object.entries(parsed).filter(([, mtime]) => Number.isFinite(mtime)));
+  } catch {
+    return new Map();
+  }
+}
+
+/**
+ * Environment entries for a child process that runs plugin syncs with this
+ * process's environment (read-sync-worker.js). They tell the child which .env
+ * the decrypted values it inherits came from, so getDecryptedEnvVar there
+ * reloads them after .env changes, as it would here, instead of taking them as
+ * current because the file is no newer than the child.
+ */
+export function envFreshnessForChild() {
+  return {
+    TODAY_PROCESS_ENV_MTIME_MS: PROCESS_ENV_MTIME_MS === null ? 'none' : String(PROCESS_ENV_MTIME_MS),
+    TODAY_REFRESHED_ENV_MTIMES: JSON.stringify(Object.fromEntries(refreshedEnvVarMtimes)),
+  };
 }
 
 /**

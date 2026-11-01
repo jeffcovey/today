@@ -8,7 +8,7 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { readSyncNeeded, getLatestSyncTimeForType } from './plugin-loader.js';
+import { readSyncNeeded, getLatestSyncTimeForType, envFreshnessForChild } from './plugin-loader.js';
 import { getTodayDate } from './date-utils.js';
 
 const READ_SYNC_WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'read-sync-worker.js');
@@ -23,6 +23,11 @@ export const READ_SYNC_BUDGET_MS = 20 * 1000;
 // already bounded at 8 minutes; this stops a type with many slow sources from
 // holding its locks indefinitely.
 export const READ_SYNC_WORKER_MAX_MS = 30 * 60 * 1000;
+
+// SIGTERM gives the worker this long to stop its plugin commands and exit.
+// A worker stuck in a synchronous call can't run its SIGTERM handler, so it
+// is then sent SIGKILL.
+export const READ_SYNC_WORKER_KILL_GRACE_MS = 10 * 1000;
 
 /**
  * Run ensureSyncForType for one type in a child process (#690).
@@ -42,29 +47,36 @@ export const READ_SYNC_WORKER_MAX_MS = 30 * 60 * 1000;
 export function runReadSyncInChild(pluginType, {
   workerPath = READ_SYNC_WORKER,
   maxMs = READ_SYNC_WORKER_MAX_MS,
+  killGraceMs = READ_SYNC_WORKER_KILL_GRACE_MS,
 } = {}) {
   return new Promise(resolve => {
     let child;
     try {
       child = spawn(process.execPath, [workerPath, pluginType], {
         cwd: process.cwd(),
-        env: process.env,
+        // The decrypted secrets this process holds, and which .env they came
+        // from, so the worker reloads them if .env has changed since.
+        env: { ...process.env, ...envFreshnessForChild() },
         stdio: ['ignore', 2, 2],
       });
     } catch {
       resolve(false);
       return;
     }
-    const killer = setTimeout(() => child.kill('SIGTERM'), maxMs);
+    let escalate;
+    const killer = setTimeout(() => {
+      child.kill('SIGTERM');
+      escalate = setTimeout(() => child.kill('SIGKILL'), killGraceMs);
+      if (typeof escalate.unref === 'function') escalate.unref();
+    }, maxMs);
     if (typeof killer.unref === 'function') killer.unref();
-    child.on('error', () => {
+    const done = ok => {
       clearTimeout(killer);
-      resolve(false);
-    });
-    child.on('exit', code => {
-      clearTimeout(killer);
-      resolve(code === 0);
-    });
+      clearTimeout(escalate);
+      resolve(ok);
+    };
+    child.on('error', () => done(false));
+    child.on('exit', code => done(code === 0));
   });
 }
 
