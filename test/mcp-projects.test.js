@@ -9,7 +9,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import Database from 'better-sqlite3';
-import { getProjectsDueForReview, addDays, nextReviewDate } from '../src/projects.js';
+import { getProjectsDueForReview, addDays, nextReviewDate, isCalendarDate, REVIEW_FREQUENCY_DAYS } from '../src/projects.js';
 import {
   listProjectsTool,
   getProjectTool,
@@ -76,6 +76,22 @@ describe('due for review', () => {
   });
 });
 
+describe('review eligibility in list and get', () => {
+  test('an overdue project that is on hold is not marked due', () => {
+    const db = projectDb();
+    const garage = listProjectsTool(db, {}, { today: TODAY }).projects.find(p => p.title === 'Garage sale');
+    expect(garage).toMatchObject({ next_review: '2026-01-02', due_for_review: false });
+    expect(getProjectTool(db, { id: 'vault/projects/move.md' }, { today: TODAY }).due_for_review).toBe(false);
+  });
+
+  test('calendar dates must exist', () => {
+    expect(isCalendarDate('2026-02-28')).toBe(true);
+    expect(isCalendarDate('2028-02-29')).toBe(true);
+    expect(isCalendarDate('2026-02-29')).toBe(false);
+    expect(isCalendarDate('2026-11-1')).toBe(false);
+  });
+});
+
 describe('list_projects', () => {
   test('leaves out completed and archived projects unless asked', () => {
     const db = projectDb();
@@ -103,35 +119,80 @@ describe('get_project', () => {
     expect(project.next_review).toBeNull();
   });
 
+  test('says when github-projects cached only part of the items', () => {
+    const db = projectDb();
+    const items = Array.from({ length: 100 }, (_, i) => ({ title: `Issue ${i}`, state: 'closed', number: i }));
+    db.prepare(`INSERT INTO projects (id, source, title, status, metadata)
+      VALUES ('jeffcovey#7', 'github-projects/default', 'Big board', 'active', ?)`)
+      .run(JSON.stringify({ item_count: 240, items }));
+    const project = getProjectTool(db, { id: 'jeffcovey#7' }, { today: TODAY });
+    expect(project.item_counts).toEqual({ open: 0, closed: 100 });
+    expect(project.items_partial).toBe(true);
+    expect(project.items_note).toBe('Counts and items cover only the first 100 of 240 items; more open items may exist.');
+    expect(getProjectTool(projectDb(), { id: 'launch' }, { today: TODAY }).items_partial).toBeUndefined();
+  });
+
   test('is null when nothing matches', () => {
     expect(getProjectTool(projectDb(), { id: 'nothing like it' }, { today: TODAY })).toBeNull();
   });
 });
 
+// A plugin double that saves the review the way markdown-projects does
+// (last_reviewed = next review minus the period), and a sync that copies it
+// into the database.
+function markdownLikePlugin(db) {
+  const saved = new Map();
+  const write = jest.fn(async (project, args) => {
+    saved.set(project.id, args);
+    return { success: true };
+  });
+  const sync = jest.fn(async () => {
+    for (const [id, { reviewDate, frequency }] of saved) {
+      db.prepare('UPDATE projects SET review_frequency = ?, last_reviewed = ? WHERE id = ?')
+        .run(frequency, addDays(reviewDate, -REVIEW_FREQUENCY_DAYS[frequency]), id);
+    }
+    return { success: true, count: 1 };
+  });
+  return { write, sync };
+}
+
 describe('mark_project_reviewed', () => {
-  test('sets the next review one period from today, keeping the frequency, then syncs', async () => {
-    const write = jest.fn(async () => ({ success: true }));
-    const sync = jest.fn(async () => ({ success: true }));
-    const result = await markProjectReviewed(projectDb(), { id: 'Garden' }, { today: TODAY, write, sync });
+  test('sets the next review one period from today, keeping the frequency, then syncs and reads it back', async () => {
+    const db = projectDb();
+    const { write, sync } = markdownLikePlugin(db);
+    const result = await markProjectReviewed(db, { id: 'Garden' }, { today: TODAY, write, sync });
     expect(result).toEqual({
       success: true,
       project: { id: 'vault/projects/garden.md', title: 'Garden' },
       next_review_date: '2026-11-08',
       frequency: 'weekly',
+      recorded_next_review: '2026-11-08',
     });
     expect(write).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'vault/projects/garden.md' }),
       { action: 'set-review-date', reviewDate: '2026-11-08', frequency: 'weekly' }
     );
     expect(sync).toHaveBeenCalledWith(expect.anything(), 'markdown-projects/local');
+    expect(getProjectsDueForReview(db, TODAY).map(p => p.title)).toEqual(['Novel']);
   });
 
   test('takes an explicit next review date', async () => {
-    const write = jest.fn(async () => ({ success: true }));
-    const result = await markProjectReviewed(projectDb(), { id: 'vault/projects/taxes.md', next_review_date: '2027-01-15' },
-      { today: TODAY, write, sync: async () => ({ success: true }) });
-    expect(result.next_review_date).toBe('2027-01-15');
+    const db = projectDb();
+    const { write, sync } = markdownLikePlugin(db);
+    const result = await markProjectReviewed(db, { id: 'vault/projects/taxes.md', next_review_date: '2027-01-15' },
+      { today: TODAY, write, sync });
+    expect(result).toMatchObject({ next_review_date: '2027-01-15', recorded_next_review: '2027-01-15' });
+    expect(result.warning).toBeUndefined();
     expect(write.mock.calls[0][1]).toEqual({ action: 'set-review-date', reviewDate: '2027-01-15', frequency: 'monthly' });
+  });
+
+  test('rejects dates that are not on the calendar', async () => {
+    const write = jest.fn();
+    for (const next_review_date of ['2026-02-30', '2026-13-01', '11/08/2026']) {
+      const result = await markProjectReviewed(projectDb(), { id: 'Garden', next_review_date }, { today: TODAY, write });
+      expect(result.error).toMatch(/real date/);
+    }
+    expect(write).not.toHaveBeenCalled();
   });
 
   test('refuses an ambiguous match rather than guess which project', async () => {
@@ -143,16 +204,15 @@ describe('mark_project_reviewed', () => {
   });
 
   test('needs a frequency for a project without one', async () => {
-    const write = jest.fn(async () => ({ success: true }));
     const db = projectDb();
-    const refused = await markProjectReviewed(db, { id: 'App launch' }, { today: TODAY, write });
+    const { write, sync } = markdownLikePlugin(db);
+    const refused = await markProjectReviewed(db, { id: 'App launch' }, { today: TODAY, write, sync });
     expect(refused.error).toMatch(/has no review frequency/);
-    const ok = await markProjectReviewed(db, { id: 'App launch', frequency: 'monthly' },
-      { today: TODAY, write, sync: async () => ({ success: true }) });
-    expect(ok).toMatchObject({ success: true, next_review_date: '2026-12-01', frequency: 'monthly' });
+    const ok = await markProjectReviewed(db, { id: 'App launch', frequency: 'monthly' }, { today: TODAY, write, sync });
+    expect(ok).toMatchObject({ success: true, next_review_date: '2026-12-01', frequency: 'monthly', recorded_next_review: '2026-12-01' });
   });
 
-  test('reports the plugin error and a sync that lags behind', async () => {
+  test('reports the plugin error, a failed sync and a skipped one', async () => {
     const failed = await markProjectReviewed(projectDb(), { id: 'Garden' },
       { today: TODAY, write: async () => ({ success: false, error: 'file locked' }) });
     expect(failed).toEqual({ success: false, error: 'file locked' });
@@ -161,6 +221,29 @@ describe('mark_project_reviewed', () => {
       { today: TODAY, write: async () => ({ success: true }), sync: async () => ({ success: false, message: 'busy' }) });
     expect(lagging.success).toBe(true);
     expect(lagging.warning).toMatch(/busy/);
+
+    // syncPluginSource reports a locked source as a success with this message.
+    const skipped = await markProjectReviewed(projectDb(), { id: 'Garden' }, {
+      today: TODAY,
+      write: async () => ({ success: true }),
+      sync: async () => ({ success: true, count: 0, message: 'Skipped markdown-projects/local: sync already in progress' }),
+    });
+    expect(skipped.warning).toMatch(/another sync of this source was running/);
+  });
+
+  test('says when Today reads back a different schedule than was asked for', async () => {
+    // github-projects derives last_reviewed from project activity and its
+    // configured frequency, so an explicit date does not round-trip.
+    const db = projectDb();
+    const sync = async () => {
+      db.prepare("UPDATE projects SET last_reviewed = ?, review_frequency = 'weekly' WHERE id = 'vault/projects/taxes.md'").run(TODAY);
+      return { success: true };
+    };
+    const result = await markProjectReviewed(db, { id: 'Taxes', next_review_date: '2027-01-15' },
+      { today: TODAY, write: async () => ({ success: true }), sync });
+    expect(result.success).toBe(true);
+    expect(result.recorded_next_review).toBe('2026-11-08');
+    expect(result.warning).toBe('Saved to the plugin, but Today now records the next review as 2026-11-08 (weekly), not 2027-01-15.');
   });
 
   test('is a write tool, hidden on read-only connections', () => {

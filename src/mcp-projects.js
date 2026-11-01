@@ -11,12 +11,14 @@ import {
   findProject,
   nextReviewDate,
   addDays,
+  isCalendarDate,
   parseMetadata,
   getProjectItemCounts,
   getProjectItems,
   runProjectWrite,
   REVIEW_FREQUENCY_DAYS,
   REVIEW_FREQUENCIES,
+  REVIEWABLE_STATUSES,
 } from './projects.js';
 
 // get_project lists at most this many open items, with the count of the rest.
@@ -69,7 +71,10 @@ export const PROJECT_WRITE_TOOLS = ['mark_project_reviewed'];
 
 function withReviewInfo(project, today) {
   const next = nextReviewDate(project, today);
-  const out = { ...project, next_review: next, due_for_review: next !== null && next <= today };
+  // Same rule as getProjectsDueForReview: on-hold or finished projects are
+  // never due, however long since their last review.
+  const reviewable = REVIEWABLE_STATUSES.includes(project.status);
+  const out = { ...project, next_review: next, due_for_review: reviewable && next !== null && next <= today };
   if (out.days_since != null) out.days_since = Math.floor(out.days_since);
   return out;
 }
@@ -97,11 +102,19 @@ export function getProjectTool(db, args, { today }) {
   const metadata = parseMetadata(project);
   const { metadata: _raw, ...fields } = project;
   const openItems = getProjectItems(db, metadata);
+  // github-projects caches only the first page of a project's items but
+  // records the real total; say so rather than present a partial count as whole.
+  const cachedItems = metadata.items?.length ?? 0;
+  const partial = Number.isInteger(metadata.item_count) && metadata.item_count > cachedItems;
   return {
     ...withReviewInfo(fields, today),
     item_counts: getProjectItemCounts(db, metadata),
     open_items: openItems.slice(0, PROJECT_ITEMS_LIMIT),
     open_items_not_shown: Math.max(0, openItems.length - PROJECT_ITEMS_LIMIT),
+    ...(partial ? {
+      items_partial: true,
+      items_note: `Counts and items cover only the first ${cachedItems} of ${metadata.item_count} items; more open items may exist.`,
+    } : {}),
   };
 }
 
@@ -154,8 +167,8 @@ export async function markProjectReviewed(db, args, {
   }
 
   const nextDate = args.next_review_date || addDays(today, REVIEW_FREQUENCY_DAYS[frequency]);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(nextDate)) {
-    return { success: false, error: 'next_review_date must be YYYY-MM-DD' };
+  if (!isCalendarDate(nextDate)) {
+    return { success: false, error: 'next_review_date must be a real date in YYYY-MM-DD form' };
   }
 
   // set-review-date is how both project plugins record a review: the next
@@ -172,9 +185,21 @@ export async function markProjectReviewed(db, args, {
     const syncResult = await sync(db, project.source);
     if (syncResult && syncResult.success === false) {
       warning = `Saved, but the database has not caught up yet: ${syncResult.message || syncResult.error}`;
+    } else if (/sync already in progress/.test(syncResult?.message || '')) {
+      // syncPluginSource reports a skipped, locked source as a success.
+      warning = 'Saved, but another sync of this source was running, so the database may still show the old review date until the next sync.';
     }
   } catch (error) {
     warning = `Saved, but the database has not caught up yet: ${error.message}`;
+  }
+
+  // Read the schedule back as Today now records it. github-projects, for one,
+  // derives last_reviewed from project activity and its configured frequency,
+  // so an explicit date or frequency may not be what it reads back.
+  const after = db.prepare('SELECT * FROM projects WHERE id = ?').get(project.id);
+  const recorded = after ? nextReviewDate(after, today) : null;
+  if (!warning && recorded !== nextDate) {
+    warning = `Saved to the plugin, but Today now records the next review as ${recorded ?? 'unscheduled'}${after?.review_frequency ? ` (${after.review_frequency})` : ''}, not ${nextDate}.`;
   }
 
   return {
@@ -182,6 +207,7 @@ export async function markProjectReviewed(db, args, {
     project: { id: project.id, title: project.title },
     next_review_date: nextDate,
     frequency,
+    recorded_next_review: recorded,
     ...(warning ? { warning } : {}),
   };
 }

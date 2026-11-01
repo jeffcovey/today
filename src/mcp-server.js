@@ -439,6 +439,8 @@ export function createMCPServer({ readOnly = false } = {}) {
 
         case 'get_project': {
           await ensureSyncForType(db, 'projects');
+          // markdown-projects' items are rows in the tasks table.
+          await ensureSyncForType(db, 'tasks');
           const project = getProjectTool(db, args, { today: getTodayDate() });
           if (!project) {
             return {

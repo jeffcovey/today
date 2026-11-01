@@ -21,8 +21,11 @@ export const REVIEW_FREQUENCY_DAYS = {
 
 export const REVIEW_FREQUENCIES = Object.keys(REVIEW_FREQUENCY_DAYS);
 
+// Only these statuses are ever due for review.
+export const REVIEWABLE_STATUSES = ['active', 'planning'];
+
 const DUE_FOR_REVIEW_CONDITION = `
-  status IN ('active', 'planning')
+  status IN (${REVIEWABLE_STATUSES.map(s => `'${s}'`).join(', ')})
   AND review_frequency IS NOT NULL
   AND (
     last_reviewed IS NULL
@@ -51,6 +54,12 @@ export function getProjectsDueForReview(db, today) {
  * Add days to a YYYY-MM-DD date, in UTC so the server's time zone can't
  * shift the result by a day.
  */
+export function isCalendarDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const d = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
+}
+
 export function addDays(date, days) {
   const d = new Date(`${date}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
