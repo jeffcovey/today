@@ -60,7 +60,27 @@ if (query.includes('fields(first: 20)')) {
   });
 } else if (query.includes('after:')) {
   // Paginated continuation of the project items search
-  if (scenario === 'overflow-meta-later') {
+  if (scenario === 'repository-later') {
+    output({
+      data: {
+        user: {
+          projectV2: {
+            items: {
+              pageInfo: { hasNextPage: false, endCursor: null },
+              nodes: [{
+                content: {
+                  repository: {
+                    name: 'work',
+                    owner: { login: 'example-org' }
+                  }
+                }
+              }]
+            }
+          }
+        }
+      }
+    });
+  } else if (scenario === 'overflow-meta-later') {
     output({
       data: {
         user: {
@@ -107,25 +127,41 @@ if (query.includes('fields(first: 20)')) {
       }
     });
   }
-} else if (query.includes('items(first: 10)')) {
-  output({
-    data: {
-      user: {
-        projectV2: {
-          items: {
-            nodes: [{
-              content: {
-                repository: {
-                  name: 'today',
-                  owner: { login: 'jeffcovey' }
-                }
-              }
-            }]
+} else if (query.includes('items(first: 50)')) {
+  if (scenario === 'repository-later') {
+    output({
+      data: {
+        user: {
+          projectV2: {
+            items: {
+              pageInfo: { hasNextPage: true, endCursor: 'CURSOR_REPOSITORY' },
+              nodes: Array.from({ length: 50 }, () => ({ content: {} }))
+            }
           }
         }
       }
-    }
-  });
+    });
+  } else {
+    output({
+      data: {
+        user: {
+          projectV2: {
+            items: {
+              pageInfo: { hasNextPage: false, endCursor: null },
+              nodes: [{
+                content: {
+                  repository: {
+                    name: 'today',
+                    owner: { login: 'jeffcovey' }
+                  }
+                }
+              }]
+            }
+          }
+        }
+      }
+    });
+  }
 } else if (query.includes('repository(owner:')) {
   output({ data: { repository: { id: 'REPO_1' } } });
 } else if (query.includes('updateIssue(input:')) {
@@ -221,6 +257,19 @@ describe('github-projects/write.js set-review-date metadata issue handling', () 
     expect(queries).toContain('createIssue(input:');
     expect(queries).toContain('addProjectV2ItemById(input:');
     expect(queries).not.toContain('updateIssue(input:');
+  });
+
+  test('paginates to find a repository on a later project item', () => {
+    const { result, queries } = runWrite({
+      scenario: 'repository-later',
+      reviewDate: '2026-10-05',
+      frequency: 'weekly'
+    });
+
+    expect(result.success).toBe(true);
+    expect(queries).toContain('after: "CURSOR_REPOSITORY"');
+    expect(queries).toContain('repository(owner: "example-org", name: "work")');
+    expect(queries).toContain('createIssue(input:');
   });
 
   test('finds metadata issue beyond the first page of items and updates it', () => {

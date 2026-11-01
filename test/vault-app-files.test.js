@@ -135,11 +135,11 @@ describe('what a links file may say', () => {
       '',
       'Some prose, which is not a link.',
       '- [GitHub](https://github.com)',
-      '* [OlderGay.Men](https://oldergay.men)',
+      '* [Docs](https://docs.example.com)',
       ''
     ].join('\n'))).toEqual([
       { label: 'GitHub', href: 'https://github.com' },
-      { label: 'OlderGay.Men', href: 'https://oldergay.men' }
+      { label: 'Docs', href: 'https://docs.example.com' }
     ]);
   });
 

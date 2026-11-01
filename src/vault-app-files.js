@@ -125,7 +125,7 @@ export function readVaultQuotes(vaultPath, appDirectory) {
 
 // ── The calm panel's links ─────────────────────────────────────────────────
 // An unordered list of ordinary markdown links, shown across the top of the
-// panel as "GitHub • OlderGay.Men". A plain markdown list so the file reads
+// panel as "GitHub • Docs". A plain markdown list so the file reads
 // as a page in the vault, and is editable from a phone like any other note.
 
 export const LINKS_FILENAME = 'links.md';

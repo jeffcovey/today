@@ -365,7 +365,7 @@ export function applyDeploymentOverrides(aiOverrides, outputPath) {
   writeFileAtomic(outputPath, stringify(config));
 }
 /**
- * Public https base for this deployment, e.g. https://today.jeffcovey.net.
+ * Public https base for this deployment, e.g. https://today.example.com.
  *
  * The deployment name is recorded in .data/deployment-name but the provider is
  * not, so the domain has to be looked up across providers. Returns null when
