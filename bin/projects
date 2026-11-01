@@ -3,9 +3,15 @@
 import { getDatabase } from '../src/database-service.js';
 import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
 import { getTodayDate } from '../src/date-utils.js';
+import { getConfig } from '../src/config.js';
 import { program } from 'commander';
 import { colors } from '../src/cli-utils.js';
 import { execSync } from 'child_process';
+
+function getProjectSourceConfig(project) {
+  const [pluginName, sourceName] = project.source.split('/');
+  return getConfig('plugins')?.[pluginName]?.[sourceName] || {};
+}
 
 // Priority emoji map
 const PRIORITY_EMOJI = {
@@ -714,6 +720,7 @@ program
         env: {
           ...process.env,
           PLUGIN_WRITE_ARGS: JSON.stringify(writeArgs),
+          PLUGIN_CONFIG: JSON.stringify(getProjectSourceConfig(project)),
           PROJECT_ROOT: process.cwd(),
         }
       });
@@ -806,6 +813,7 @@ program
         env: {
           ...process.env,
           PLUGIN_WRITE_ARGS: JSON.stringify(writeArgs),
+          PLUGIN_CONFIG: JSON.stringify(getProjectSourceConfig(project)),
           PROJECT_ROOT: process.cwd(),
         }
       });
@@ -894,6 +902,7 @@ program
         env: {
           ...process.env,
           PLUGIN_WRITE_ARGS: JSON.stringify(writeArgs),
+          PLUGIN_CONFIG: JSON.stringify(getProjectSourceConfig(project)),
           PROJECT_ROOT: process.cwd(),
         }
       });
@@ -990,6 +999,7 @@ program
         env: {
           ...process.env,
           PLUGIN_WRITE_ARGS: JSON.stringify(writeArgs),
+          PLUGIN_CONFIG: JSON.stringify(getProjectSourceConfig(project)),
           PROJECT_ROOT: process.cwd(),
         }
       });
@@ -1084,6 +1094,7 @@ program
         env: {
           ...process.env,
           PLUGIN_WRITE_ARGS: JSON.stringify(writeArgs),
+          PLUGIN_CONFIG: JSON.stringify(getProjectSourceConfig(project)),
           PROJECT_ROOT: process.cwd(),
         }
       });
