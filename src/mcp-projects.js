@@ -193,9 +193,8 @@ export async function markProjectReviewed(db, args, {
     warning = `Saved, but the database has not caught up yet: ${error.message}`;
   }
 
-  // Read the schedule back as Today now records it. github-projects, for one,
-  // derives last_reviewed from project activity and its configured frequency,
-  // so an explicit date or frequency may not be what it reads back.
+  // Read the schedule back as Today now records it, so the reply can't claim
+  // a schedule the plugin's reader doesn't keep.
   const after = db.prepare('SELECT * FROM projects WHERE id = ?').get(project.id);
   const recorded = after ? nextReviewDate(after, today) : null;
   if (!warning && recorded !== nextDate) {

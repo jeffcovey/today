@@ -8,6 +8,7 @@
 //   gh auth refresh -s read:project
 
 import { execSync } from 'child_process';
+import { reviewFields } from './review-schedule.js';
 
 // Clear environment tokens so gh uses its own OAuth session from `gh auth login`
 delete process.env.GH_TOKEN;
@@ -396,6 +397,7 @@ function buildQuery() {
             title
             state
             url
+            body
             repository {
               nameWithOwner
             }
@@ -713,11 +715,15 @@ const entries = projects.map(project => {
   const attentionScore = attentionData.score;
   const attentionReasons = attentionData.reasons;
 
-  // Set review frequency based on project status
-  const reviewFrequency = project.closed ? closedReviewFrequency : defaultReviewFrequency;
-
-  // Use GitHub project activity as last reviewed date
-  const lastReviewed = project.updatedAt ? project.updatedAt.split('T')[0] : null;
+  // A schedule saved by set-review-date wins. Otherwise: frequency from the
+  // project's status and GitHub project activity as the last review.
+  const { review_frequency: reviewFrequency, last_reviewed: lastReviewed } = reviewFields(
+    project.items?.nodes,
+    {
+      review_frequency: project.closed ? closedReviewFrequency : defaultReviewFrequency,
+      last_reviewed: project.updatedAt ? project.updatedAt.split('T')[0] : null,
+    }
+  );
 
   // Build unique ID
   const idPrefix = ownerType === 'repo' ? `${owner}/${repository}` : owner;

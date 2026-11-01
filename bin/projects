@@ -989,7 +989,9 @@ program
       action: 'set-review-date',
       projectId: project.id,
       reviewDate: date,
-      frequency: frequency,
+      // Keep the project's own frequency unless -f changes it: github-projects
+      // would otherwise save 'weekly', and its reader now honours what is saved.
+      frequency: frequency || project.review_frequency || undefined,
       ownerType: ownerType,
     };
 
