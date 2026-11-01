@@ -357,7 +357,9 @@ function handleSetReviewDate() {
 
   // Calculate last_reviewed date based on review frequency
   // Target review date minus frequency = last_reviewed date
-  const reviewDateObj = new Date(reviewDate);
+  // Parsed and shifted in UTC: local-time setDate on a UTC-midnight date put
+  // last_reviewed a day early in time zones west of UTC.
+  const reviewDateObj = new Date(`${reviewDate}T00:00:00Z`);
 
   // Get current frequency or use provided frequency
   const reviewFrequency = frequency || frontmatter.review_frequency || 'weekly';
@@ -375,7 +377,7 @@ function handleSetReviewDate() {
 
   // Calculate last_reviewed date
   const lastReviewedObj = new Date(reviewDateObj);
-  lastReviewedObj.setDate(lastReviewedObj.getDate() - daysToSubtract);
+  lastReviewedObj.setUTCDate(lastReviewedObj.getUTCDate() - daysToSubtract);
   const lastReviewedDate = lastReviewedObj.toISOString().split('T')[0];
 
   // Update the frontmatter

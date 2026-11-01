@@ -42,6 +42,7 @@ const TOOL_TYPES = {
   tasks: ['list_tasks', 'create_task', 'complete_task'],
   events: ['list_events', 'create_event'],
   'time-logs': ['start_timer', 'stop_timer'],
+  projects: ['list_projects', 'get_project', 'mark_project_reviewed'],
 };
 
 // MCP-specific notes that replace the CLI-oriented queryInstructions.
@@ -119,7 +120,7 @@ export function typeGuidance(type, instructionsByType) {
 
 /**
  * Append each tool's plugin guidance to its description. Types without a
- * tool of their own (health, email, projects, …) go on query_database.
+ * tool of their own (health, email, …) go on query_database.
  * Mutates and returns `tools`.
  */
 export function addGuidanceToTools(tools, instructionsByType) {
