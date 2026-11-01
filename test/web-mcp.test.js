@@ -77,6 +77,16 @@ describe('readStoredMcpToken', () => {
     expect(readStoredMcpToken({ exec: () => '\n' })).toBeNull();
   });
 
+  test('a key that was never set is a confirmed absence, not a read failure', () => {
+    // `dotenvx get` exits 1 with this on stderr when the key is not in .env.
+    const error = Object.assign(new Error('Command failed: npx dotenvx get MCP_TOKEN'), {
+      status: 1,
+      stderr: '\u2620 [MISSING_KEY] missing key (MCP_TOKEN). fix: [https://github.com/dotenvx/dotenvx/issues/759]\n',
+      stdout: ''
+    });
+    expect(readStoredMcpToken({ exec: () => { throw error; } })).toBeNull();
+  });
+
   test('propagates read failures instead of reporting absence', () => {
     const error = new Error('dotenvx get failed');
     expect(() => readStoredMcpToken({ exec: () => { throw error; } })).toThrow(error);

@@ -67,12 +67,26 @@ export function tokenMatches(presented, expected) {
  * would silently rotate the token and lock out every connector (#701).
  */
 export function readStoredMcpToken({ exec = execSync } = {}) {
-  const out = exec(`npx dotenvx get ${MCP_TOKEN_ENV}`, {
-    cwd: path.join(__dirname, '..'),
-    stdio: ['pipe', 'pipe', 'pipe'],
-    encoding: 'utf8'
-  }).trim();
-  return out || null;
+  try {
+    const out = exec(`npx dotenvx get ${MCP_TOKEN_ENV}`, {
+      cwd: path.join(__dirname, '..'),
+      stdio: ['pipe', 'pipe', 'pipe'],
+      encoding: 'utf8'
+    }).trim();
+    return out || null;
+  } catch (error) {
+    // `dotenvx get` exits 1 with [MISSING_KEY] when the key was never set:
+    // that is a confirmed absence, the first-start case. Anything else (a
+    // missing private key, a corrupt .env) is a read failure and must not be
+    // taken as absence, or the caller would overwrite a token that exists.
+    if (isMissingKeyError(error)) return null;
+    throw error;
+  }
+}
+
+function isMissingKeyError(error) {
+  const text = [error?.stderr, error?.stdout, error?.message].map((x) => (x == null ? '' : String(x))).join('\n');
+  return /MISSING_KEY/.test(text);
 }
 
 function storeMcpToken(token) {
