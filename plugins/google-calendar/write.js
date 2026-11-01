@@ -6,6 +6,7 @@
 
 import { google } from 'googleapis';
 import readline from 'readline';
+import { getConfiguredTimezone } from '../../src/date-utils.js';
 
 // Read config from environment
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
@@ -139,7 +140,7 @@ function buildGoogleEvent(event) {
     } else {
       googleEvent.start = {
         dateTime: event.start_date,
-        timeZone: event.start_timezone || event.timezone || 'America/New_York'
+        timeZone: event.start_timezone || event.timezone || getConfiguredTimezone()
       };
     }
   }
@@ -150,7 +151,7 @@ function buildGoogleEvent(event) {
     } else {
       googleEvent.end = {
         dateTime: event.end_date,
-        timeZone: event.end_timezone || event.timezone || 'America/New_York'
+        timeZone: event.end_timezone || event.timezone || getConfiguredTimezone()
       };
     }
   }

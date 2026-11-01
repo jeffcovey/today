@@ -62,6 +62,31 @@ export function installProcessGroupShutdownHandlers(options = {}) {
 }
 
 /**
+ * Make SIGTERM stop this process's plugin process groups before it exits:
+ * SIGTERM to each group, SIGKILL after killGraceMs, then process.exit(143),
+ * which still runs 'exit' listeners such as the database's close.
+ *
+ * For a worker that something else may terminate (read-sync-worker.js). It
+ * replaces every SIGTERM listener installed so far, because
+ * database-service.js's calls process.exit() at once, before any later
+ * listener could reach the detached groups, which would then outlive their
+ * timeouts. It also stands in for installProcessGroupShutdownHandlers, so a
+ * later call to that adds nothing.
+ *
+ * @param {object} [options]
+ * @param {number} [options.killGraceMs=2000] - Wait between SIGTERM and SIGKILL
+ */
+export function stopProcessGroupsBeforeExitOnSigterm({ killGraceMs = 2000 } = {}) {
+  process.removeAllListeners('SIGTERM');
+  process.once('SIGTERM', () => {
+    shuttingDown = true;
+    void terminateActiveProcessGroups({ killGraceMs, escalateToSigkill: true })
+      .finally(() => process.exit(143));
+  });
+  shutdownHandlersInstalled = true;
+}
+
+/**
  * Run a shell command as its own process group, with a timeout that tears down
  * the entire tree.
  *
