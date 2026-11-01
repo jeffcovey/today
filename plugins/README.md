@@ -367,6 +367,12 @@ console.log(JSON.stringify({ entries: readEntries(files) }));
 
 A reader that only reads needs no change.
 
+## Read Syncs and Staleness
+
+The CLI tools (`bin/tasks`, `bin/calendar` and the rest) and the MCP server's reads freshen their data first with `ensureSyncForType()`. Each enabled source of the type is judged on its own `sync_metadata` row (keyed `<plugin>/<source>`): a source that has never synced, or last synced longer ago than its type's `staleMinutes` in [plugin-schemas.js](/src/plugin-schemas.js) (0 means every read), is synced; fresh sources are left alone. So one fresh source doesn't hide a stale one, and a stale one doesn't make the fresh ones re-read. `force` (the MCP `sync_data` tool) syncs every source.
+
+A source whose read keeps failing records no sync time, so it stays stale and is tried again on the next read.
+
 ## Plugin Types
 
 Each plugin type has a defined schema. Data is stored in a shared table for that type. [plugin-schemas.js](/src/plugin-schemas.js) is the source of schema truth.

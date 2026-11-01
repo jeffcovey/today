@@ -8,7 +8,7 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { readSyncNeeded, getLatestSyncTimeForType, envFreshnessForChild } from './plugin-loader.js';
+import { readSyncNeeded, getStaleSourcesForType, envFreshnessForChild } from './plugin-loader.js';
 import { getTodayDate } from './date-utils.js';
 
 const READ_SYNC_WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'read-sync-worker.js');
@@ -90,21 +90,22 @@ const inflight = new Map();
  * If the sync is still running when the budget runs out, it carries on in the
  * background and the caller answers from what the database already holds.
  *
- * @returns {Promise<{complete: boolean, lastSync: Date|null}>} complete is
- *   false when the read is answered before the sync finished.
+ * @returns {Promise<{complete: boolean, due: Array<{sourceId: string, lastSync: Date|null}>}>}
+ *   complete is false when the read is answered before the sync finished;
+ *   due then lists the sources still waiting for theirs.
  */
 export async function syncForRead(db, pluginType, options = {}) {
   const {
     budgetMs = READ_SYNC_BUDGET_MS,
     sync = (_db, type) => runReadSyncInChild(type),
     needed = readSyncNeeded,
-    lastSyncTime = getLatestSyncTimeForType,
+    staleSources = getStaleSourcesForType,
   } = options;
 
   let pending = inflight.get(pluginType);
   // Fresh data needs no worker; this is the common case and costs one query.
   if (!pending && !needed(db, pluginType)) {
-    return { complete: true, lastSync: null };
+    return { complete: true, due: [] };
   }
   if (!pending) {
     pending = Promise.resolve()
@@ -123,10 +124,16 @@ export async function syncForRead(db, pluginType, options = {}) {
   const outcome = await Promise.race([pending.then(() => 'done'), timedOut]);
   clearTimeout(timer);
 
-  return {
-    complete: outcome === 'done',
-    lastSync: outcome === 'done' ? null : lastSyncTime(db, pluginType),
-  };
+  if (outcome === 'done') return { complete: true, due: [] };
+  // Sources sync one at a time, so the ones already done are fresh by now and
+  // the rest are still due.
+  let due = [];
+  try {
+    due = staleSources(db, pluginType).map(({ sourceId, lastSync }) => ({ sourceId, lastSync: lastSync || null }));
+  } catch {
+    // The note just names no sources
+  }
+  return { complete: false, due };
 }
 
 /**
@@ -141,17 +148,21 @@ export async function waitForReadSyncs(pluginType) {
   await Promise.all(pending);
 }
 
+const STALE_NOTE_MAX_SOURCES = 3;
+
 /**
  * A line telling the client its data may be behind, or null when the sync
- * finished in time. Sources sync one at a time, so the newest source's sync
- * time says nothing about the others.
+ * finished in time. Names the sources still waiting for their sync and when
+ * each last synced, since each source is synced on its own clock.
  */
 export function staleNote(label, syncResult) {
   if (syncResult.complete) return null;
-  const newest = syncResult.lastSync
-    ? `The most recent ${label} source sync started at ${syncResult.lastSync.toISOString()}; other sources may be older.`
-    : `No ${label} source has a recorded sync time.`;
-  return `Note: a ${label} sync is still running, so this comes from the database as it stood. ${newest} Call again in a minute for fresher data.`;
+  const due = syncResult.due || [];
+  const named = due.slice(0, STALE_NOTE_MAX_SOURCES).map(({ sourceId, lastSync }) =>
+    `${sourceId} (${lastSync ? `last synced ${lastSync.toISOString()}` : 'never synced'})`);
+  const more = due.length > named.length ? `, and ${due.length - named.length} more` : '';
+  const waiting = named.length > 0 ? ` Still to refresh: ${named.join(', ')}${more}.` : '';
+  return `Note: a ${label} sync is still running, so this comes from the database as it stood.${waiting} Call again in a minute for fresher data.`;
 }
 
 export const LIST_TASKS_DEFAULT_LIMIT = 100;

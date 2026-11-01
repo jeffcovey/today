@@ -155,6 +155,15 @@ const pluginCache = new Map();
  * @returns {Promise<Map<string, object>>} Map of plugin name to plugin metadata
  */
 export async function discoverPlugins() {
+  return discoverPluginsSync();
+}
+
+/**
+ * discoverPlugins without the promise: the manifests are read once per
+ * process and cached, so later calls cost nothing. For callers that must stay
+ * synchronous (readSyncNeeded runs on every MCP read).
+ */
+function discoverPluginsSync() {
   if (pluginCache.size > 0) {
     return pluginCache;
   }
@@ -606,9 +615,81 @@ export function getLatestSyncTimeForType(db, pluginType) {
 }
 
 /**
- * Whether ensureSyncForType would sync this type now: false when its data is
- * fresh or when CONTEXT_ONLY is set. A cheap check, for callers that want to
- * skip starting a sync at all (see syncForRead in mcp-reads.js).
+ * The enabled sources of a plugin type that have a read command, each with
+ * its sync_metadata key. Synchronous and cheap: plugin manifests are cached
+ * after the first load and config.toml is re-read only when it changes.
+ * @returns {Array<{plugin: object, sourceName: string, config: object, sourceId: string}>}
+ */
+export function getReadSourcesForType(pluginType) {
+  const sources = [];
+  for (const [name, plugin] of discoverPluginsSync()) {
+    if (plugin.type !== pluginType || !plugin.commands?.read) continue;
+    for (const { sourceName, config } of getPluginSources(name)) {
+      sources.push({ plugin, sourceName, config, sourceId: `${plugin.name}/${sourceName}` });
+    }
+  }
+  return sources;
+}
+
+/**
+ * Each source's last sync time, from its own sync_metadata row: null when it
+ * has no row, or a row with no sync time yet (a lock taken by a sync that
+ * never finished).
+ * @returns {Map<string, Date|null>}
+ */
+function getSyncTimesForSources(db, sourceIds) {
+  const times = new Map(sourceIds.map(id => [id, null]));
+  if (sourceIds.length === 0) return times;
+  try {
+    const rows = db.prepare(`
+      SELECT source, last_synced_at FROM sync_metadata
+      WHERE source IN (${sourceIds.map(() => '?').join(', ')})
+    `).all(...sourceIds);
+    for (const row of rows) {
+      if (row.last_synced_at) times.set(row.source, new Date(row.last_synced_at + 'Z'));
+    }
+  } catch {
+    // Table might not exist yet: every source counts as never synced
+  }
+  return times;
+}
+
+/**
+ * The enabled sources of a type that are due a read sync: never synced, or
+ * synced longer ago than staleMinutes (0 means always due). Each source is
+ * judged by its own sync time, so one fresh source doesn't hide a stale one.
+ * @returns {Array<{plugin, sourceName, config, sourceId, lastSync: Date|null}>}
+ */
+export function getStaleSourcesForType(db, pluginType, options = {}) {
+  const { staleMinutes = getStaleMinutes(pluginType), sources = getReadSourcesForType(pluginType) } = options;
+  const times = getSyncTimesForSources(db, sources.map(s => s.sourceId));
+  const now = Date.now();
+  return sources
+    .map(source => ({ ...source, lastSync: times.get(source.sourceId) }))
+    .filter(({ lastSync }) => staleMinutes <= 0 || !lastSync || (now - lastSync.getTime()) / 60000 >= staleMinutes);
+}
+
+/**
+ * The oldest sync time among a type's enabled sources, or null when any of
+ * them has never synced (or the type has none).
+ */
+export function getOldestSyncTimeForType(db, pluginType) {
+  const sources = getReadSourcesForType(pluginType);
+  if (sources.length === 0) return null;
+  let oldest = null;
+  for (const time of getSyncTimesForSources(db, sources.map(s => s.sourceId)).values()) {
+    if (!time) return null;
+    if (!oldest || time < oldest) oldest = time;
+  }
+  return oldest;
+}
+
+/**
+ * Whether ensureSyncForType would sync this type now: true when any enabled
+ * source of the type is stale, false when all are fresh or CONTEXT_ONLY is
+ * set. A cheap check (one sync_metadata query, plugin manifests cached), for
+ * callers that want to skip starting a sync at all (see syncForRead in
+ * mcp-reads.js).
  */
 export function readSyncNeeded(db, pluginType, options = {}) {
   const { staleMinutes = getStaleMinutes(pluginType) } = options;
@@ -618,51 +699,44 @@ export function readSyncNeeded(db, pluginType, options = {}) {
     return false;
   }
 
-  const lastSync = getLatestSyncTimeForType(db, pluginType);
-
-  // staleMinutes of 0 means always sync
-  if (staleMinutes > 0 && lastSync) {
-    const ageMinutes = (Date.now() - lastSync.getTime()) / 1000 / 60;
-    if (ageMinutes < staleMinutes) {
-      return false; // Data is fresh
-    }
-  }
-  return true;
+  return getStaleSourcesForType(db, pluginType, { staleMinutes }).length > 0;
 }
 
 /**
  * Ensure data for a plugin type is synced before read operations.
- * Silently syncs if data is stale or has never been synced.
+ * Silently syncs each enabled source that is stale or has never been synced;
+ * fresh sources are left alone.
  * @param {object} db - Database instance
  * @param {string} pluginType - Plugin type (e.g., 'events', 'time-logs', 'issues')
  * @param {object} options - Options
- * @param {number} options.staleMinutes - Minutes before data is considered stale (uses schema default if not specified)
- * @param {boolean} options.force - Force sync even if not stale (default: false)
+ * @param {number} options.staleMinutes - Minutes before a source's data is considered stale (uses schema default if not specified)
+ * @param {boolean} options.force - Sync every source, fresh or not (default: false)
  * @param {boolean} options.skipWriteHooks - A read-only sync: no write hooks,
  *   and the readers run with READ_ONLY=true so they write nothing either
  *   (default: false). The MCP server's pre-read syncs use it.
- * @returns {boolean} - True if sync was performed, false if data was fresh
+ * @returns {boolean} - True if any source was synced, false if all were fresh
  */
 export async function ensureSyncForType(db, pluginType, options = {}) {
   const { staleMinutes = getStaleMinutes(pluginType), force = false, skipAutoTag = true, skipWriteHooks = false } = options;
 
-  if (!force && !readSyncNeeded(db, pluginType, { staleMinutes })) {
+  // Skip sync when CONTEXT_ONLY is set (during context gathering for AI prompts)
+  if (!force && process.env.CONTEXT_ONLY === 'true') {
     return false;
   }
 
   try {
+    const targets = force
+      ? getReadSourcesForType(pluginType)
+      : getStaleSourcesForType(db, pluginType, { staleMinutes });
+    if (targets.length === 0) return false;
+
     const vaultPath = getAbsoluteVaultPath();
     const context = { db, vaultPath };
-    const enabledPlugins = await getEnabledPlugins();
-
-    for (const { plugin, sources } of enabledPlugins) {
-      if (!plugin.commands?.read || plugin.type !== pluginType) continue;
-      for (const { sourceName, config } of sources) {
-        // Callers waiting on a read (CLI commands and MCP reads) use this to
-        // freshen data first. Auto-tagging is a blocking AI call of several
-        // seconds; the scheduler's full syncs do it instead unless overridden.
-        await syncPluginSource(plugin, sourceName, config, context, { skipAutoTag, skipWriteHooks, _caller: 'ensure-sync' });
-      }
+    for (const { plugin, sourceName, config } of targets) {
+      // Callers waiting on a read (CLI commands and MCP reads) use this to
+      // freshen data first. Auto-tagging is a blocking AI call of several
+      // seconds; the scheduler's full syncs do it instead unless overridden.
+      await syncPluginSource(plugin, sourceName, config, context, { skipAutoTag, skipWriteHooks, _caller: 'ensure-sync' });
     }
     return true;
   } catch {
@@ -695,7 +769,8 @@ function formatTimeAgo(date) {
  * @returns {string} Formatted status message
  */
 export function getSyncStatusMessage(db, pluginType) {
-  const lastSync = getLatestSyncTimeForType(db, pluginType);
+  // The oldest source, since each source syncs on its own clock.
+  const lastSync = getOldestSyncTimeForType(db, pluginType);
   const staleMinutes = getStaleMinutes(pluginType);
 
   // For types that sync on every read, just show that info

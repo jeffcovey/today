@@ -205,7 +205,7 @@ describe('timer_status and list_time_entries', () => {
 
   test('timer_status says when nothing runs, and passes on a stale-sync note', async () => {
     const db = makeDb('time-logs');
-    const syncForRead = async () => ({ complete: false, lastSync: new Date('2026-11-01T12:00:00Z') });
+    const syncForRead = async () => ({ complete: false, due: [{ sourceId: 'markdown-time-tracking/local', lastSync: new Date('2026-11-01T12:00:00Z') }] });
     const result = await tool('timer_status').handler({}, { db, syncForRead });
     expect(result.content[0].text).toMatch(/^Note: a time log sync is still running/);
     expect(result.content[1].text).toBe('No timer running.');
