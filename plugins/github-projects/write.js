@@ -6,6 +6,7 @@ const PROJECT_ITEMS_PAGE_SIZE = 50;
 const MAX_PROJECT_ITEM_PAGES = 20;
 
 import { execSync } from 'child_process';
+import { buildMetadataIssueBody } from './review-schedule.js';
 
 // Clear environment tokens so gh uses its own OAuth session
 delete process.env.GH_TOKEN;
@@ -36,20 +37,6 @@ function escapeGraphQLString(value) {
     .replace(/\\/g, '\\\\')
     .replace(/"/g, '\\"')
     .replace(/\n/g, '\\n');
-}
-
-function buildMetadataIssueBody(projectTitle, reviewDate, frequency) {
-  const dayOfWeek = new Date(`${reviewDate}T00:00:00Z`).toLocaleDateString('en-US', {
-    weekday: 'long',
-    timeZone: 'UTC'
-  });
-
-  return `This issue tracks review scheduling for the ${projectTitle} project.
-
-**Next Review Date:** ${reviewDate} (${dayOfWeek})
-**Review Frequency:** ${frequency}
-
-This is a metadata issue for project management - not a development task.`;
 }
 
 // Parse project ID to extract owner type, owner, and project number
