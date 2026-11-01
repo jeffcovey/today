@@ -400,6 +400,14 @@ Tools that take a task, event or contact ID require the item's `title` and refus
 - `src/mcp-tools/day-reads.js` (read): `get_plan` (a day, week, month, quarter or year plan file), `timer_status`, `list_time_entries`, `habits_today`, `list_issues` and `search_tasks`, mirroring `bin/track`, `bin/habits`, `bin/issues` and `bin/tasks`.
 - `src/mcp-tools/task-writes.js` (write): `postpone_task` and `update_task`. Each rewrites one line of a markdown task file (`src/task-postpone.js`, `src/task-line-edit.js`), checked against the task's title and the synced line, under the file's lock (`src/file-lock.js`), then re-reads that file with `syncPluginSource`'s `skipWriteHooks`, so no auto-archive, dating, stage or priority hook runs.
 
+Read tools that mirror everyday `bin/` commands, each listed only when a plugin of its type is enabled and each reading the synced tables after the same bounded freshen-before-read (`syncForRead`) the built-in reads use; the tools themselves make no live calls to IMAP or YNAB:
+
+- `src/mcp-tools/email.js`: `list_emails`, `search_email`, `get_email` (the `email` table; `get_email` caps the body and says when it hasn't been synced).
+- `src/mcp-tools/contacts.js`: `upcoming_birthdays`, `search_contacts`.
+- `src/mcp-tools/diary.js`: `list_diary` (today, a date, `week`, `recent`, `on_this_day`, or a text search).
+- `src/mcp-tools/health-habits.js`: `health_today`, `health_summary`, `habit_streaks`, `habit_history`.
+- `src/mcp-tools/finance-reads.js`: `finance_overview` (`accounts`, `upcoming`, `recent`, `budget`), `uncategorized_transactions`.
+
 Day-to-day write tools (issue #686):
 
 - `src/mcp-tools/diary-writes.js`: `add_diary_entry` (write), like `bin/diary add`, through `src/diary-add.js`.
