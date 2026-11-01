@@ -4,11 +4,15 @@
  */
 
 import { jest } from '@jest/globals';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import Database from 'better-sqlite3';
 import {
   listTasks,
   formatTaskList,
   syncForRead,
+  runReadSyncInChild,
   waitForReadSyncs,
   staleNote,
   LIST_TASKS_DEFAULT_LIMIT,
@@ -127,5 +131,76 @@ describe('syncForRead', () => {
     const sync = jest.fn(async () => { throw new Error('calendar down'); });
     const result = await syncForRead({}, 'events-broken', { sync, budgetMs: 1000 });
     expect(result.complete).toBe(true);
+  });
+});
+
+describe('syncForRead without a stale type', () => {
+  test('fresh data starts no sync at all', async () => {
+    const sync = jest.fn(async () => true);
+    const result = await syncForRead({}, 'events-fresh', { sync, needed: () => false });
+    expect(result).toEqual({ complete: true, lastSync: null });
+    expect(sync).not.toHaveBeenCalled();
+  });
+});
+
+describe('runReadSyncInChild', () => {
+  let dir;
+  const worker = (name, body) => {
+    const file = path.join(dir, name);
+    fs.writeFileSync(file, body);
+    return file;
+  };
+
+  beforeAll(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'read-sync-worker-')); });
+  afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  test('resolves true on a clean exit and false on a failure', async () => {
+    await expect(runReadSyncInChild('events', { workerPath: worker('ok.mjs', 'process.exit(0);') })).resolves.toBe(true);
+    await expect(runReadSyncInChild('events', { workerPath: worker('fail.mjs', 'process.exit(1);') })).resolves.toBe(false);
+    await expect(runReadSyncInChild('events', { workerPath: path.join(dir, 'missing.mjs') })).resolves.toBe(false);
+  });
+
+  test('passes the type and kills a worker that runs too long', async () => {
+    const typeFile = path.join(dir, 'type.txt');
+    await runReadSyncInChild('tasks', {
+      workerPath: worker('type.mjs', `import fs from 'fs'; fs.writeFileSync(${JSON.stringify(typeFile)}, process.argv[2]);`),
+    });
+    expect(fs.readFileSync(typeFile, 'utf8')).toBe('tasks');
+
+    const hang = worker('hang.mjs', 'setInterval(() => {}, 1000);');
+    await expect(runReadSyncInChild('events', { workerPath: hang, maxMs: 200 })).resolves.toBe(false);
+  });
+
+  test('a worker that blocks its own event loop does not block the read budget', async () => {
+    // Two seconds of synchronous work, like a long better-sqlite3 write.
+    const busy = worker('busy.mjs', 'const end = Date.now() + 2000; while (Date.now() < end) {} process.exit(0);');
+    const started = Date.now();
+    const result = await syncForRead({}, 'events-busy', {
+      needed: () => true,
+      sync: (_db, type) => runReadSyncInChild(type, { workerPath: busy }),
+      budgetMs: 100,
+      lastSyncTime: () => null,
+    });
+    expect(result.complete).toBe(false);
+    expect(Date.now() - started).toBeLessThan(1000);
+    await waitForReadSyncs('events-busy');
+  });
+
+  test('the real worker runs a sync against the working directory and exits cleanly', async () => {
+    const work = fs.mkdtempSync(path.join(os.tmpdir(), 'read-sync-real-'));
+    const previous = process.env.TODAY_CONFIG;
+    const cwd = process.cwd();
+    try {
+      fs.writeFileSync(path.join(work, 'config.toml'), '');
+      process.env.TODAY_CONFIG = path.join(work, 'config.toml');
+      process.chdir(work);
+      await expect(runReadSyncInChild('events')).resolves.toBe(true);
+      expect(fs.existsSync(path.join(work, '.data', 'today.db'))).toBe(true);
+    } finally {
+      process.chdir(cwd);
+      if (previous === undefined) delete process.env.TODAY_CONFIG;
+      else process.env.TODAY_CONFIG = previous;
+      fs.rmSync(work, { recursive: true, force: true });
+    }
   });
 });

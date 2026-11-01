@@ -568,6 +568,31 @@ export function getLatestSyncTimeForType(db, pluginType) {
 }
 
 /**
+ * Whether ensureSyncForType would sync this type now: false when its data is
+ * fresh or when CONTEXT_ONLY is set. A cheap check, for callers that want to
+ * skip starting a sync at all (see syncForRead in mcp-reads.js).
+ */
+export function readSyncNeeded(db, pluginType, options = {}) {
+  const { staleMinutes = getStaleMinutes(pluginType) } = options;
+
+  // Skip sync when CONTEXT_ONLY is set (during context gathering for AI prompts)
+  if (process.env.CONTEXT_ONLY === 'true') {
+    return false;
+  }
+
+  const lastSync = getLatestSyncTimeForType(db, pluginType);
+
+  // staleMinutes of 0 means always sync
+  if (staleMinutes > 0 && lastSync) {
+    const ageMinutes = (Date.now() - lastSync.getTime()) / 1000 / 60;
+    if (ageMinutes < staleMinutes) {
+      return false; // Data is fresh
+    }
+  }
+  return true;
+}
+
+/**
  * Ensure data for a plugin type is synced before read operations.
  * Silently syncs if data is stale or has never been synced.
  * @param {object} db - Database instance
@@ -580,21 +605,8 @@ export function getLatestSyncTimeForType(db, pluginType) {
 export async function ensureSyncForType(db, pluginType, options = {}) {
   const { staleMinutes = getStaleMinutes(pluginType), force = false, skipAutoTag = true } = options;
 
-  // Skip sync when CONTEXT_ONLY is set (during context gathering for AI prompts)
-  if (process.env.CONTEXT_ONLY === 'true' && !force) {
+  if (!force && !readSyncNeeded(db, pluginType, { staleMinutes })) {
     return false;
-  }
-
-  if (!force) {
-    const lastSync = getLatestSyncTimeForType(db, pluginType);
-
-    // staleMinutes of 0 means always sync
-    if (staleMinutes > 0 && lastSync) {
-      const ageMinutes = (Date.now() - lastSync.getTime()) / 1000 / 60;
-      if (ageMinutes < staleMinutes) {
-        return false; // Data is fresh
-      }
-    }
   }
 
   try {
