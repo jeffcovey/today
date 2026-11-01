@@ -389,6 +389,14 @@ The primary user interface is the CLI in `bin/`. Important entry points include:
 - `bin/mcp-server` — stdio, for a client on the same machine (Claude Desktop, Claude Code).
 - `POST/GET/DELETE /mcp` on the web server (`src/web-mcp.js`) — Streamable HTTP, for remote clients such as claude.ai custom connectors. Off unless `config.toml` has `[mcp] enabled = true`. Every request needs `Authorization: Bearer <MCP_TOKEN>`; the token is generated into `.env` the first time the web server starts with the section enabled (`npx dotenvx get MCP_TOKEN` prints it). `read_only = true` hides and refuses the writing tools (`create_task`, `complete_task`, `create_event`, `start_timer`, `stop_timer`, `sync_data`). Sessions are held in memory and dropped after an hour idle.
 
+Callers get the same guidance `bin/today` gives its own AI (`src/mcp-guidance.js`):
+
+- Each tool's description carries its plugin type's description, the enabled sources, and the user's `ai_instructions` for each source. Types without a tool of their own go on `query_database`.
+- The server's `instructions`, sent at initialize, carry the configured time zone, the user's top-level `[ai] ai_instructions`, and the allowed profile fields.
+- The `get_context` tool returns all of that plus the current time and live context-plugin output, the same plugins `bin/context show` runs. Each plugin runs in its own process group in the user's configured time zone. The weather plugin is left out unless `profile_fields` shares `location`, and nothing runs on a read-only connection, because the plans plugin writes plan files even in context-only mode.
+
+Profile fields go out only as `[mcp] profile_fields` allows, for example `profile_fields = ["name", "location", "home_location", "vocation", "wake_time", "bed_time", "email", "birthdate"]`. Without the setting, `email` and `birthdate` stay out. Tool descriptions and server instructions are built when a client connects or lists tools, so config edits apply on the next connection; `get_context` always reads the current config.
+
 ## Contributor workflow notes
 
 - Prefer editing `src/plugin-schemas.js` when changing plugin-backed data fields.
