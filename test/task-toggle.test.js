@@ -61,6 +61,12 @@ describe('toggleTaskInLines', () => {
     expect(result.lines).toEqual([otherChain, result.updatedLine]);
   });
 
+  test('a task whose words are a reordering of another still gets its next occurrence', () => {
+    const other = '- [ ] Ask Bob about Alice 🔁 every week ⏳ 2026-09-25';
+    const result = toggleTaskInLines([other, '- [ ] Ask Alice about Bob 🔁 every week ⏳ 2026-09-20'], 2, true, TODAY);
+    expect(result.newTaskLine).toBe('- [ ] Ask Alice about Bob 🔁 every week ⏳ 2026-09-27 ➕ 2026-09-20');
+  });
+
   test('a different task with the same rule still gets its next occurrence', () => {
     const ken = '- [ ] Contact Ken Felts #stage/off-stage #topic/friends_socializing 🔽 🔁 every 6 weeks when done ⏳ 2026-12-11';
     const result = toggleTaskInLines([ken, DONALD_OPEN], 2, true, TODAY);
@@ -117,6 +123,10 @@ describe('taskIdentity', () => {
     const a = '- [x] Contact Paul Melville #stage/off-stage #topic/friends_socializing 🔽 🔁 every 6 weeks when done ➕ 2026-01-20 ⏳ 2026-03-03 ✅ 2026-02-06';
     const b = '- [ ] Contact Paul Melville 🔽 ⏳ 2026-12-08 #stage/off-stage  #topic/friends_socializing 🔁 every 6 weeks when done ➕ 2026-07-22 ';
     expect(taskIdentity(a)).toBe(taskIdentity(b));
+  });
+
+  test('keeps the description in order', () => {
+    expect(taskIdentity('- [ ] Ask Alice about Bob 🔁 every week')).not.toBe(taskIdentity('- [ ] Ask Bob about Alice 🔁 every week'));
   });
 
   test('tells different rules apart', () => {

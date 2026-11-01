@@ -31,6 +31,7 @@ export const RECURRENCE_TERMINATOR_PATTERN = `${RECURRENCE_TERMINATOR_TOKENS.joi
 const TASK_LINE = /^(?:\s*>)*\s*- \[[ xX]\]/;
 const CHECKED = /^(?:\s*>)*\s*- \[[xX]\]/;
 const DATED_TOKEN = /(?:➕|📅|⏳|🛫|✅|❌)\s*\d{4}-\d{2}-\d{2}/g;
+const REORDERABLE_TOKEN = /^(?:#\S+|🔺|⏫|🔼|🔽|⏬)$/u;
 
 /**
  * Parse the 🔁 rule from a task line, or null when the task doesn't recur.
@@ -92,15 +93,27 @@ export function calculateNextRecurrence(pattern, fromDate) {
  * The part of a task line that names the task: no blockquote prefix,
  * checkbox or dates, with spacing collapsed. Two occurrences of the same
  * recurring task share it even when their fields are in a different order.
+ *
+ * The description keeps its word order, so "Ask Alice about Bob" and "Ask Bob
+ * about Alice" stay different tasks. Only tags and the priority emoji, which
+ * Obsidian Tasks and Today write in different places, are compared as a set.
  */
 export function taskIdentity(taskLine) {
-  return taskLine
+  const rule = getRecurrenceRule(taskLine);
+  let rest = taskLine
     .replace(/^(?:\s*>)*\s*- \[[ xX]\]\s*/, '')
-    .replace(DATED_TOKEN, ' ')
-    .split(/\s+/)
-    .filter(Boolean)
-    .sort()
-    .join(' ');
+    .replace(DATED_TOKEN, ' ');
+  if (rule) {
+    rest = rest.replace(/🔁\s+/, ' ').replace(rule, ' ');
+  }
+
+  const words = [];
+  const metadata = [];
+  for (const token of rest.split(/\s+/).filter(Boolean)) {
+    (REORDERABLE_TOKEN.test(token) ? metadata : words).push(token);
+  }
+
+  return JSON.stringify([words.join(' '), metadata.sort(), rule]);
 }
 
 /**
