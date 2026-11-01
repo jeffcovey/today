@@ -10,9 +10,12 @@
 // alternates between, few enough that the open card stays short on a phone.
 export const RECENT_TIMERS_LIMIT = 5;
 
-// Rows read to find them. Bounded so the home page never scans years of
-// logs; a few hundred entries is weeks of tracking, far more than enough to
-// find five distinct descriptions.
+// Only timers started in this many days are considered. The cutoff is on
+// start_time because that column is indexed, so the home page reads weeks of
+// logs, not years: over 30,000 entries a full scan took about 25 ms per render.
+export const RECENT_TIMERS_DAYS = 60;
+
+// Rows read to find them: far more than enough for five distinct ones.
 const RECENT_TIMERS_SCAN = 300;
 
 // Two descriptions that differ only in case or spacing are the same activity.
@@ -22,22 +25,30 @@ function descriptionKey(description) {
 
 /**
  * The most recent distinct descriptions of finished timers, newest first.
- * A description that recurs is listed once, at its most recent use.
+ * A description that recurs is listed once, at its most recent use, spelled
+ * as it was then: spacing is ignored for the comparison but kept in what is
+ * returned, since that is what a restart starts.
  *
  * @returns {string[]}
  */
-export function getRecentTimerDescriptions(db, { limit = RECENT_TIMERS_LIMIT } = {}) {
+export function getRecentTimerDescriptions(db, { limit = RECENT_TIMERS_LIMIT, now = new Date() } = {}) {
+  // A calendar date a day wider than the window, so no offset can push an
+  // entry inside it out: start_time is compared as text.
+  const since = new Date(now.getTime() - (RECENT_TIMERS_DAYS + 1) * 86400000).toISOString().slice(0, 10);
   let rows;
   try {
     rows = db.prepare(`
       SELECT description
       FROM time_logs
-      WHERE end_time IS NOT NULL
+      WHERE start_time >= ?
+        AND end_time IS NOT NULL
         AND description IS NOT NULL
         AND TRIM(description) != ''
-      ORDER BY end_time DESC
+      -- julianday, not the text: entries keep their UTC offset, so across a
+      -- DST change the text order and the time order disagree.
+      ORDER BY julianday(end_time) DESC
       LIMIT ?
-    `).all(RECENT_TIMERS_SCAN);
+    `).all(since, RECENT_TIMERS_SCAN);
   } catch {
     // No time_logs table (time tracking never set up): nothing to offer.
     return [];
@@ -49,7 +60,7 @@ export function getRecentTimerDescriptions(db, { limit = RECENT_TIMERS_LIMIT } =
     const key = descriptionKey(description);
     if (seen.has(key)) continue;
     seen.add(key);
-    recent.push(description.replace(/\s+/g, ' ').trim());
+    recent.push(description.trim());
     if (recent.length >= limit) break;
   }
   return recent;
@@ -76,9 +87,10 @@ export function renderRecentTimers(descriptions) {
   if (!descriptions || descriptions.length === 0) return '';
 
   const items = descriptions.map((description) => {
-    const words = description.split(' ').filter((token) => !token.startsWith('#')).join(' ');
-    const tags = description.split(' ').filter((token) => token.startsWith('#')).join(' ');
-    const label = words || description;
+    const tokens = description.split(/\s+/).filter(Boolean);
+    const words = tokens.filter((token) => !token.startsWith('#')).join(' ');
+    const tags = tokens.filter((token) => token.startsWith('#')).join(' ');
+    const label = words || tokens.join(' ');
     const safe = escapeHtml(description);
     return `
             <li>

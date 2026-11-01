@@ -774,11 +774,14 @@ function getTimerWidget(timer, recentTimers = []) {
               const text = btn.querySelector('.btn-text');
               const desc = document.getElementById('timerDescription').value;
               if (!desc.trim()) return;
+              const recents = document.querySelectorAll('.timer-recent');
               btn.disabled = true;
+              recents.forEach(b => { b.disabled = true; });
               icon.className = 'fas fa-spinner fa-spin';
               text.textContent = ' Starting...';
               fetch('/api/track/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({description: desc})}).then(() => location.reload()).catch(() => {
                 btn.disabled = false;
+                recents.forEach(b => { b.disabled = false; });
                 icon.className = 'fas fa-play';
                 text.textContent = ' Start';
               })">

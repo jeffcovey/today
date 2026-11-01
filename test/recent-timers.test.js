@@ -6,10 +6,14 @@
 import fs from 'fs';
 import Database from 'better-sqlite3';
 import {
-  getRecentTimerDescriptions,
+  getRecentTimerDescriptions as getRecent,
   renderRecentTimers,
   RECENT_TIMERS_LIMIT,
+  RECENT_TIMERS_DAYS,
 } from '../src/recent-timers.js';
+
+const NOW = new Date('2026-11-01T16:00:00Z');
+const getRecentTimerDescriptions = (db, options = {}) => getRecent(db, { now: NOW, ...options });
 
 function timeLogDb(entries) {
   const db = new Database(':memory:');
@@ -63,10 +67,43 @@ describe('getRecentTimerDescriptions', () => {
 
   test('treats differences of case and spacing as the same activity', () => {
     const db = timeLogDb([
-      ['2026-10-31T09:00:00-04:00', '2026-10-31T09:30:00-04:00', 'tidy  the house'],
-      ['2026-10-31T10:00:00-04:00', '2026-10-31T10:30:00-04:00', 'Tidy the house '],
+      ['2026-10-31T09:00:00-04:00', '2026-10-31T09:30:00-04:00', 'Tidy the house'],
+      ['2026-10-31T10:00:00-04:00', '2026-10-31T10:30:00-04:00', 'tidy  the house '],
     ]);
-    expect(getRecentTimerDescriptions(db)).toEqual(['Tidy the house']);
+    // Listed once, spelled as it was last used (ends trimmed): that is what
+    // the restart starts.
+    expect(getRecentTimerDescriptions(db)).toEqual(['tidy  the house']);
+  });
+
+  test('orders by when a timer ended, not by how its offset reads', () => {
+    // The night clocks go back: 01:10 EST is twenty minutes after 01:50 EDT,
+    // though it sorts first as text.
+    const db = timeLogDb([
+      ['2026-11-01T01:00:00-05:00', '2026-11-01T01:10:00-05:00', 'Later'],
+      ['2026-11-01T01:30:00-04:00', '2026-11-01T01:50:00-04:00', 'Earlier'],
+    ]);
+    expect(getRecentTimerDescriptions(db)).toEqual(['Later', 'Earlier']);
+  });
+
+  test(`only looks back ${RECENT_TIMERS_DAYS} days`, () => {
+    const db = timeLogDb([
+      ['2026-08-01T09:00:00-04:00', '2026-08-01T09:30:00-04:00', 'Last summer'],
+      ['2026-10-20T09:00:00-04:00', '2026-10-20T09:30:00-04:00', 'Last week'],
+    ]);
+    expect(getRecentTimerDescriptions(db)).toEqual(['Last week']);
+  });
+
+  test('reads the recent rows through the start_time index', () => {
+    const db = timeLogDb([]);
+    db.exec('CREATE INDEX idx_time_logs_start_time ON time_logs(start_time)');
+    const plans = [];
+    const prepare = db.prepare.bind(db);
+    db.prepare = (sql) => {
+      plans.push(prepare(`EXPLAIN QUERY PLAN ${sql}`).all('2026-01-01', 1).map(r => r.detail).join('; '));
+      return prepare(sql);
+    };
+    getRecentTimerDescriptions(db);
+    expect(plans[0]).toMatch(/USING INDEX idx_time_logs_start_time/);
   });
 
   test('is empty when time tracking was never set up', () => {
@@ -90,6 +127,12 @@ describe('renderRecentTimers', () => {
     // No tags, no empty tag span.
     expect(html).toContain('<span class="timer-recent-label">Zazen</span>');
     expect(html.match(/timer-recent-tags/g)).toHaveLength(1);
+  });
+
+  test('extra spacing is kept in what restarts but not in what is shown', () => {
+    const html = renderRecentTimers(['Review  API #topic/dev']);
+    expect(html).toContain('data-description="Review  API #topic/dev"');
+    expect(html).toContain('<span class="timer-recent-label">Review API</span>');
   });
 
   test('a description that is only tags still has a label', () => {
@@ -131,5 +174,16 @@ describe('wiring', () => {
     const handler = commonSource.slice(commonSource.indexOf('function restartRecentTimer('));
     expect(handler).toContain("fetch('/api/track/start'");
     expect(handler).toContain('JSON.stringify({ description })');
+  });
+
+  test('a start from either path holds off the other until it finishes', () => {
+    // Otherwise reopening the card mid-request sends a second start, which
+    // stops the first timer and replaces it.
+    const handler = commonSource.slice(commonSource.indexOf('function restartRecentTimer('));
+    expect(handler).toContain("querySelectorAll('.timer-recent, #startTimerBtn')");
+    const start = webServerSource.indexOf('id="startTimerBtn"');
+    const startHandler = webServerSource.slice(start, webServerSource.indexOf('</button>', start));
+    expect(startHandler).toContain("querySelectorAll('.timer-recent')");
+    expect(startHandler).toContain('recents.forEach(b => { b.disabled = true; })');
   });
 });

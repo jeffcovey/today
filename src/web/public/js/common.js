@@ -811,12 +811,13 @@ function initializeTimerCards() {
 }
 
 // A recent timer under "What are you working on?": start a new timer with that
-// description, tags and all. Every recent button is disabled while it starts,
-// so a second tap cannot start a second timer.
+// description, tags and all. Start and every recent button are disabled while
+// it starts (Start does the same to these), so reopening the card mid-request
+// cannot send a second start that would stop and replace the first timer.
 function restartRecentTimer(button) {
   const description = button.dataset.description;
   if (!description) return;
-  const buttons = Array.from(document.querySelectorAll('.timer-recent'));
+  const buttons = Array.from(document.querySelectorAll('.timer-recent, #startTimerBtn'));
   const icon = button.querySelector('i');
   buttons.forEach(b => { b.disabled = true; });
   if (icon) icon.className = 'fas fa-spinner fa-spin';
