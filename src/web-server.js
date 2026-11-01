@@ -35,6 +35,7 @@ import { convertEmojisToIcons } from './emoji-mappings.js';
 import { getMarkdownFileCache } from './markdown-file-cache.js';
 import { getAbsoluteVaultPath, getAppDirectory, getConfig, getPublicBaseUrl, getVaultPath } from './config.js';
 import { formatDate, formatDisplayDate, getDayName, getTodayDate } from './date-utils.js';
+import { RECURRENCE_TERMINATOR_PATTERN, toggleTaskInLines } from './task-toggle.js';
 import { isPluginConfigured, getPluginSources } from './plugin-loader.js';
 import { createAiCommitMessageHandler } from './git-ai-commit-message-route.js';
 import { runTrackCommand } from './track-command.js';
@@ -96,6 +97,7 @@ import { readTasks, withLazyTasks } from './dataview-tasks.js';
 import { isPostponable, postponeTaskLine } from './task-postpone.js';
 import { injectRoleReplyForms, saveRoleReply, ROLE_REPLY_ENDPOINT } from '../plugins/roles/web-reply.js';
 import { roleBlocksToCards } from '../plugins/roles/web-cards.js';
+import { getProjectsDueForReview } from './projects.js';
 import {
   formatInlineDataviewValue,
   generateTableOfContentsHtml,
@@ -894,26 +896,7 @@ async function getTodayTaskTimerItems() {
     ORDER BY category, title
   `).all(today);
 
-  const projects = db.prepare(`
-    SELECT id, title, priority, review_frequency, last_reviewed,
-           julianday(?) - julianday(last_reviewed) as days_since
-    FROM projects
-    WHERE status IN ('active', 'planning')
-      AND review_frequency IS NOT NULL
-      AND (
-        last_reviewed IS NULL
-        OR (review_frequency = 'daily' AND julianday(?) - julianday(last_reviewed) >= 1)
-        OR (review_frequency = 'weekly' AND julianday(?) - julianday(last_reviewed) >= 7)
-        OR (review_frequency = 'monthly' AND julianday(?) - julianday(last_reviewed) >= 30)
-        OR (review_frequency = 'quarterly' AND julianday(?) - julianday(last_reviewed) >= 90)
-        OR (review_frequency = 'yearly' AND julianday(?) - julianday(last_reviewed) >= 365)
-      )
-    ORDER BY
-      CASE
-        WHEN last_reviewed IS NULL THEN 0
-        ELSE julianday(?) - julianday(last_reviewed)
-      END DESC
-  `).all(today, today, today, today, today, today, today);
+  const projects = getProjectsDueForReview(db, today);
 
   // Filter out tasks from excluded files (vault-relative paths)
   const excludeFiles = getConfig('task_timer.exclude_files') || [];
@@ -7769,68 +7752,6 @@ app.post('/toggle-checkbox/*path', authMiddleware, async (req, res) => {
 });
 
 // Save route handler
-// Obsidian Tasks date/metadata emoji that terminate a 🔁 recurrence rule.
-// Kept in one place so the /task/toggle (parse) and /task/edit (preserve)
-// routes can't drift on which tokens end the rule — a mismatch here silently
-// breaks recurring-task regeneration (see issue #358). Alternation, not a
-// character class, so multi-code-unit emoji (📅 🛫) match correctly.
-const RECURRENCE_TERMINATOR_TOKENS = ['⏳', '📅', '🛫', '✅', '➕'];
-const RECURRENCE_TERMINATOR_PATTERN = `${RECURRENCE_TERMINATOR_TOKENS.join('|')}|#`;
-
-// Helper function to calculate next recurrence date
-function calculateNextRecurrence(pattern, fromDate) {
-  // Parse patterns like:
-  // - "every day" / "every 2 days" / "every 0.6 days"
-  // - "every week" / "every 3 weeks"
-  // - "every month" / "every 6 months"
-  // - "every year" / "every 2 years"
-  // - "every day when done" / "every 5 days when done"
-
-  const baseDate = new Date(fromDate + 'T00:00:00');
-
-  // Remove "when done" if present - it doesn't affect the calculation
-  const cleanPattern = pattern.replace(/\s+when\s+done\s*$/i, '').trim();
-
-  // Match the pattern
-  const match = cleanPattern.match(/^every\s+(?:(\d+(?:\.\d+)?)\s+)?(day|days|week|weeks|month|months|year|years)$/i);
-
-  if (!match) {
-    console.error(`[TASK] Could not parse recurrence pattern: "${pattern}"`);
-    return null;
-  }
-
-  const quantity = parseFloat(match[1] || '1');
-  const unit = match[2].toLowerCase();
-
-  // Calculate the next date
-  const nextDate = new Date(baseDate);
-
-  switch (unit) {
-    case 'day':
-    case 'days':
-      nextDate.setDate(nextDate.getDate() + Math.round(quantity));
-      break;
-    case 'week':
-    case 'weeks':
-      nextDate.setDate(nextDate.getDate() + Math.round(quantity * 7));
-      break;
-    case 'month':
-    case 'months':
-      nextDate.setMonth(nextDate.getMonth() + Math.round(quantity));
-      break;
-    case 'year':
-    case 'years':
-      nextDate.setFullYear(nextDate.getFullYear() + Math.round(quantity));
-      break;
-    default:
-      console.error(`[TASK] Unsupported recurrence unit: "${unit}"`);
-      return null;
-  }
-
-  // Return in YYYY-MM-DD format
-  return formatDate(nextDate);
-}
-
 // Handle task checkbox toggling
 app.post('/task/toggle', authMiddleware, async (req, res) => {
   try {
@@ -7867,94 +7788,27 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Not a task line' });
     }
 
-    // Note: markdown_tasks cache was removed - proceeding with file version directly
     debug(`[TASK] Processing task from file: "${taskLine}"`);
 
-    // Check if this is a recurring task (has 🔁 pattern).
-    // Stop capturing at the next date token (RECURRENCE_TERMINATOR_TOKENS) OR a
-    // #tag — anything placed between the rule and a date would otherwise be
-    // swept into the pattern and break calculateNextRecurrence (issue #358).
-    const recurringMatch = taskLine.match(
-      new RegExp(`🔁\\s+(.+?)(?:\\s+(?:${RECURRENCE_TERMINATOR_PATTERN})|$)`)
-    );
-    const isRecurring = !!recurringMatch;
-    let newTaskLine = null;
-
-    // Update the task
-    let updatedLine;
-    if (completed) {
-      // Mark as done and add completion date
-      const today = getTodayDate();
-      updatedLine = taskLine
-        .replace(/^((?:\s*>)*\s*)- \[ \]/, '$1- [x]')  // Keep any blockquote prefix
-        .replace(/✅ \d{4}-\d{2}-\d{2}/, '') // Remove old completion date if exists
-        + ` ✅ ${today}`;
-
-      // If this is a recurring task, create the new occurrence
-      if (isRecurring) {
-        const recurrencePattern = recurringMatch[1].trim();
-        debug(`[TASK] Processing recurring task with pattern: ${recurrencePattern}`);
-
-        // Parse the recurrence pattern and calculate next date
-        const isWhenDone = /when\s+done/i.test(recurrencePattern);
-        const nextDate = calculateNextRecurrence(recurrencePattern, today);
-
-        if (nextDate) {
-          // Create new task line by copying the original but with:
-          // 1. Unchecked checkbox
-          // 2. Updated scheduled date (⏳)
-          // 3. For "when done" recurrences, updated due date (📅) to match
-          // 4. No completion date
-          newTaskLine = taskLine
-            .replace(/^((?:\s*>)*\s*)- \[[ xX]\]/, '$1- [ ]')  // Unchecked
-            .replace(/✅ \d{4}-\d{2}-\d{2}/, '');  // Remove any completion date
-
-          // Update or add scheduled date (⏳)
-          if (newTaskLine.includes('⏳')) {
-            newTaskLine = newTaskLine.replace(/⏳ \d{4}-\d{2}-\d{2}/, `⏳ ${nextDate}`);
-          } else {
-            // Add scheduled date before any existing dates
-            if (newTaskLine.includes('📅')) {
-              newTaskLine = newTaskLine.replace(/📅/, `⏳ ${nextDate} 📅`);
-            } else if (newTaskLine.includes('➕')) {
-              newTaskLine = newTaskLine.replace(/➕/, `⏳ ${nextDate} ➕`);
-            } else {
-              newTaskLine = newTaskLine + ` ⏳ ${nextDate}`;
-            }
-          }
-
-          // For "when done" recurrences, advance the due date (📅) to match —
-          // otherwise the new instance is due today and re-appears immediately.
-          if (isWhenDone && newTaskLine.includes('📅')) {
-            newTaskLine = newTaskLine.replace(/📅 \d{4}-\d{2}-\d{2}/, `📅 ${nextDate}`);
-          }
-
-          // Preserve creation date if original task doesn't have one
-          if (!newTaskLine.includes('➕') && !taskLine.includes('➕')) {
-            // Add today as creation date for the new task
-            newTaskLine = newTaskLine + ` ➕ ${today}`;
-          }
-
-          debug(`[TASK] Created new recurring task: ${newTaskLine}`);
-        }
-      }
-    } else {
-      // Mark as not done and remove completion date
-      updatedLine = taskLine
-        .replace(/^((?:\s*>)*\s*)- \[x\]/i, '$1- [ ]')  // Keep any blockquote prefix
-        .replace(/\s+✅ \d{4}-\d{2}-\d{2}/, '');  // Handle multiple spaces before ✅
+    // Builds the checked/unchecked line and, for a 🔁 task, its next
+    // occurrence. A task already in the requested state is left alone, so a
+    // repeated "complete" can't add a second next occurrence (issue #688).
+    const result = toggleTaskInLines(lines, line, completed, getTodayDate());
+    if (result.error) {
+      return res.status(400).json({ error: result.error });
     }
+    const { updatedLine, newTaskLine, changed } = result;
 
-    // Update the file
-    lines[line - 1] = updatedLine;
-
-    // If we have a new recurring task, insert it after the completed one
+    if (!changed) {
+      debug(`[TASK] Line ${line} is already ${completed ? 'done' : 'open'}; nothing to change`);
+      return res.json({ success: true, updatedLine, unchanged: true });
+    }
     if (newTaskLine) {
-      lines.splice(line, 0, newTaskLine); // Insert at position line (after line-1)
+      debug(`[TASK] Created new recurring task: ${newTaskLine}`);
     }
 
     {
-      const { conflict } = await writeFileAtomicCASAsync(filePath, lines.join('\n'), content);
+      const { conflict } = await writeFileAtomicCASAsync(filePath, result.lines.join('\n'), content);
       if (conflict) {
         return res.status(409).json({ error: 'Concurrent update; retry' });
       }

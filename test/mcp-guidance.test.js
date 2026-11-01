@@ -119,6 +119,23 @@ describe('addGuidanceToTools', () => {
     expect(writable[1].description).not.toContain('Tag every entry.');
   });
 
+  test('project guidance goes on the project tools, not query_database', () => {
+    const byType = new Map([
+      ['projects', { sources: ['markdown-projects/local'], instructions: [
+        { sourceId: 'markdown-projects/local', text: 'Review on Fridays.' },
+      ] }],
+    ]);
+    const tools = [
+      { name: 'list_projects', description: 'List projects' },
+      { name: 'get_project', description: 'Get project' },
+      { name: 'query_database', description: 'Run SQL' },
+    ];
+    addGuidanceToTools(tools, byType);
+    expect(tools[0].description).toContain('Review on Fridays.');
+    expect(tools[1].description).toContain('Review on Fridays.');
+    expect(tools[2].description).not.toContain('Review on Fridays.');
+  });
+
   test('without instructions the tools are left alone', () => {
     const tools = [{ name: 'list_tasks', description: 'List tasks' }];
     addGuidanceToTools(tools, null);
