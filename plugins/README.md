@@ -365,13 +365,13 @@ if (!readOnly) {
 console.log(JSON.stringify({ entries: readEntries(files) }));
 ```
 
-A reader that only reads needs no change.
+A reader that only reads needs no change. A reader that can't report its entries without first writing (project-calendar builds its events from what it pushes to the calendar) can print `{"entries": [], "incremental": true}` instead: the loader takes that as no change and keeps the rows the last full sync stored.
 
 ## Read Syncs and Staleness
 
 The CLI tools (`bin/tasks`, `bin/calendar` and the rest) and the MCP server's reads freshen their data first with `ensureSyncForType()`. Each enabled source of the type is judged on its own `sync_metadata` row (keyed `<plugin>/<source>`): a source that has never synced, or last synced longer ago than its type's `staleMinutes` in [plugin-schemas.js](/src/plugin-schemas.js) (0 means every read), is synced; fresh sources are left alone. So one fresh source doesn't hide a stale one, and a stale one doesn't make the fresh ones re-read. `force` (the MCP `sync_data` tool) syncs every source.
 
-A source whose read keeps failing records no sync time, so it stays stale and is tried again on the next read.
+A successful read that reports no changes (an incremental read with no entries) still counts as a sync for staleness, so the next read skips the source; it is recorded as `checked_at` in `extra_data`, and `last_synced_at` (the `LAST_SYNC_TIME` a reader gets) stays where the last sync with changes left it. A source whose read keeps failing records no sync time, so it stays stale and is tried again on the next read.
 
 ## Plugin Types
 

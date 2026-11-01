@@ -204,12 +204,18 @@ describe('project-calendar', () => {
   }
   const config = { calendar_source: 'work' };
 
-  test('READ_ONLY reports the synced projects without pushing to the calendar', async () => {
+  test('READ_ONLY pushes nothing and reports no change, so the stored events stay', async () => {
     const root = await setup();
+    // The mapping holds only event IDs, so entries built now would carry
+    // dates the calendar was never sent.
+    const Database = (await import('better-sqlite3')).default;
+    const db = new Database(path.join(root, '.data', 'today.db'));
+    db.prepare("UPDATE projects SET due_date = '2027-01-15' WHERE id = 'p1'").run();
+    db.close();
     const { status, output } = runReader('project-calendar', root, { config, readOnly: true });
     expect(status).toBe(0);
     expect(fs.existsSync(path.join(root, 'calendar.log'))).toBe(false);
-    expect(output.entries.map(e => e.title)).toEqual(['Launch']);
+    expect(output).toEqual({ entries: [], files_processed: [], incremental: true });
   });
 
   test('without READ_ONLY, it runs bin/calendar sync-projects first', async () => {

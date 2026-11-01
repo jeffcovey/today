@@ -632,9 +632,10 @@ export function getReadSourcesForType(pluginType) {
 }
 
 /**
- * Each source's last sync time, from its own sync_metadata row: null when it
- * has no row, or a row with no sync time yet (a lock taken by a sync that
- * never finished).
+ * Each source's last sync time, from its own sync_metadata row: the later of
+ * last_synced_at and a no-change read's checked_at (see recordNoChangeSync).
+ * Null when it has neither, e.g. no row, or a lock taken by a sync that never
+ * finished.
  * @returns {Map<string, Date|null>}
  */
 function getSyncTimesForSources(db, sourceIds) {
@@ -642,11 +643,15 @@ function getSyncTimesForSources(db, sourceIds) {
   if (sourceIds.length === 0) return times;
   try {
     const rows = db.prepare(`
-      SELECT source, last_synced_at FROM sync_metadata
+      SELECT source, last_synced_at, extra_data FROM sync_metadata
       WHERE source IN (${sourceIds.map(() => '?').join(', ')})
     `).all(...sourceIds);
     for (const row of rows) {
-      if (row.last_synced_at) times.set(row.source, new Date(row.last_synced_at + 'Z'));
+      const stamps = [row.last_synced_at, parseExtraData(row.extra_data)?.checked_at]
+        .filter(t => typeof t === 'string' && t)
+        .map(t => new Date(t + 'Z'))
+        .filter(d => !Number.isNaN(d.getTime()));
+      if (stamps.length > 0) times.set(row.source, new Date(Math.max(...stamps)));
     }
   } catch {
     // Table might not exist yet: every source counts as never synced
@@ -810,6 +815,24 @@ function updateSyncMetadata(db, sourceId, filesProcessed, entriesCount, extraDat
       entries_count = excluded.entries_count,
       extra_data = excluded.extra_data
   `).run(sourceId, stamp, JSON.stringify(filesProcessed), entriesCount, extraData ? JSON.stringify(extraData) : null);
+}
+
+/**
+ * Record a successful read that found nothing new, as checked_at in
+ * extra_data, so readSyncNeeded takes the source as fresh. last_synced_at is
+ * the reader's cursor (LAST_SYNC_TIME) and stays put: a reader also answers
+ * "no changes" when it couldn't look (its directory is missing, #508), and
+ * moving the cursor then would skip files restored with older mtimes. The
+ * file list, row count and plugin state stay as the last full sync left
+ * them. A filtered re-read (keepWatermark) records nothing.
+ */
+function recordNoChangeSync(db, sourceId, syncStartedAt, { keepWatermark = false } = {}) {
+  if (keepWatermark) return;
+  const stamp = syncStartedAt || db.prepare(`SELECT datetime('now') AS t`).get().t;
+  const previous = parseExtraData(getSyncMetadata(db, sourceId)?.extra_data) || {};
+  db.prepare(`INSERT OR IGNORE INTO sync_metadata (source) VALUES (?)`).run(sourceId);
+  db.prepare(`UPDATE sync_metadata SET extra_data = ? WHERE source = ?`)
+    .run(JSON.stringify({ ...previous, checked_at: stamp }), sourceId);
 }
 
 const SYNC_LOCK_STALE_MINUTES = 5;
@@ -1132,6 +1155,9 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
         message: `${messages.join('; ')}${metadataMsg}${hintMsg}${warningMsg}${reconcileMsg}`
       };
     }
+    // Nothing changed, but the read succeeded: the source is fresh as of
+    // this sync, or readSyncNeeded keeps taking it as stale.
+    recordNoChangeSync(db, sourceId, syncStartedAt, { keepWatermark });
     return {
       success: true,
       count: 0,

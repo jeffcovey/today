@@ -89,7 +89,7 @@ describe('listTasks', () => {
 });
 
 describe('syncForRead', () => {
-  const lastSync = new Date('2026-11-01T12:00:00Z');
+  const lastSync = new Date('2025-11-01T12:00:00Z');
   // Stands in for a stale type; readSyncNeeded is tested in plugin-loader-per-source-staleness.
   const needed = () => true;
   const staleSources = () => [
@@ -113,7 +113,7 @@ describe('syncForRead', () => {
     expect(result).toEqual({ complete: false, due: staleSources() });
     expect(staleNote('calendar', result)).toBe(
       'Note: a calendar sync is still running, so this comes from the database as it stood. '
-      + 'Still to refresh: google-calendar/work (last synced 2026-11-01T12:00:00.000Z), '
+      + 'Still to refresh: google-calendar/work (last synced 2025-11-01T12:00:00.000Z), '
       + 'public-calendars/holidays (never synced). '
       + 'Call again in a minute for fresher data.'
     );
@@ -134,6 +134,37 @@ describe('syncForRead', () => {
     expect(waited).toBe(true);
     const after = await syncForRead({}, 'events-slow', { sync: async () => false, needed, budgetMs: 50 });
     expect(after.complete).toBe(true);
+  });
+
+  test('sources this run already synced are not listed as due, even when always stale', async () => {
+    // A type with staleMinutes 0 (time-logs) counts every source as stale, so
+    // the ones this run finished still come back from staleSources.
+    let finish;
+    const sync = jest.fn(() => new Promise(resolve => { finish = resolve; }));
+    const old = new Date('2025-11-01T12:00:00Z');
+    const alwaysStale = () => [
+      { sourceId: 'markdown-time-tracking/a', lastSync: new Date() },
+      { sourceId: 'markdown-time-tracking/b', lastSync: new Date() },
+      { sourceId: 'markdown-time-tracking/c', lastSync: new Date() },
+      { sourceId: 'markdown-time-tracking/d', lastSync: old },
+      { sourceId: 'markdown-time-tracking/e', lastSync: null },
+    ];
+    const result = await syncForRead({}, 'time-logs-slow', { sync, needed, budgetMs: 30, staleSources: alwaysStale });
+    expect(result).toEqual({
+      complete: false,
+      due: [
+        { sourceId: 'markdown-time-tracking/d', lastSync: old },
+        { sourceId: 'markdown-time-tracking/e', lastSync: null },
+      ],
+    });
+    expect(staleNote('time', result)).toBe(
+      'Note: a time sync is still running, so this comes from the database as it stood. '
+      + 'Still to refresh: markdown-time-tracking/d (last synced 2025-11-01T12:00:00.000Z), '
+      + 'markdown-time-tracking/e (never synced). '
+      + 'Call again in a minute for fresher data.'
+    );
+    finish(true);
+    await waitForReadSyncs('time-logs-slow');
   });
 
   test('the note names at most three sources, and says how many more', () => {

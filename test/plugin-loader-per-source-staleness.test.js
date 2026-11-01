@@ -12,6 +12,8 @@ const __filename = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(__filename), '..');
 const pluginDir = path.join(repoRoot, 'plugins', 'per-source-staleness-stub');
 const marker = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'per-source-staleness-')), 'reads.log');
+// While this file exists, the stub reports a successful read with no changes.
+const noChange = path.join(path.dirname(marker), 'no-change');
 
 fs.mkdirSync(pluginDir, { recursive: true });
 fs.writeFileSync(path.join(pluginDir, 'plugin.toml'), `
@@ -27,6 +29,10 @@ read = "./read.js"
 fs.writeFileSync(path.join(pluginDir, 'read.js'), `#!/usr/bin/env node
 import fs from 'fs';
 fs.appendFileSync(${JSON.stringify(marker)}, process.env.SOURCE_ID + '\\n');
+if (fs.existsSync(${JSON.stringify(noChange)})) {
+  console.log(JSON.stringify({ entries: [], files_processed: [], incremental: true }));
+  process.exit(0);
+}
 console.log(JSON.stringify({ entries: [{ id: process.env.SOURCE_ID + ':1', title: 'A task', status: 'open' }] }));
 `);
 fs.chmodSync(path.join(pluginDir, 'read.js'), 0o755);
@@ -53,6 +59,7 @@ jest.unstable_mockModule('../src/config.js', () => ({
 
 const {
   ensureSyncForType, readSyncNeeded, getStaleSourcesForType, getOldestSyncTimeForType, getSyncStatusMessage,
+  getReadSourcesForType, syncPluginSource,
 } = await import('../src/plugin-loader.js');
 const { getSqlColumns, getStaleMinutes } = await import('../src/plugin-schemas.js');
 const Database = (await import('better-sqlite3')).default;
@@ -97,7 +104,10 @@ describe('per-source staleness', () => {
     fs.rmSync(path.dirname(marker), { recursive: true, force: true });
     if (contextOnly !== undefined) process.env.CONTEXT_ONLY = contextOnly;
   });
-  beforeEach(() => fs.rmSync(marker, { force: true }));
+  beforeEach(() => {
+    fs.rmSync(marker, { force: true });
+    fs.rmSync(noChange, { force: true });
+  });
   afterEach(() => { delete process.env.CONTEXT_ONLY; });
 
   test('a fresh source and a stale one: only the stale one syncs', async () => {
@@ -154,6 +164,48 @@ describe('per-source staleness', () => {
     expect(reads()).toEqual([]);
     expect(await ensureSyncForType(db, 'tasks', { force: true })).toBe(true);
     expect(reads()).toEqual([A, B]);
+  });
+
+  test('a read with no changes still counts as a sync, so the next read skips the source', async () => {
+    const db = createDb();
+    synced(db, A, staleMinutes + 60);
+    db.prepare(`UPDATE sync_metadata SET last_sync_files = '["a.md"]', entries_count = 3, extra_data = ? WHERE source = ?`)
+      .run(JSON.stringify({ folder_state: { INBOX: 7 } }), A);
+    const cursor = db.prepare('SELECT last_synced_at FROM sync_metadata WHERE source = ?').get(A).last_synced_at;
+    synced(db, B, 0);
+    db.prepare(`INSERT INTO tasks (id, title, status, source) VALUES ('a:1', 'Kept', 'open', ?)`).run(A);
+    fs.writeFileSync(noChange, '');
+
+    expect(await ensureSyncForType(db, 'tasks')).toBe(true);
+    expect(reads()).toEqual([A]);
+    expect(db.prepare('SELECT title FROM tasks WHERE source = ?').all(A)).toEqual([{ title: 'Kept' }]);
+    const row = db.prepare('SELECT * FROM sync_metadata WHERE source = ?').get(A);
+    const extra = JSON.parse(row.extra_data);
+    expect((Date.now() - new Date(extra.checked_at + 'Z').getTime()) / 60000).toBeLessThan(1);
+    // The reader's cursor, file list, row count and plugin state stay as the
+    // last full sync left them.
+    expect(row.last_synced_at).toBe(cursor);
+    expect(row.last_sync_files).toBe('["a.md"]');
+    expect(row.entries_count).toBe(3);
+    expect(extra.folder_state).toEqual({ INBOX: 7 });
+
+    expect(readSyncNeeded(db, 'tasks')).toBe(false);
+    expect(await ensureSyncForType(db, 'tasks')).toBe(false);
+    expect(reads()).toEqual([A]);
+  });
+
+  test('a filtered no-change read with keepSyncWatermark records nothing', async () => {
+    const db = createDb();
+    synced(db, A, staleMinutes + 60);
+    const before = db.prepare('SELECT last_synced_at, extra_data FROM sync_metadata WHERE source = ?').get(A);
+    fs.writeFileSync(noChange, '');
+    const { plugin, sourceName, config } = getReadSourcesForType('tasks').find(s => s.sourceId === A);
+    const result = await syncPluginSource(plugin, sourceName, config, { db, vaultPath: '/tmp/test-vault' }, {
+      fileFilter: 'a.md', keepSyncWatermark: true, skipWriteHooks: true, _caller: 'test',
+    });
+    expect(result.success).toBe(true);
+    expect(db.prepare('SELECT last_synced_at, extra_data FROM sync_metadata WHERE source = ?').get(A)).toEqual(before);
+    expect(readSyncNeeded(db, 'tasks')).toBe(true);
   });
 
   test('a type with no enabled sources needs no sync', () => {

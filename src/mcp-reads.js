@@ -83,6 +83,7 @@ export function runReadSyncInChild(pluginType, {
 
 // One sync per type at a time in this process: a read that arrives while an
 // earlier read's sync is still running waits on that one, not a second sync.
+// Each entry is { promise, startedAt } (startedAt in epoch ms).
 const inflight = new Map();
 
 /**
@@ -102,18 +103,20 @@ export async function syncForRead(db, pluginType, options = {}) {
     staleSources = getStaleSourcesForType,
   } = options;
 
-  let pending = inflight.get(pluginType);
+  let run = inflight.get(pluginType);
   // Fresh data needs no worker; this is the common case and costs one query.
-  if (!pending && !needed(db, pluginType)) {
+  if (!run && !needed(db, pluginType)) {
     return { complete: true, due: [] };
   }
-  if (!pending) {
-    pending = Promise.resolve()
+  if (!run) {
+    const promise = Promise.resolve()
       .then(() => sync(db, pluginType))
       .catch(() => false) // reads never fail on a sync error
       .finally(() => inflight.delete(pluginType));
-    inflight.set(pluginType, pending);
+    run = { promise, startedAt: Date.now() };
+    inflight.set(pluginType, run);
   }
+  const pending = run.promise;
 
   let timer;
   const timedOut = new Promise(resolve => {
@@ -125,11 +128,16 @@ export async function syncForRead(db, pluginType, options = {}) {
   clearTimeout(timer);
 
   if (outcome === 'done') return { complete: true, due: [] };
-  // Sources sync one at a time, so the ones already done are fresh by now and
-  // the rest are still due.
+  // Sources sync one at a time. A source this run already synced has a sync
+  // time at or after the run's start; it may still count as stale (a type
+  // with staleMinutes 0 is always stale), so leave it out by that time.
+  // sync_metadata keeps whole seconds, so compare from the start's second.
+  const runStart = Math.floor(run.startedAt / 1000) * 1000;
   let due = [];
   try {
-    due = staleSources(db, pluginType).map(({ sourceId, lastSync }) => ({ sourceId, lastSync: lastSync || null }));
+    due = staleSources(db, pluginType)
+      .filter(({ lastSync }) => !lastSync || lastSync.getTime() < runStart)
+      .map(({ sourceId, lastSync }) => ({ sourceId, lastSync: lastSync || null }));
   } catch {
     // The note just names no sources
   }
@@ -145,7 +153,7 @@ export async function waitForReadSyncs(pluginType) {
   const pending = pluginType
     ? [inflight.get(pluginType)].filter(Boolean)
     : [...inflight.values()];
-  await Promise.all(pending);
+  await Promise.all(pending.map(run => run.promise));
 }
 
 const STALE_NOTE_MAX_SOURCES = 3;
