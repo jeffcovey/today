@@ -92,8 +92,11 @@ async function restartTimer(args, ctx) {
   }
   if (descriptionProblem(last.description)) return errorResult(`The last entry can't be restarted: ${descriptionProblem(last.description)}`);
 
+  // The check above reads the cache, so a timer started since the sync would
+  // pass it. start_if_idle has the plugin check current-timer.md itself, under
+  // its lock, and refuse rather than replace a timer that is running.
   const entry = { start_time: formatInZone(now, tz), end_time: null, description: last.description };
-  const result = await write('time-logs', entry, { db, sourceFilter: last.source });
+  const result = await write('time-logs', { ...entry, start_if_idle: true }, { db, sourceFilter: last.source });
   if (!result.success && !result.partialSuccess) return errorResult(result.error);
 
   return jsonResult({

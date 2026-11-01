@@ -151,6 +151,35 @@ describe('add_diary_entry', () => {
     expect(concern.content).toContain('<!-- ROLE:cpa:START -->\n## 🤖 CPA\n\n### 09:00\nReport\n<!-- ROLE:cpa:END -->');
   });
 
+  test('untimed text already in a section is kept under a midnight heading the reader reads', async () => {
+    const existing = ['---', 'date: 2026-11-01', '---', '', '## Journal', 'Slept badly.', '', '## Progress', '', '### 08:00', 'Early', ''].join('\n');
+    const journal = insertDiaryEntry(existing, { type: 'journal', text: 'Better now', date: '2026-11-01', time: '12:00' });
+    expect(journal.content).toContain('## Journal\n\n### 00:00\nSlept badly.\n\n### 12:00\nBetter now\n\n## Progress');
+    const progress = insertDiaryEntry(existing, { type: 'progress', text: 'Later', date: '2026-11-01', time: '12:00' });
+    expect(progress.content).toContain('## Progress\n\n### 08:00\nEarly\n\n### 12:00\nLater\n');
+    expect(progress.content).not.toContain('### 00:00');
+
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'today-diary-untimed-'));
+    try {
+      const dir = path.join(root, 'vault', 'diary');
+      await fs.mkdir(dir, { recursive: true });
+      await fs.writeFile(path.join(dir, '2026-10-20.md'), ['---', 'date: 2026-10-20', '---', '', '## Journal', 'Slept badly.', ''].join('\n'));
+      addDiaryEntry({ type: 'journal', text: 'Better now', diaryDir: dir, timezone: TZ, now: new Date('2026-10-20T16:00:00Z') });
+      const result = spawnSync('node', [path.join(PROJECT_ROOT, 'plugins', 'markdown-diary', 'read.js')], {
+        encoding: 'utf8',
+        env: {
+          ...process.env, TZ, PROJECT_ROOT: root, VAULT_PATH: path.join(root, 'vault'), SOURCE_ID: 'markdown-diary/test',
+          LAST_SYNC_TIME: '', CONFIG_PATH: path.join(root, 'config.toml'), PLUGIN_CONFIG: JSON.stringify({ diary_directory: 'vault/diary' }),
+        },
+      });
+      const rows = JSON.stringify(JSON.parse(result.stdout.trim().split('\n').pop()));
+      expect(rows).toContain('Slept badly.');
+      expect(rows).toContain('Better now');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
   test('headings inside ROLE and TODAY blocks are not the user\'s sections', () => {
     const roleBlock = ['<!-- ROLE:coach:START -->', '## Progress', '', '### 09:00', 'Role report', '<!-- ROLE:coach:END -->'];
     const onlyInBlock = ['---', 'date: 2026-11-01', '---', '', ...roleBlock, ''].join('\n');
@@ -229,6 +258,7 @@ describe('add_diary_entry', () => {
       { type: 'journal', text: '<!-- ROLE:cpa:END --> sneaky' },
       { type: 'journal', text: '## New section' },
       { type: 'gratitude', text: 'two\nlines' },
+      { type: 'gratitude', text: 'coffee\rfriends' },
     ]) {
       const result = await call('add_diary_entry', args, { now: () => NOW });
       expect(result.isError).toBe(true);
@@ -356,6 +386,49 @@ describe('time entries', () => {
     }
   });
 
+  test('with start_if_idle, the time-tracking plugin refuses to replace a running timer', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'today-time-idle-'));
+    try {
+      const timerFile = path.join(root, 'vault/logs/time-tracking/current-timer.md');
+      const run = entry => spawnSync('node', [path.join(PROJECT_ROOT, 'plugins/markdown-time-tracking/write.js')], {
+        encoding: 'utf8',
+        env: { ...process.env, PROJECT_ROOT: root, VAULT_PATH: 'vault', PLUGIN_CONFIG: '{}', ENTRY_JSON: JSON.stringify(entry) },
+      });
+      const restart = { start_time: '2026-11-01T12:00:00-05:00', end_time: null, description: 'Restarted', start_if_idle: true };
+
+      const started = run(restart);
+      expect(JSON.parse(started.stdout).success).toBe(true);
+      expect(await fs.readFile(timerFile, 'utf8')).toBe('Restarted\n2026-11-01T12:00:00-05:00');
+
+      await fs.writeFile(timerFile, 'Writing\n2026-11-01T11:30:00-05:00');
+      const refused = run(restart);
+      expect(refused.status).toBe(1);
+      expect(JSON.parse(refused.stdout)).toMatchObject({ success: false, error: expect.stringMatching(/already running: "Writing".*nothing was changed/) });
+      expect(await fs.readFile(timerFile, 'utf8')).toBe('Writing\n2026-11-01T11:30:00-05:00');
+
+      // Without the option a start still replaces the timer, as before.
+      expect(JSON.parse(run({ ...restart, start_if_idle: undefined, description: 'Plain' }).stdout).success).toBe(true);
+      expect(await fs.readFile(timerFile, 'utf8')).toBe('Plain\n2026-11-01T12:00:00-05:00');
+
+      // The check and the write wait for the shared lock on current-timer.md.
+      await fs.writeFile(timerFile, '');
+      await fs.writeFile(`${timerFile}.lock`, `${process.pid}\n${Date.now()}`);
+      const locked = run(restart);
+      expect(JSON.parse(locked.stdout).error).toMatch(/Timed out acquiring file lock/);
+      expect(await fs.readFile(timerFile, 'utf8')).toBe('');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test('restart_timer reports the plugin\'s refusal when a timer started after the check', async () => {
+    const write = recorder(() => ({ success: false, error: 'A timer is already running: "Writing" since 2026-11-01T11:30:00-05:00. Stop it first; nothing was changed.' }));
+    const ctx = ctxFor(timeDb([{ start: '2026-11-01T08:00:00-05:00', end: '2026-11-01T09:00:00-05:00', description: 'Email' }]), write);
+    const result = await call('restart_timer', {}, ctx);
+    expect(result.isError).toBe(true);
+    expect(text(result)).toMatch(/already running: "Writing".*nothing was changed/);
+  });
+
   test('restart_timer starts the last entry\'s description now', async () => {
     const ctx = ctxFor(timeDb([
       { start: '2026-11-01T08:00:00-05:00', end: '2026-11-01T09:00:00-05:00', description: 'Email' },
@@ -367,7 +440,7 @@ describe('time entries', () => {
     expect(out.restarted_from.end_time).toBe('2026-11-01T10:30:00-05:00');
     expect(ctx.writeEntryAndSync.calls).toEqual([[
       'time-logs',
-      { start_time: '2026-11-01T12:00:00-05:00', end_time: null, description: 'Deep work #topic/programming' },
+      { start_time: '2026-11-01T12:00:00-05:00', end_time: null, description: 'Deep work #topic/programming', start_if_idle: true },
       { db: ctx.db, sourceFilter: SOURCE },
     ]]);
   });
@@ -560,6 +633,15 @@ describe('update_event and delete_event', () => {
     const source = { plugin: { name: 'fake', _path: dir, commands: { write: 'write.js' }, settings: {} }, sourceName: 'x', config: { calendar_id: 'cal' } };
     const result = await runEventPluginWrite(source, 'delete', { id: 'abc' });
     expect(result).toEqual({ success: true, got: { action: 'delete', event: { id: 'abc' } }, calendar: 'cal' });
+  });
+
+  test('runEventPluginWrite reports a plugin that exits without reading a large payload', async () => {
+    const dir = path.join(workDir, 'fake-plugin-early-exit');
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, 'write.js'), "console.error('Error: bad config'); process.exit(3);\n");
+    const source = { plugin: { name: 'fake', _path: dir, commands: { write: 'write.js' }, settings: {} }, sourceName: 'x', config: {} };
+    const result = await runEventPluginWrite(source, 'update', { id: 'abc', description: 'x'.repeat(8 * 1024 * 1024) });
+    expect(result).toEqual({ success: false, error: 'The calendar plugin gave no result: Error: bad config' });
   });
 });
 

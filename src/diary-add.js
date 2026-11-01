@@ -37,6 +37,10 @@ const SECTIONS = {
 
 const SECTION_END = /\n(?:## |<!--\s*(?:ROLE|TODAY):)/;
 
+// The heading plugins/markdown-diary/read.js treats as an entry's time. Once a
+// section has one, the reader keeps only text under such headings.
+const TIMESTAMP_HEADING = /^### \d{1,2}:\d{2}(?::\d{2})?\s*$/m;
+
 /**
  * Absolute diary directory for a markdown-diary source's config, resolved the
  * way plugins/markdown-diary/read.js resolves it: path.join onto the project
@@ -94,9 +98,16 @@ export function insertDiaryEntry(content, { type, text, date, time }) {
 
   const markdown = type === 'gratitude' ? `- ${text}` : `### ${time}\n${text}`;
   const joiner = type === 'gratitude' ? '\n' : '\n\n';
+  // The reader reads a section with no timestamp headings as one entry at
+  // midnight, and ignores untimed text once a heading exists. Give existing
+  // untimed text that midnight heading so the new entry doesn't hide it.
+  let kept = sectionContent.trimEnd();
+  if (type !== 'gratitude' && kept.trim() && !TIMESTAMP_HEADING.test(kept)) {
+    kept = `\n\n### 00:00\n${kept.trim()}`;
+  }
   // `rest` starts with the newline before the next heading or marker, which
   // leaves one blank line between the entry and what follows.
-  return { content: `${before}${sectionContent.trimEnd()}${joiner}${markdown}\n${rest}`, markdown };
+  return { content: `${before}${kept}${joiner}${markdown}\n${rest}`, markdown };
 }
 
 /**

@@ -115,6 +115,10 @@ export function runEventPluginWrite(source, action, event) {
       const detail = stripAnsi(stderr).trim().split('\n').pop() || `exit code ${code}`;
       resolve({ success: false, error: `The calendar plugin gave no result: ${detail}` });
     });
+    // A plugin that exits before reading all of stdin makes the pipe emit
+    // EPIPE; unhandled, that would take down the server. The close handler
+    // above still reports the plugin's result or its failure.
+    child.stdin.on('error', () => {});
     child.stdin.end(JSON.stringify({ action, event }));
   });
 }

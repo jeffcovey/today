@@ -41,7 +41,7 @@ async function addDiaryEntryHandler(args, ctx) {
   if (!text) return errorResult('text is required');
   if (text.length > MAX_TEXT) return errorResult(`text is ${text.length} characters; the limit is ${MAX_TEXT}`);
   if (/<!--\s*(ROLE|TODAY):/i.test(text)) return errorResult('text may not contain ROLE: or TODAY: marker comments');
-  if (type === 'gratitude' && text.includes('\n')) {
+  if (type === 'gratitude' && /[\r\n]/.test(text)) {
     return errorResult('A gratitude entry is one bullet line; send it without line breaks');
   }
   if (/^#{1,2}\s/m.test(text)) {
