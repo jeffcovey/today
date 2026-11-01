@@ -3,7 +3,11 @@
  * event loop stays free while it runs (#690).
  *
  * Usage: node src/read-sync-worker.js <plugin-type>
- * Exits 0 when the sync ran or the data was already fresh, 1 on a failure.
+ * Exits 0 once ensureSyncForType returns, and 1 only when the worker itself
+ * can't run (no type given, or an error that escapes ensureSyncForType).
+ * As with the in-process read syncs this replaces, a source whose sync fails
+ * doesn't fail the read: ensureSyncForType skips past it, so that is still
+ * exit 0. syncForRead uses the exit only to know the sync is over.
  * Started by runReadSyncInChild in mcp-reads.js, from the server's working
  * directory, so it opens the same database.
  */

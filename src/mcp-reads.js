@@ -42,7 +42,8 @@ export const READ_SYNC_WORKER_KILL_GRACE_MS = 10 * 1000;
  * database, and its stdout goes to stderr so it can never write into a stdio
  * MCP transport.
  *
- * @returns {Promise<boolean>} true if the worker exited cleanly
+ * @returns {Promise<boolean>} true if the worker exited 0 (see
+ *   read-sync-worker.js for what that does and doesn't mean)
  */
 export function runReadSyncInChild(pluginType, {
   workerPath = READ_SYNC_WORKER,
