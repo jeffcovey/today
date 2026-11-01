@@ -10,7 +10,6 @@
 
 import { TZDate } from '@date-fns/tz';
 import { format } from 'date-fns';
-import { getTodayDate } from '../date-utils.js';
 
 const WITH_OFFSET = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/i;
 const NAIVE = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?$/;
@@ -39,9 +38,11 @@ function inRange(y, mo, d, h, mi, s) {
  * @param {string} tz - zone for naive times
  * @param {object} [options]
  * @param {boolean} [options.allowTimeOnly] - accept "HH:MM" as today in `tz`
+ * @param {Date} [options.now] - the reference instant whose day in `tz` is "today"
+ *   for HH:MM; pass the handler's own clock so it agrees with its other checks
  * @returns {{date: Date, naive: boolean} | {error: string}}
  */
-export function parseCallerTime(input, tz, { allowTimeOnly = false } = {}) {
+export function parseCallerTime(input, tz, { allowTimeOnly = false, now = new Date() } = {}) {
   const text = String(input ?? '').trim();
   let m = text.match(WITH_OFFSET);
   if (m) {
@@ -57,7 +58,7 @@ export function parseCallerTime(input, tz, { allowTimeOnly = false } = {}) {
   if (!m && allowTimeOnly) {
     const t = text.match(TIME_ONLY);
     if (t) {
-      const [y, mo, d] = getTodayDate(tz).split('-');
+      const [y, mo, d] = format(new TZDate(now.getTime(), tz), 'yyyy-MM-dd').split('-');
       m = [text, y, mo, d, t[1].padStart(2, '0'), t[2], '0'];
     }
   }

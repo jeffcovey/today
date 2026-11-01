@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url';
 import { getSourcesForType, syncPluginSource } from '../plugin-loader.js';
 import { getConfiguredTimezone } from '../date-utils.js';
 import { jsonResult, errorResult } from '../mcp-safeguards.js';
-import { addDiaryEntry, resolveDiaryDirectory, DIARY_ADD_TYPES } from '../diary-add.js';
+import { addDiaryEntry, resolveDiaryDirectory, DiaryBusyError, DIARY_ADD_TYPES } from '../diary-add.js';
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const MAX_TEXT = 10000;
@@ -54,13 +54,19 @@ async function addDiaryEntryHandler(args, ctx) {
 
   const tz = getConfiguredTimezone();
   const now = ctx.now ? ctx.now() : new Date();
-  const written = addDiaryEntry({
-    type,
-    text,
-    diaryDir: resolveDiaryDirectory(source.config),
-    timezone: tz,
-    now,
-  });
+  let written;
+  try {
+    written = addDiaryEntry({
+      type,
+      text,
+      diaryDir: resolveDiaryDirectory(source.config),
+      timezone: tz,
+      now,
+    });
+  } catch (error) {
+    if (error instanceof DiaryBusyError) return errorResult(error.message);
+    throw error;
+  }
 
   let syncNote = null;
   if (ctx.db) {

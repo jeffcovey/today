@@ -41,6 +41,20 @@ function relFile(file) {
   return file ? path.relative(PROJECT_ROOT, file) : null;
 }
 
+/**
+ * writeEntryAndSync reports a write whose file change landed but whose cache
+ * sync failed as success: false with partialSuccess. The entry is saved, so
+ * say so plainly; an error here would invite a retry that writes it twice.
+ */
+function savedNote(result) {
+  if (result.success || !result.partialSuccess) return {};
+  return {
+    saved: true,
+    note: `${result.error}. The change is saved in the time log, so don't repeat this call; ` +
+      'reads will show it after the next sync.',
+  };
+}
+
 /** A description is one line in a pipe-separated file. */
 function descriptionProblem(description) {
   if (!description) return 'description is required';
@@ -80,7 +94,7 @@ async function restartTimer(args, ctx) {
 
   const entry = { start_time: formatInZone(now, tz), end_time: null, description: last.description };
   const result = await write('time-logs', entry, { db, sourceFilter: last.source });
-  if (!result.success) return errorResult(result.error);
+  if (!result.success && !result.partialSuccess) return errorResult(result.error);
 
   return jsonResult({
     started: { description: entry.description, start_time: entry.start_time, source: result.source?.sourceId || last.source },
@@ -89,6 +103,7 @@ async function restartTimer(args, ctx) {
       end_time: formatInZone(last.end_time, tz),
     },
     file: relFile(result.writeResult?.file),
+    ...savedNote(result),
     user_timezone: tz,
   }, [note, `Started a timer for "${entry.description}" at ${entry.start_time}.`].filter(Boolean).join('\n'));
 }
@@ -113,7 +128,7 @@ async function addTimeEntry(args, ctx) {
   let start;
   let end;
   if (args.start !== undefined && args.start !== null && args.start !== '') {
-    const parsed = parseCallerTime(args.start, tz, { allowTimeOnly: true });
+    const parsed = parseCallerTime(args.start, tz, { allowTimeOnly: true, now });
     if (parsed.error) return errorResult(parsed.error);
     start = parsed.date;
     end = new Date(start.getTime() + minutes * 60000);
@@ -130,31 +145,25 @@ async function addTimeEntry(args, ctx) {
   if (!target.success) return errorResult(target.error);
   const sourceId = target.source.sourceId;
 
-  // The plugin clears current-timer.md when it writes a finished entry, so a
-  // timer running on this source would be lost. Note it and put it back.
+  // keep_current_timer stops the plugin from clearing current-timer.md, which
+  // it otherwise does for every finished entry, so a running timer is left
+  // exactly as it is rather than cleared and written back from a snapshot.
   const sync = ctx.syncForRead ? await ctx.syncForRead(db, 'time-logs') : null;
   const note = staleNote('time log', sync);
   const running = runningTimers(db).find(t => t.source === sourceId) || null;
 
   const entry = { start_time: formatInZone(start, tz), end_time: formatInZone(end, tz), description };
-  const result = await write('time-logs', entry, { db, sourceFilter: sourceId });
-  if (!result.success) return errorResult(result.error);
+  const result = await write('time-logs', { ...entry, keep_current_timer: true }, { db, sourceFilter: sourceId });
+  if (!result.success && !result.partialSuccess) return errorResult(result.error);
 
-  let timerNote = null;
-  if (running) {
-    const restore = { start_time: running.start_time, end_time: null, description: running.description };
-    const restored = await write('time-logs', restore, { db, sourceFilter: sourceId });
-    timerNote = restored.success
-      ? `The running timer "${running.description}" was kept.`
-      : `The entry was added, but the running timer "${running.description}" (started ${formatInZone(running.start_time, tz)}) ` +
-        `was stopped by the write and could not be restored: ${restored.error}. Restart it with start_timer.`;
-  }
+  const timerNote = running ? `The running timer "${running.description}" was left running.` : null;
 
   const lead = `Added ${formatDurationMinutes(minutes)}: "${description}", ${entry.start_time} to ${entry.end_time}.`;
   return jsonResult({
     entry: { ...entry, duration_minutes: minutes, source: sourceId },
     file: relFile(result.writeResult?.file),
     ...(timerNote ? { running_timer: timerNote } : {}),
+    ...savedNote(result),
     user_timezone: tz,
   }, [note, lead].filter(Boolean).join('\n'));
 }

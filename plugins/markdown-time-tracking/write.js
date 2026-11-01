@@ -77,8 +77,12 @@ try {
     // a clobber race instead of preventing one.
     fs.appendFileSync(monthFile, line);
 
-    // Clear current-timer.md (keep file but empty for Apple Shortcuts compatibility)
-    writeFileAtomic(currentTimerFile, '');
+    // Clear current-timer.md (keep file but empty for Apple Shortcuts compatibility),
+    // unless the caller is recording past work alongside a running timer
+    // (keep_current_timer: true), which leaves the timer as it is.
+    if (entry.keep_current_timer !== true) {
+      writeFileAtomic(currentTimerFile, '');
+    }
 
     console.log(JSON.stringify({
       success: true,

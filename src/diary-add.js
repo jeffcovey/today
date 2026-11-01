@@ -7,9 +7,9 @@
  * for tools that add entries (the MCP add_diary_entry tool). Two things
  * differ from the inline copy in bin/diary, both to keep existing content
  * intact: a section is found by its whole heading line (so "## Concern" is
- * not found inside "## Concerns"), and it ends at a ROLE/TODAY marker
- * comment as well as at the next "## " heading, so an entry is never written
- * into a role's block.
+ * not found inside "## Concerns"), headings inside ROLE/TODAY marker blocks
+ * are skipped, and a section ends at a marker comment as well as at the next
+ * "## " heading, so an entry is never written into a role's block.
  */
 
 import fs from 'fs';
@@ -18,6 +18,7 @@ import { fileURLToPath } from 'url';
 import { format } from 'date-fns';
 import { TZDate } from '@date-fns/tz';
 import { writeFileAtomicCAS } from './fs-atomic.js';
+import { withFileLocks } from './file-lock.js';
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -36,10 +37,36 @@ const SECTIONS = {
 
 const SECTION_END = /\n(?:## |<!--\s*(?:ROLE|TODAY):)/;
 
-/** Absolute diary directory for a markdown-diary source's config. */
-export function resolveDiaryDirectory(sourceConfig = {}) {
+/**
+ * Absolute diary directory for a markdown-diary source's config, resolved the
+ * way plugins/markdown-diary/read.js resolves it: path.join onto the project
+ * root, even for a directory that is already absolute. Resolving it any other
+ * way would write entries where the reader never looks.
+ */
+export function resolveDiaryDirectory(sourceConfig = {}, projectRoot = PROJECT_ROOT) {
   const dir = sourceConfig.diary_directory || DEFAULT_DIARY_DIRECTORY;
-  return path.isAbsolute(dir) ? dir : path.join(PROJECT_ROOT, dir);
+  return path.join(projectRoot, dir);
+}
+
+/** Thrown by addDiaryEntry when another write holds the day's file lock. */
+export class DiaryBusyError extends Error {}
+
+// ROLE and TODAY marker blocks belong to the roles plugin and the diary
+// reader; a heading inside one is part of that block, not the user's section.
+const MARKER_BLOCK = /<!--\s*(ROLE|TODAY):([^:\s]+):START\s*-->[\s\S]*?<!--\s*\1:\2:END\s*-->/g;
+
+function markerSpans(doc) {
+  return [...doc.matchAll(MARKER_BLOCK)].map(m => [m.index, m.index + m[0].length]);
+}
+
+/** The first heading line matching `re` that is not inside a marker block. */
+function findSectionOutsideMarkers(doc, re) {
+  const spans = markerSpans(doc);
+  const global = new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`);
+  for (const m of doc.matchAll(global)) {
+    if (!spans.some(([start, end]) => m.index >= start && m.index < end)) return m;
+  }
+  return null;
 }
 
 /**
@@ -51,10 +78,10 @@ export function insertDiaryEntry(content, { type, text, date, time }) {
   if (!section) throw new Error(`Invalid type "${type}". Use: ${DIARY_ADD_TYPES.join(', ')}`);
 
   let doc = content || `---\ndate: ${date}\n---\n\n`;
-  let match = doc.match(section.match);
+  let match = findSectionOutsideMarkers(doc, section.match);
   if (!match) {
     doc = `${doc.trimEnd()}\n\n## ${section.heading}\n`;
-    match = doc.match(section.match);
+    match = findSectionOutsideMarkers(doc, section.match);
   }
 
   const insertPoint = match.index + match[0].length;
@@ -96,16 +123,29 @@ export function addDiaryEntry({ type, text, diaryDir, timezone, now = new Date()
   const file = path.join(diaryDir, `${date}.md`);
   fs.mkdirSync(diaryDir, { recursive: true });
 
-  for (let attempt = 0; attempt < 5; attempt++) {
-    let original = null;
-    try {
-      original = fs.readFileSync(file, 'utf8');
-    } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
+  // The CAS check and the rename are separate steps, so two processes adding
+  // entries at once could both pass the check and one entry would be lost.
+  // The lock serialises writers that use it; the CAS retry still covers
+  // writers that don't (an editor, a sync).
+  try {
+    return withFileLocks([file], () => {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        let original = null;
+        try {
+          original = fs.readFileSync(file, 'utf8');
+        } catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+        }
+        const { content, markdown } = insertDiaryEntry(original, { type, text: body, date, time });
+        const { conflict } = writeFileAtomicCAS(file, content, original);
+        if (!conflict) return { file, date, time, type, markdown, created: original === null };
+      }
+      throw new Error(`${file} kept changing while the entry was being added; nothing was written`);
+    });
+  } catch (error) {
+    if (/Timed out acquiring file lock/.test(error.message)) {
+      throw new DiaryBusyError(`Another write to ${path.basename(file)} is in progress; nothing was changed. Try again in a moment.`);
     }
-    const { content, markdown } = insertDiaryEntry(original, { type, text: body, date, time });
-    const { conflict } = writeFileAtomicCAS(file, content, original);
-    if (!conflict) return { file, date, time, type, markdown, created: original === null };
+    throw error;
   }
-  throw new Error(`${file} kept changing while the entry was being added; nothing was written`);
 }

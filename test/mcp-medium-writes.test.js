@@ -16,7 +16,8 @@ import Database from 'better-sqlite3';
 import { clearConfigCache } from '../src/config.js';
 import { getSqlColumns, getTableName } from '../src/plugin-schemas.js';
 import { setRegisteredToolsForTesting, getRegisteredTools } from '../src/mcp-tools/index.js';
-import { insertDiaryEntry } from '../src/diary-add.js';
+import { spawnSync } from 'child_process';
+import { insertDiaryEntry, addDiaryEntry, resolveDiaryDirectory } from '../src/diary-add.js';
 import { parseCallerTime, formatInZone } from '../src/mcp-tools/_time.js';
 import { tools as diaryTools } from '../src/mcp-tools/diary-writes.js';
 import { tools as timerTools } from '../src/mcp-tools/timer-writes.js';
@@ -69,7 +70,8 @@ beforeAll(async () => {
     `timezone = "${TZ}"`,
     `vault_path = "${path.relative(PROJECT_ROOT, vaultDir)}"`,
     '[mcp]', 'write_log = false',
-    '[plugins.markdown-diary.default]', 'enabled = true', `diary_directory = "${diaryDir}"`,
+    // The diary reader joins diary_directory onto the project root, so the writer does too.
+    '[plugins.markdown-diary.default]', 'enabled = true', `diary_directory = "${path.relative(PROJECT_ROOT, diaryDir)}"`,
     '[plugins.roles.default]', 'enabled = true',
     '[plugins.google-calendar.personal]', 'enabled = true', 'calendar_id = "me@example.com"',
     '[plugins.public-calendars.holidays]', 'enabled = true', 'url = "https://example.com/holidays.ics"',
@@ -121,6 +123,12 @@ describe('caller times', () => {
     expect(parseCallerTime('9:00', TZ).error).toMatch(/Could not read/);
     expect(parseCallerTime('9:00', TZ, { allowTimeOnly: true }).date).toBeInstanceOf(Date);
   });
+
+  test('HH:MM is read on the reference day, not the host clock\'s', () => {
+    const now = new Date('2026-03-10T03:30:00Z'); // 23:30 on March 9 in New York
+    expect(formatInZone(parseCallerTime('9:00', TZ, { allowTimeOnly: true, now }).date, TZ)).toBe('2026-03-09T09:00:00-04:00');
+    expect(formatInZone(parseCallerTime('9:00', 'UTC', { allowTimeOnly: true, now }).date, TZ)).toBe('2026-03-10T05:00:00-04:00');
+  });
 });
 
 describe('add_diary_entry', () => {
@@ -141,6 +149,63 @@ describe('add_diary_entry', () => {
     expect(concern.content).toContain('### 08:00\nRain\n\n### 12:00\nWind\n\n<!-- ROLE:cpa:START -->');
     expect(concern.content.match(/## Concern/g)).toHaveLength(1);
     expect(concern.content).toContain('<!-- ROLE:cpa:START -->\n## 🤖 CPA\n\n### 09:00\nReport\n<!-- ROLE:cpa:END -->');
+  });
+
+  test('headings inside ROLE and TODAY blocks are not the user\'s sections', () => {
+    const roleBlock = ['<!-- ROLE:coach:START -->', '## Progress', '', '### 09:00', 'Role report', '<!-- ROLE:coach:END -->'];
+    const onlyInBlock = ['---', 'date: 2026-11-01', '---', '', ...roleBlock, ''].join('\n');
+    const added = insertDiaryEntry(onlyInBlock, { type: 'progress', text: 'Mine', date: '2026-11-01', time: '12:00' });
+    expect(added.content).toBe(`${onlyInBlock.trimEnd()}\n\n## Progress\n\n### 12:00\nMine\n`);
+
+    const both = ['---', 'date: 2026-11-01', '---', '',
+      '<!-- TODAY:plan:START -->', '## Journal', 'generated', '<!-- TODAY:plan:END -->', '',
+      ...roleBlock, '', '## Progress', '', '### 08:00', 'Earlier', '', '## Journal', ''].join('\n');
+    const progress = insertDiaryEntry(both, { type: 'progress', text: 'Mine', date: '2026-11-01', time: '12:00' });
+    expect(progress.content).toContain('### 08:00\nEarlier\n\n### 12:00\nMine\n\n## Journal');
+    expect(progress.content).toContain(roleBlock.join('\n'));
+    const journal = insertDiaryEntry(both, { type: 'journal', text: 'Mine', date: '2026-11-01', time: '12:00' });
+    expect(journal.content).toContain('<!-- TODAY:plan:START -->\n## Journal\ngenerated\n<!-- TODAY:plan:END -->');
+    expect(journal.content.endsWith('## Journal\n\n### 12:00\nMine\n')).toBe(true);
+  });
+
+  test('an absolute diary_directory is resolved the way the diary reader resolves it', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'today-diary-root-'));
+    try {
+      const configured = '/abs/diary';
+      const dir = resolveDiaryDirectory({ diary_directory: configured }, root);
+      expect(dir).toBe(path.join(root, 'abs', 'diary'));
+      addDiaryEntry({ type: 'journal', text: 'Read me back', diaryDir: dir, timezone: TZ, now: new Date('2026-10-20T16:00:00Z') });
+
+      const result = spawnSync('node', [path.join(PROJECT_ROOT, 'plugins', 'markdown-diary', 'read.js')], {
+        encoding: 'utf8',
+        env: {
+          ...process.env, TZ, PROJECT_ROOT: root, VAULT_PATH: path.join(root, 'vault'), SOURCE_ID: 'markdown-diary/test',
+          LAST_SYNC_TIME: '', CONFIG_PATH: path.join(root, 'config.toml'), PLUGIN_CONFIG: JSON.stringify({ diary_directory: configured }),
+        },
+      });
+      const out = JSON.parse(result.stdout.trim().split('\n').pop());
+      const rows = out.entries || out.rows || out.items || out;
+      expect(JSON.stringify(rows)).toContain('Read me back');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test('waits for the day\'s file lock and refuses, changing nothing, while another write holds it', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'today-diary-lock-'));
+    try {
+      const now = new Date('2026-10-20T16:00:00Z');
+      const first = addDiaryEntry({ type: 'journal', text: 'First', diaryDir: dir, timezone: TZ, now });
+      expect(await fs.readdir(dir)).toEqual(['2026-10-20.md']); // the lock is released
+      const before = await fs.readFile(first.file, 'utf8');
+
+      await fs.writeFile(`${first.file}.lock`, `${process.pid}\n${Date.now()}`);
+      expect(() => addDiaryEntry({ type: 'journal', text: 'Second', diaryDir: dir, timezone: TZ, now }))
+        .toThrow(/Another write to 2026-10-20\.md is in progress; nothing was changed/);
+      expect(await fs.readFile(first.file, 'utf8')).toBe(before);
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
   });
 
   test('writes today\'s file and returns the entry', async () => {
@@ -194,7 +259,7 @@ describe('time entries', () => {
     expect(out.file).toBe('vault/logs/time-tracking/2026-11.md');
     expect(ctx.writeEntryAndSync.calls).toEqual([[
       'time-logs',
-      { start_time: '2026-11-01T11:40:00-05:00', end_time: '2026-11-01T12:00:00-05:00', description: 'Reviewing PRs #topic/programming' },
+      { start_time: '2026-11-01T11:40:00-05:00', end_time: '2026-11-01T12:00:00-05:00', description: 'Reviewing PRs #topic/programming', keep_current_timer: true },
       { db: ctx.db, sourceFilter: SOURCE },
     ]]);
   });
@@ -231,11 +296,64 @@ describe('time entries', () => {
   test('add_time_entry keeps a timer running on the same source', async () => {
     const ctx = ctxFor(timeDb([{ start: '2026-11-01T11:30:00-05:00', description: 'Writing #topic/writing' }]));
     const out = json(await call('add_time_entry', { duration: '15m', description: 'Call with Sam', start: '10:00' }, ctx));
-    expect(out.running_timer).toMatch(/kept/);
+    expect(out.running_timer).toMatch(/left running/);
+    // One write that tells the plugin to leave current-timer.md alone; nothing is cleared and written back.
     expect(ctx.writeEntryAndSync.calls.map(c => c[1])).toEqual([
-      { start_time: '2026-11-01T10:00:00-05:00', end_time: '2026-11-01T10:15:00-05:00', description: 'Call with Sam' },
-      { start_time: '2026-11-01T11:30:00-05:00', end_time: null, description: 'Writing #topic/writing' },
+      { start_time: '2026-11-01T10:00:00-05:00', end_time: '2026-11-01T10:15:00-05:00', description: 'Call with Sam', keep_current_timer: true },
     ]);
+  });
+
+  test('add_time_entry reads HH:MM on the handler\'s own day', async () => {
+    const ctx = { ...ctxFor(timeDb()), now: () => new Date('2026-03-12T16:00:00Z') };
+    const out = json(await call('add_time_entry', { duration: '30m', description: 'Standup', start: '9:00' }, ctx));
+    expect(out.entry.start_time).toBe('2026-03-12T09:00:00-04:00');
+    const late = await call('add_time_entry', { duration: '30m', description: 'Standup', start: '13:00' }, ctx);
+    expect(late.isError).toBe(true);
+    expect(text(late)).toMatch(/in the future/);
+  });
+
+  test('a saved entry whose cache sync failed is reported as saved, not as an error', async () => {
+    const partial = recorder(() => ({
+      success: false, partialSuccess: true, error: 'Write succeeded, but local sync failed: disk busy',
+      source: { sourceId: SOURCE }, writeResult: { file: path.join(PROJECT_ROOT, 'vault/logs/time-tracking/2026-11.md') },
+    }));
+    const added = await call('add_time_entry', { duration: '20m', description: 'Email' }, ctxFor(timeDb(), partial));
+    expect(added.isError).toBeUndefined();
+    expect(json(added)).toMatchObject({ saved: true, file: 'vault/logs/time-tracking/2026-11.md' });
+    expect(json(added).note).toMatch(/local sync failed: disk busy.*don't repeat this call/);
+
+    const restarted = await call('restart_timer', {}, ctxFor(timeDb([
+      { start: '2026-11-01T08:00:00-05:00', end: '2026-11-01T09:00:00-05:00', description: 'Email' },
+    ]), partial));
+    expect(restarted.isError).toBeUndefined();
+    expect(json(restarted).saved).toBe(true);
+
+    const failed = recorder(() => ({ success: false, error: 'Failed to write: EACCES' }));
+    const refused = await call('add_time_entry', { duration: '20m', description: 'Email' }, ctxFor(timeDb(), failed));
+    expect(refused.isError).toBe(true);
+  });
+
+  test('the time-tracking plugin leaves current-timer.md alone only when asked', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'today-time-write-'));
+    try {
+      const timerFile = path.join(root, 'vault/logs/time-tracking/current-timer.md');
+      const run = entry => spawnSync('node', [path.join(PROJECT_ROOT, 'plugins/markdown-time-tracking/write.js')], {
+        encoding: 'utf8',
+        env: { ...process.env, PROJECT_ROOT: root, VAULT_PATH: 'vault', PLUGIN_CONFIG: '{}', ENTRY_JSON: JSON.stringify(entry) },
+      });
+      const done = { start_time: '2026-11-01T10:00:00-05:00', end_time: '2026-11-01T10:15:00-05:00', description: 'Call' };
+      run({ start_time: '2026-11-01T11:30:00-05:00', end_time: null, description: 'Writing' });
+
+      expect(JSON.parse(run({ ...done, keep_current_timer: true }).stdout).success).toBe(true);
+      expect(await fs.readFile(timerFile, 'utf8')).toBe('Writing\n2026-11-01T11:30:00-05:00');
+
+      expect(JSON.parse(run(done).stdout).success).toBe(true);
+      expect(await fs.readFile(timerFile, 'utf8')).toBe('');
+      const month = await fs.readFile(path.join(root, 'vault/logs/time-tracking/2026-11.md'), 'utf8');
+      expect(month.trim().split('\n')).toHaveLength(2);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 
   test('restart_timer starts the last entry\'s description now', async () => {
