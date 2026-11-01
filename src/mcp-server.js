@@ -53,6 +53,15 @@ import {
   LIST_TASKS_MAX_LIMIT,
 } from './mcp-reads.js';
 import { getAbsoluteVaultPath } from './config.js';
+import {
+  getMcpPolicy,
+  isKindAllowed,
+  refusalReason,
+  verifyTitle,
+  logWrite,
+  errorResult,
+} from './mcp-safeguards.js';
+import { getRegisteredTools } from './mcp-tools/index.js';
 import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -61,7 +70,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 
-// Tools that change something: hidden and refused on a read-only connection.
+// Built-in tools that change something: hidden and refused on a read-only
+// connection. Tools in src/mcp-tools/ declare their own kind ('read',
+// 'write' or 'destructive'); see src/mcp-safeguards.js.
 export const WRITE_TOOLS = new Set([
   'create_task', 'complete_task', 'create_event', 'start_timer', 'stop_timer', 'sync_data',
 ]);
@@ -133,9 +144,9 @@ export function createMCPServer({ readOnly = false } = {}) {
           type: 'object',
           properties: {
             task_id: { type: 'string', description: 'Full task ID from the database' },
-            title: { type: 'string', description: 'Task title for verification (optional but recommended)' },
+            title: { type: 'string', description: "The task's title (or a distinctive part of it), to confirm the right task is completed" },
           },
-          required: ['task_id'],
+          required: ['task_id', 'title'],
         },
       });
 
@@ -241,10 +252,47 @@ export function createMCPServer({ readOnly = false } = {}) {
       },
     });
 
-    return { tools: readOnly ? tools.filter(tool => !WRITE_TOOLS.has(tool.name)) : tools };
+    const policy = getMcpPolicy({ readOnly });
+    const registered = await getRegisteredTools();
+    for (const tool of registered.values()) {
+      if (tool.pluginType && !pluginTypes.has(tool.pluginType)) continue;
+      if (!isKindAllowed(tool.kind, policy)) continue;
+      tools.push({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema });
+    }
+
+    return { tools: policy.readOnly ? tools.filter(tool => !WRITE_TOOLS.has(tool.name)) : tools };
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name } = request.params;
+    const args = request.params.arguments || {};
+    const policy = getMcpPolicy({ readOnly });
+    const registered = (await getRegisteredTools()).get(name);
+    const kind = registered ? registered.kind : (WRITE_TOOLS.has(name) ? 'write' : 'read');
+
+    if (!isKindAllowed(kind, policy)) {
+      return errorResult(refusalReason(name, kind, policy));
+    }
+
+    let result;
+    if (registered) {
+      try {
+        const db = getDatabase();
+        result = await registered.handler(args, { db, policy, syncForRead });
+      } catch (error) {
+        result = errorResult(error.message);
+      }
+    } else {
+      result = await callBuiltinTool({ ...request, params: { ...request.params, arguments: args } });
+    }
+
+    if (kind !== 'read') {
+      logWrite({ tool: name, kind, args, result, policy });
+    }
+    return result;
+  });
+
+  const callBuiltinTool = async (request) => {
     const { name, arguments: args } = request.params;
     if (readOnly && WRITE_TOOLS.has(name)) {
       return {
@@ -299,6 +347,13 @@ export function createMCPServer({ readOnly = false } = {}) {
 
           const source = taskId.substring(0, firstColon);
           const pluginId = taskId.substring(firstColon + 1);
+
+          const task = db.prepare('SELECT title, status FROM tasks WHERE id = ?').get(taskId);
+          if (!task) {
+            return errorResult(`No task with id ${taskId}. Look it up with list_tasks first.`);
+          }
+          const check = verifyTitle(args.title, task.title, { what: 'task' });
+          if (!check.ok) return errorResult(check.error);
 
           const entry = {
             action: 'complete',
@@ -516,7 +571,7 @@ export function createMCPServer({ readOnly = false } = {}) {
         isError: true,
       };
     }
-  });
+  };
 
   // === RESOURCES ===
   // Resources provide read access to data

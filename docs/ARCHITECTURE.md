@@ -389,6 +389,14 @@ The primary user interface is the CLI in `bin/`. Important entry points include:
 - `bin/mcp-server` — stdio, for a client on the same machine (Claude Desktop, Claude Code).
 - `POST/GET/DELETE /mcp` on the web server (`src/web-mcp.js`) — Streamable HTTP, for remote clients such as claude.ai custom connectors. Off unless `config.toml` has `[mcp] enabled = true`. Every request needs `Authorization: Bearer <MCP_TOKEN>`; the token is generated into `.env` the first time the web server starts with the section enabled (`npx dotenvx get MCP_TOKEN` prints it). `read_only = true` hides and refuses the writing tools (`create_task`, `complete_task`, `create_event`, `start_timer`, `stop_timer`, `sync_data`). Sessions are held in memory and dropped after an hour idle.
 
+Tools are built into `src/mcp-server.js` or defined in modules under `src/mcp-tools/`, which are discovered from the directory (see `src/mcp-tools/index.js` for the module shape). Each tool has a kind, enforced by the server (`src/mcp-safeguards.js`):
+
+- `read` changes nothing.
+- `write` is a vault change that is easy to undo. Hidden and refused when `read_only = true`.
+- `destructive` deletes or moves data, rewrites in bulk, or writes to an outside service such as Google Calendar updates or YNAB. Hidden and refused unless `[mcp] allow_destructive = true`, and always refused on a read-only connection.
+
+Tools that take a task, event or contact ID require the item's `title` and refuse when it doesn't match. Batch tools take `dry_run`, on by default. Every `write` and `destructive` call, including refused ones, is appended to `<vault>/logs/mcp-writes/YYYY-MM-DD.md`; `[mcp] write_log = "other/dir"` moves it and `write_log = false` turns it off.
+
 ## Contributor workflow notes
 
 - Prefer editing `src/plugin-schemas.js` when changing plugin-backed data fields.
