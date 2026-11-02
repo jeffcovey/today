@@ -117,15 +117,66 @@ describe('IMAP reader retries and folder cursors', () => {
     expect(result.metadata.folder_state.New).toBeUndefined();
   });
 
-  test('retains the cursor when a message cannot be parsed', async () => {
+  test.each([new Date('invalid'), undefined])('uses the internal date when the header date is %s and advances the cursor', async headerDate => {
+    const internalDate = new Date();
     jest.spyOn(client, 'fetch').mockImplementation(async function* () {
       yield {
-        uid: 10, internalDate: new Date(), flags: new Set(),
-        envelope: { date: new Date('invalid') }
+        uid: 10, internalDate, flags: new Set(),
+        envelope: { date: headerDate }
       };
     });
     const result = await read({ folders: 'INBOX' });
-    expect(result.metadata.folder_state.INBOX).toEqual(previous.INBOX);
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].date).toBe(internalDate.toISOString());
+    expect(result.metadata.folder_state.INBOX).toEqual({
+      uidValidity: 1, uidNext: 11, highestModseq: '30'
+    });
+    expect(result.metadata.errors).toEqual([]);
+  });
+
+  test.each([new Date('invalid'), undefined])('uses the current time when neither date is usable (%s)', async internalDate => {
+    jest.spyOn(client, 'fetch').mockImplementation(async function* () {
+      yield {
+        uid: 10, internalDate, flags: new Set(),
+        envelope: { date: new Date('invalid') }
+      };
+    });
+    const before = Date.now();
+    const result = await read({ folders: 'INBOX' });
+    const after = Date.now();
+    expect(result.entries).toHaveLength(1);
+    const date = Date.parse(result.entries[0].date);
+    expect(date).toBeGreaterThanOrEqual(before);
+    expect(date).toBeLessThanOrEqual(after);
+    expect(result.metadata.errors).toEqual([]);
+  });
+
+  test('prefers a valid header date over the internal date', async () => {
+    const headerDate = new Date('2007-01-04');
+    jest.spyOn(client, 'fetch').mockImplementation(async function* () {
+      yield {
+        uid: 10, internalDate: new Date(), flags: new Set(),
+        envelope: { date: headerDate }
+      };
+    });
+    const result = await read({ folders: 'INBOX' });
+    expect(result.entries[0].date).toBe(headerDate.toISOString());
+    expect(result.metadata.errors).toEqual([]);
+  });
+
+  test('logs and skips an unparseable message without holding back the cursor', async () => {
+    jest.spyOn(client, 'fetch').mockImplementation(async function* () {
+      yield {
+        uid: 10, internalDate: new Date(), flags: new Set(),
+        envelope: { to: {} }
+      };
+      yield { uid: 11, internalDate: new Date(), flags: new Set() };
+    });
+    const result = await read({ folders: 'INBOX' });
+    expect(result.entries.map(entry => entry.id)).toEqual(['INBOX:11']);
+    expect(result.metadata.folder_state.INBOX).toEqual({
+      uidValidity: 1, uidNext: 11, highestModseq: '30'
+    });
     expect(result.metadata.errors).toHaveLength(1);
     expect(result.metadata.errors[0]).toContain('Error parsing message 10');
   });

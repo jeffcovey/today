@@ -270,7 +270,6 @@ async function syncFolder(folderPath, isIncremental, lastState) {
     const lock = await client.getMailboxLock(folderPath);
     let folderCount = 0;
     let flagUpdateCount = 0;
-    let parseFailed = false;
     let syncType = 'full';
 
     try {
@@ -394,6 +393,9 @@ async function syncFolder(folderPath, isIncremental, lastState) {
           const fromAddr = envelope.from?.[0];
           const toAddrs = envelope.to || [];
           const ccAddrs = envelope.cc || [];
+          const date = [envelope.date, message.internalDate]
+            .map(value => value ? new Date(value) : null)
+            .find(value => value && !Number.isNaN(value.getTime())) || new Date();
 
           const emailId = `${folderPath}:${message.uid}`;
 
@@ -408,7 +410,7 @@ async function syncFolder(folderPath, isIncremental, lastState) {
               : null,
             reply_to: envelope.replyTo?.[0]?.address || null,
             subject: envelope.subject || '',
-            date: envelope.date ? envelope.date.toISOString() : new Date().toISOString(),
+            date: date.toISOString(),
             folder: folderPath,
             flags: JSON.stringify(flags),
             size: message.size || 0,
@@ -435,7 +437,6 @@ async function syncFolder(folderPath, isIncremental, lastState) {
           }
 
         } catch (parseError) {
-          parseFailed = true;
           metadata.errors.push(`Error parsing message ${message.uid}: ${parseError.message}`);
         }
       }
@@ -445,14 +446,12 @@ async function syncFolder(folderPath, isIncremental, lastState) {
         flagUpdateCount = applyFlagUpdates(sourceId, pendingFlagUpdates);
       }
 
-      // Only advance the cursor after the entire folder was read successfully.
-      if (!parseFailed) {
-        newFolderState[folderPath] = {
-          uidValidity: currentUidValidity,
-          uidNext: currentUidNext,
-          highestModseq: currentHighestModseq != null ? currentHighestModseq.toString() : null
-        };
-      }
+      // Advance after a completed fetch, even if individual messages were skipped.
+      newFolderState[folderPath] = {
+        uidValidity: currentUidValidity,
+        uidNext: currentUidNext,
+        highestModseq: currentHighestModseq != null ? currentHighestModseq.toString() : null
+      };
 
       metadata.folders_synced.push({
         folder: folderPath,
