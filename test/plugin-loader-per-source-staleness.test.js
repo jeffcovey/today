@@ -30,7 +30,8 @@ fs.writeFileSync(path.join(pluginDir, 'read.js'), `#!/usr/bin/env node
 import fs from 'fs';
 fs.appendFileSync(${JSON.stringify(marker)}, process.env.SOURCE_ID + '\\n');
 if (fs.existsSync(${JSON.stringify(noChange)})) {
-  console.log(JSON.stringify({ entries: [], files_processed: [], incremental: true }));
+  const metadata = JSON.parse(fs.readFileSync(${JSON.stringify(noChange)}, 'utf8') || '{}');
+  console.log(JSON.stringify({ entries: [], files_processed: [], incremental: true, metadata }));
   process.exit(0);
 }
 console.log(JSON.stringify({ entries: [{ id: process.env.SOURCE_ID + ':1', title: 'A task', status: 'open' }] }));
@@ -210,6 +211,37 @@ describe('per-source staleness', () => {
 
   test('a type with no enabled sources needs no sync', () => {
     expect(readSyncNeeded(createDb(), 'events')).toBe(false);
+  });
+
+  test('an empty read saves explicitly returned folder cursors without replacing other sync metadata', async () => {
+    const db = createDb();
+    synced(db, A, staleMinutes + 60);
+    const oldState = {
+      INBOX: { uidNext: 10, highestModseq: '20' },
+      Failed: { uidNext: 5, highestModseq: '8' }
+    };
+    const folder_state = {
+      ...oldState,
+      INBOX: { uidNext: 11, highestModseq: '30' }
+    };
+    db.prepare(`UPDATE sync_metadata SET last_sync_files = '["a.md"]', entries_count = 3, extra_data = ? WHERE source = ?`)
+      .run(JSON.stringify({ folder_state: oldState, config_fingerprint: 'kept' }), A);
+    const before = db.prepare('SELECT * FROM sync_metadata WHERE source = ?').get(A);
+    fs.writeFileSync(noChange, JSON.stringify({ folder_state }));
+    const { plugin, sourceName, config } = getReadSourcesForType('tasks').find(s => s.sourceId === A);
+
+    const result = await syncPluginSource(plugin, sourceName, config, { db, vaultPath: '/tmp/test-vault' }, {
+      skipWriteHooks: true, _caller: 'test'
+    });
+    expect(result.success).toBe(true);
+    const after = db.prepare('SELECT * FROM sync_metadata WHERE source = ?').get(A);
+    expect(after.last_synced_at).toBe(before.last_synced_at);
+    expect(after.last_sync_files).toBe(before.last_sync_files);
+    expect(after.entries_count).toBe(before.entries_count);
+    expect(JSON.parse(after.extra_data)).toMatchObject({
+      folder_state, config_fingerprint: 'kept', checked_at: expect.any(String)
+    });
+    db.close();
   });
 
   test('the "Last synced" hint goes by the oldest source', () => {

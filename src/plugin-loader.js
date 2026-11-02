@@ -824,15 +824,19 @@ function updateSyncMetadata(db, sourceId, filesProcessed, entriesCount, extraDat
  * "no changes" when it couldn't look (its directory is missing, #508), and
  * moving the cursor then would skip files restored with older mtimes. The
  * file list, row count and plugin state stay as the last full sync left
- * them, except the owed-hook markers (write_hooks_pending, auto_tag_pending),
- * which are set or cleared as owed says. A filtered re-read (keepWatermark)
- * records nothing.
+ * them, except explicitly returned folder cursors and the owed-hook markers
+ * (write_hooks_pending, auto_tag_pending), which are set or cleared as owed
+ * says. A filtered re-read (keepWatermark) records nothing.
  */
-function recordNoChangeSync(db, sourceId, syncStartedAt, { keepWatermark = false, owed = {} } = {}) {
+function recordNoChangeSync(db, sourceId, syncStartedAt, { keepWatermark = false, owed = {}, folderState } = {}) {
   if (keepWatermark) return;
   const stamp = syncStartedAt || db.prepare(`SELECT datetime('now') AS t`).get().t;
   const { write_hooks_pending: _hooks, auto_tag_pending: _tag, ...previous } = parseExtraData(getSyncMetadata(db, sourceId)?.extra_data) || {};
-  const next = withOwedHooks({ ...previous, checked_at: stamp }, owed);
+  const next = withOwedHooks({
+    ...previous,
+    ...(folderState ? { folder_state: folderState } : {}),
+    checked_at: stamp
+  }, owed);
   db.prepare(`INSERT OR IGNORE INTO sync_metadata (source) VALUES (?)`).run(sourceId);
   db.prepare(`UPDATE sync_metadata SET extra_data = ? WHERE source = ?`)
     .run(JSON.stringify(next), sourceId);
@@ -1175,7 +1179,7 @@ async function _syncPluginSourceInner(plugin, sourceName, sourceConfig, context,
     } else {
       // Nothing changed, but the read succeeded: the source is fresh as of
       // this sync, or readSyncNeeded keeps taking it as stale.
-      recordNoChangeSync(db, sourceId, syncStartedAt, { keepWatermark, owed });
+      recordNoChangeSync(db, sourceId, syncStartedAt, { keepWatermark, owed, folderState: pluginMetadata?.folder_state });
       message = `${pluginMetadata?.message || 'No changes since last sync'}${hintMsg}${warningMsg}${reconcileMsg}`;
     }
     if (runOwedHooks) {

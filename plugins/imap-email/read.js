@@ -24,6 +24,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import Database from 'better-sqlite3';
 import { isWithinSyncWindow, reconcileFolder, searchSince } from './reconcile.js';
+import { getPendingBodies } from './body-queue.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -205,7 +206,7 @@ const sinceDate = new Date();
 sinceDate.setDate(sinceDate.getDate() - daysToSync);
 
 const entries = [];
-const emailsNeedingBodies = []; // Track for background fetch
+let emailsNeedingBodies = []; // Track for background fetch
 const metadata = {
   folders_synced: [],
   total_fetched: 0,
@@ -269,6 +270,7 @@ async function syncFolder(folderPath, isIncremental, lastState) {
     const lock = await client.getMailboxLock(folderPath);
     let folderCount = 0;
     let flagUpdateCount = 0;
+    let parseFailed = false;
     let syncType = 'full';
 
     try {
@@ -352,13 +354,6 @@ async function syncFolder(folderPath, isIncremental, lastState) {
         }
       }
 
-      // Store new folder state (including highestModseq for CONDSTORE)
-      newFolderState[folderPath] = {
-        uidValidity: currentUidValidity,
-        uidNext: currentUidNext,
-        highestModseq: currentHighestModseq != null ? currentHighestModseq.toString() : null
-      };
-
       // Use the appropriate range/criteria for the fetch
       const fetchTarget = fetchRange || fetchSearchCriteria;
 
@@ -440,6 +435,7 @@ async function syncFolder(folderPath, isIncremental, lastState) {
           }
 
         } catch (parseError) {
+          parseFailed = true;
           metadata.errors.push(`Error parsing message ${message.uid}: ${parseError.message}`);
         }
       }
@@ -447,6 +443,15 @@ async function syncFolder(folderPath, isIncremental, lastState) {
       // Apply CONDSTORE flag updates for existing messages
       if (pendingFlagUpdates.length > 0) {
         flagUpdateCount = applyFlagUpdates(sourceId, pendingFlagUpdates);
+      }
+
+      // Only advance the cursor after the entire folder was read successfully.
+      if (!parseFailed) {
+        newFolderState[folderPath] = {
+          uidValidity: currentUidValidity,
+          uidNext: currentUidNext,
+          highestModseq: currentHighestModseq != null ? currentHighestModseq.toString() : null
+        };
       }
 
       metadata.folders_synced.push({
@@ -480,6 +485,7 @@ async function main() {
     // Load prior folder state even for a full sync: it carries the UIDVALIDITY
     // that says whether cached UIDs can still be compared against the server's.
     previousFolderState = getFolderState(sourceId);
+    Object.assign(newFolderState, previousFolderState);
     if (isIncremental) {
       metadata.incremental = true;
     }
@@ -538,7 +544,14 @@ async function main() {
       console.error(`✓ Removed ${metadata.total_expunged} cached emails no longer on the server`);
     }
 
-    // Launch background body fetch if needed (only for emails without bodies)
+    if (includeBody) {
+      const projectRoot = process.env.PROJECT_ROOT || process.cwd();
+      emailsNeedingBodies = getPendingBodies(
+        path.join(projectRoot, '.data', 'today.db'), sourceId, emailsNeedingBodies
+      );
+    }
+
+    // Launch background body fetch if needed (including retries from earlier syncs)
     if (includeBody && emailsNeedingBodies.length > 0) {
       metadata.bodies_pending = emailsNeedingBodies.length;
 
