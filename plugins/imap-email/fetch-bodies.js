@@ -165,10 +165,14 @@ async function main() {
 
     // Process folders in order (emails are already sorted by size overall)
     for (const [folder, emailList] of Object.entries(byFolder)) {
-      console.error(`  ${folder}: ${emailList.length} emails...`);
-      const fetched = await fetchBodiesForFolder(folder, emailList);
-      totalFetched += fetched;
-      console.error(`    ✓ ${fetched} bodies fetched`);
+      try {
+        console.error(`  ${folder}: ${emailList.length} emails...`);
+        const fetched = await fetchBodiesForFolder(folder, emailList);
+        totalFetched += fetched;
+        console.error(`    ✓ ${fetched} bodies fetched`);
+      } catch (error) {
+        console.error(`  Failed to fetch folder ${folder}: ${error.message}`);
+      }
     }
 
     await client.logout();

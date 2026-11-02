@@ -23,7 +23,8 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import Database from 'better-sqlite3';
-import { reconcileFolder, searchSince } from './reconcile.js';
+import { isWithinSyncWindow, reconcileFolder, searchSince } from './reconcile.js';
+import { getPendingBodies } from './body-queue.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -65,49 +66,6 @@ function isBackgroundFetcherRunning() {
   }
 
   return false;
-}
-
-// Get existing email data (including bodies) to avoid re-fetching and preserve content
-function getExistingEmailData(sourceId) {
-  const projectRoot = process.env.PROJECT_ROOT || process.cwd();
-  const dbPath = path.join(projectRoot, '.data', 'today.db');
-
-  try {
-    const db = new Database(dbPath, { readonly: true, timeout: 5000 });
-    db.pragma('busy_timeout = 5000');
-
-    // Get emails that already have bodies fetched, including their content
-    const existing = db.prepare(`
-      SELECT id, snippet, text_content, html_content, attachments
-      FROM email
-      WHERE source = ?
-        AND (json_extract(metadata, '$.needs_body') = false
-             OR text_content IS NOT NULL)
-    `).all(sourceId);
-
-    db.close();
-
-    // Return map of IDs (without source prefix) to their body content
-    // IDs in DB are like: "imap-email/icloud:INBOX:12345"
-    // We need to extract: "INBOX:12345"
-    const emailMap = new Map();
-    const prefix = sourceId + ':';
-    for (const row of existing) {
-      if (row.id.startsWith(prefix)) {
-        const localId = row.id.substring(prefix.length);
-        emailMap.set(localId, {
-          snippet: row.snippet,
-          text_content: row.text_content,
-          html_content: row.html_content,
-          attachments: row.attachments
-        });
-      }
-    }
-    return emailMap;
-  } catch (err) {
-    // Database might not exist yet on first run
-    return new Map();
-  }
 }
 
 // Get stored folder state from sync_metadata
@@ -248,19 +206,16 @@ const sinceDate = new Date();
 sinceDate.setDate(sinceDate.getDate() - daysToSync);
 
 const entries = [];
-const emailsNeedingBodies = []; // Track for background fetch
+let emailsNeedingBodies = []; // Track for background fetch
 const metadata = {
   folders_synced: [],
   total_fetched: 0,
   total_expunged: 0,
   bodies_pending: 0,
-  bodies_skipped: 0,
+  skipped_outside_window: 0,
   errors: [],
   incremental: false
 };
-
-// Will be populated with emails that already have bodies fetched (Map of id -> body content)
-let existingEmails = new Map();
 
 // Folder state for incremental sync
 let previousFolderState = {};
@@ -365,7 +320,7 @@ async function syncFolder(folderPath, isIncremental, lastState) {
           console.error(`  📁 ${folderPath} (CONDSTORE, modseq changed)...`);
         } else if (hasNewMessages) {
           // No CONDSTORE (or modseq unchanged - fallback): fetch only new messages by UID
-          fetchSearchCriteria = { uid: `${lastState.uidNext}:*` };
+          fetchSearchCriteria = { uid: `${lastState.uidNext}:*`, since: sinceDate };
           syncType = 'incremental';
           console.error(`  📁 ${folderPath} (new: ${currentUidNext - lastState.uidNext})...`);
         } else {
@@ -398,13 +353,6 @@ async function syncFolder(folderPath, isIncremental, lastState) {
         }
       }
 
-      // Store new folder state (including highestModseq for CONDSTORE)
-      newFolderState[folderPath] = {
-        uidValidity: currentUidValidity,
-        uidNext: currentUidNext,
-        highestModseq: currentHighestModseq != null ? currentHighestModseq.toString() : null
-      };
-
       // Use the appropriate range/criteria for the fetch
       const fetchTarget = fetchRange || fetchSearchCriteria;
 
@@ -414,7 +362,8 @@ async function syncFolder(folderPath, isIncremental, lastState) {
         {
           envelope: true,
           flags: true,
-          size: true
+          size: true,
+          internalDate: true
           // NOT fetching source - that's slow
         },
         fetchOptions
@@ -433,14 +382,22 @@ async function syncFolder(folderPath, isIncremental, lastState) {
             continue;
           }
 
+          // CHANGEDSINCE can't be combined with SINCE, and a bulk import delivers
+          // old mail under new UIDs, so the window has to be enforced here too.
+          if (!isWithinSyncWindow(message.internalDate, sinceDate)) {
+            metadata.skipped_outside_window++;
+            continue;
+          }
+
           const envelope = message.envelope || {};
           const fromAddr = envelope.from?.[0];
           const toAddrs = envelope.to || [];
           const ccAddrs = envelope.cc || [];
+          const date = [envelope.date, message.internalDate]
+            .map(value => value ? new Date(value) : null)
+            .find(value => value && !Number.isNaN(value.getTime())) || new Date();
 
           const emailId = `${folderPath}:${message.uid}`;
-          const existingData = existingEmails.get(emailId);
-          const hasBody = !!existingData;
 
           const entry = {
             id: emailId,
@@ -453,34 +410,30 @@ async function syncFolder(folderPath, isIncremental, lastState) {
               : null,
             reply_to: envelope.replyTo?.[0]?.address || null,
             subject: envelope.subject || '',
-            date: envelope.date ? envelope.date.toISOString() : new Date().toISOString(),
+            date: date.toISOString(),
             folder: folderPath,
             flags: JSON.stringify(flags),
             size: message.size || 0,
-            // Preserve existing body content if already fetched
-            snippet: existingData?.snippet || null,
-            text_content: existingData?.text_content || null,
-            html_content: existingData?.html_content || null,
-            attachments: existingData?.attachments || null,
+            snippet: null,
+            text_content: null,
+            html_content: null,
+            attachments: null,
             metadata: JSON.stringify({
               uid: message.uid,
               modseq: message.modseq ? message.modseq.toString() : null,
-              needs_body: includeBody && !hasBody  // Don't mark as needing body if already fetched
+              needs_body: includeBody
             })
           };
 
           entries.push(entry);
           folderCount++;
 
-          // Track for background body fetch (only if body not already fetched)
-          if (includeBody && !hasBody) {
+          if (includeBody) {
             emailsNeedingBodies.push({
               folder: folderPath,
               uid: message.uid,
               size: message.size || 0
             });
-          } else if (includeBody && hasBody) {
-            metadata.bodies_skipped++;
           }
 
         } catch (parseError) {
@@ -492,6 +445,13 @@ async function syncFolder(folderPath, isIncremental, lastState) {
       if (pendingFlagUpdates.length > 0) {
         flagUpdateCount = applyFlagUpdates(sourceId, pendingFlagUpdates);
       }
+
+      // Advance after a completed fetch, even if individual messages were skipped.
+      newFolderState[folderPath] = {
+        uidValidity: currentUidValidity,
+        uidNext: currentUidNext,
+        highestModseq: currentHighestModseq != null ? currentHighestModseq.toString() : null
+      };
 
       metadata.folders_synced.push({
         folder: folderPath,
@@ -524,15 +484,11 @@ async function main() {
     // Load prior folder state even for a full sync: it carries the UIDVALIDITY
     // that says whether cached UIDs can still be compared against the server's.
     previousFolderState = getFolderState(sourceId);
+    Object.assign(newFolderState, previousFolderState);
     if (isIncremental) {
       metadata.incremental = true;
     }
 
-    // Check which emails already have bodies to avoid re-fetching
-    existingEmails = getExistingEmailData(sourceId);
-    if (existingEmails.size > 0 && !isIncremental) {
-      console.error(`  Found ${existingEmails.size} emails with bodies already fetched`);
-    }
 
     console.error(`Connecting to ${host}...`);
     await client.connect();
@@ -587,7 +543,14 @@ async function main() {
       console.error(`✓ Removed ${metadata.total_expunged} cached emails no longer on the server`);
     }
 
-    // Launch background body fetch if needed (only for emails without bodies)
+    if (includeBody) {
+      const projectRoot = process.env.PROJECT_ROOT || process.cwd();
+      emailsNeedingBodies = getPendingBodies(
+        path.join(projectRoot, '.data', 'today.db'), sourceId, emailsNeedingBodies
+      );
+    }
+
+    // Launch background body fetch if needed (including retries from earlier syncs)
     if (includeBody && emailsNeedingBodies.length > 0) {
       metadata.bodies_pending = emailsNeedingBodies.length;
 
@@ -595,9 +558,6 @@ async function main() {
       const existingFetcher = isBackgroundFetcherRunning();
       if (existingFetcher && existingFetcher.running) {
         console.error(`  ⏳ Background fetcher already running (PID ${existingFetcher.pid}) - skipping new fetch`);
-        if (metadata.bodies_skipped > 0) {
-          console.error(`  ✓ Skipped ${metadata.bodies_skipped} emails (bodies already fetched)`);
-        }
         metadata.bodies_pending = 0; // Don't report pending since we're not starting a new fetch
       } else {
         // Sort by size (smallest first) for faster initial results
@@ -621,12 +581,7 @@ async function main() {
         bgProcess.unref();
 
         console.error(`  📥 Fetching ${emailsNeedingBodies.length} NEW bodies in background (smallest first)`);
-        if (metadata.bodies_skipped > 0) {
-          console.error(`  ✓ Skipped ${metadata.bodies_skipped} emails (bodies already fetched)`);
-        }
       }
-    } else if (includeBody && metadata.bodies_skipped > 0) {
-      console.error(`  ✓ All ${metadata.bodies_skipped} email bodies already fetched`);
     }
 
     // Store folder state for next incremental sync
