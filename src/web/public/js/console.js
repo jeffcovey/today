@@ -9,10 +9,28 @@
   const socketPath = (document.currentScript && document.currentScript.dataset.socketPath) || '/_console/socket';
   const socketUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + socketPath;
 
+  // xterm.js has one set of these for both modes, and it can't read well on both.
+  // minimumContrastRatio would be simpler, but it greys out reverse-video text.
+  const ANSI_COLORS = {
+    light: {
+      black: '#24292f', red: '#b42318', green: '#116329', yellow: '#6f4e00',
+      blue: '#0550ae', magenta: '#6639ba', cyan: '#0b6b73', white: '#57606a',
+      brightBlack: '#57606a', brightRed: '#a40e26', brightGreen: '#17703a', brightYellow: '#7d4e00',
+      brightBlue: '#0860ca', brightMagenta: '#7443d0', brightCyan: '#17727a', brightWhite: '#424a53'
+    },
+    dark: {
+      black: '#7d8590', red: '#ff7b72', green: '#3fb950', yellow: '#d29922',
+      blue: '#58a6ff', magenta: '#bc8cff', cyan: '#39c5cf', white: '#b1bac4',
+      brightBlack: '#8b949e', brightRed: '#ffa198', brightGreen: '#56d364', brightYellow: '#e3b341',
+      brightBlue: '#79c0ff', brightMagenta: '#d2a8ff', brightCyan: '#56d4dd', brightWhite: '#f0f6fc'
+    }
+  };
+
   // The terminal takes its colours from the page's code-block tokens, so it
   // follows the palette and the light/dark switch like everything else.
   const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const themeFromPage = () => ({
+    ...(document.documentElement.dataset.theme === 'dark' ? ANSI_COLORS.dark : ANSI_COLORS.light),
     background: cssVar('--today-code-block-bg') || '#0d1117',
     foreground: cssVar('--today-code-block-text') || '#e6edf3',
     cursor: cssVar('--today-accent') || '#60a5fa',
