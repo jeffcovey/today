@@ -523,6 +523,10 @@ describe('terminal colors', () => {
     return (high + 0.05) / (low + 0.05);
   };
 
+  test('dark black reads on dark green for the tmux status bar', () => {
+    expect(contrast(ansi.dark.black, ansi.dark.green)).toBeGreaterThanOrEqual(4.5);
+  });
+
   test.each([['light', lightBg], ['dark', darkBg]])('every %s color reads on its background', (mode, bg) => {
     expect(Object.keys(ansi[mode])).toHaveLength(16);
     for (const [name, color] of Object.entries(ansi[mode])) {
