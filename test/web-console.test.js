@@ -526,6 +526,8 @@ describe('terminal colors', () => {
   test.each([['light', lightBg], ['dark', darkBg]])('every %s color reads on its background', (mode, bg) => {
     expect(Object.keys(ansi[mode])).toHaveLength(16);
     for (const [name, color] of Object.entries(ansi[mode])) {
+      // Black on dark has to stay dark, because programs put it on bright backgrounds.
+      if (mode === 'dark' && name === 'black') continue;
       expect([name, contrast(color, bg) >= 4.5]).toEqual([name, true]);
     }
   });
