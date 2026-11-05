@@ -19,7 +19,7 @@
       brightBlue: '#0860ca', brightMagenta: '#7443d0', brightCyan: '#17727a', brightWhite: '#424a53'
     },
     dark: {
-      black: '#7d8590', red: '#ff7b72', green: '#3fb950', yellow: '#d29922',
+      black: '#21262d', red: '#ff7b72', green: '#3fb950', yellow: '#d29922',
       blue: '#58a6ff', magenta: '#bc8cff', cyan: '#39c5cf', white: '#b1bac4',
       brightBlack: '#8b949e', brightRed: '#ffa198', brightGreen: '#56d364', brightYellow: '#e3b341',
       brightBlue: '#79c0ff', brightMagenta: '#d2a8ff', brightCyan: '#56d4dd', brightWhite: '#f0f6fc'
