@@ -9,7 +9,7 @@ import {
 } from './pomodoro.js';
 import { loadTimerState, writeTimerState } from './timer-state-store.js';
 import { getRecentTimerDescriptions, renderRecentTimers } from './recent-timers.js';
-import { readInboxSession } from './inbox-session.js';
+import { INBOX_SESSION_MAX_HOURS, readInboxSession } from './inbox-session.js';
 import express from 'express';
 import session from 'express-session';
 import Database from 'better-sqlite3';
@@ -37,7 +37,7 @@ import { getMarkdownFileCache } from './markdown-file-cache.js';
 import { getAbsoluteVaultPath, getAppDirectory, getConfig, getPublicBaseUrl, getVaultPath } from './config.js';
 import { formatDate, formatDisplayDate, getDayName, getTodayDate } from './date-utils.js';
 import { RECURRENCE_TERMINATOR_PATTERN, toggleTaskInLines } from './task-toggle.js';
-import { isPluginConfigured, getPluginSources } from './plugin-loader.js';
+import { isPluginConfigured, getPluginSources, getPlugin, applyPluginSettingsDefaults } from './plugin-loader.js';
 import { createAiCommitMessageHandler } from './git-ai-commit-message-route.js';
 import { runTrackCommand } from './track-command.js';
 import {
@@ -1584,8 +1584,10 @@ async function getInboxSessionWidget() {
 
   let session;
   try {
-    const inboxDir = path.resolve(__dirname, '..', source.config.inbox_directory || `${getVaultPath()}/inbox`);
-    session = await readInboxSession(inboxDir, { dedupWindowSeconds: source.config.dedup_window_seconds });
+    const plugin = await getPlugin('inbox-processing');
+    const config = applyPluginSettingsDefaults(plugin, source.config);
+    const inboxDir = path.join(__dirname, '..', config.inbox_directory || `${getVaultPath()}/inbox`);
+    session = await readInboxSession(inboxDir, { dedupWindowSeconds: config.dedup_window_seconds });
   } catch (error) {
     console.error('Could not read inbox session:', error.message);
     return '';
@@ -1601,12 +1603,13 @@ async function getInboxSessionWidget() {
     hour12: true,
     timeZone: getConfiguredTimezone()
   });
+  const expires = new Date(session.startTime.getTime() + INBOX_SESSION_MAX_HOURS * 3600000).toISOString();
 
   return timerCard({
     key: 'inbox-session',
     classes: 'family-time',
     extraClass: 'timer-card-grow',
-    attrs: ` data-timer-start="${session.startTime.toISOString()}"`,
+    attrs: ` data-timer-start="${session.startTime.toISOString()}" data-timer-expiry="${expires}"`,
     emoji: EMOJI_INBOX_SESSION,
     title: escapeHtmlEntities(session.description || 'Session'),
     clock: `<span class="timer-duration">${hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`}</span>`,

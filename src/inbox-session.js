@@ -33,15 +33,24 @@ export function findInboxSession(markers, {
   maxHours = INBOX_SESSION_MAX_HOURS
 } = {}) {
   const sorted = [...markers].sort((a, b) => a.time - b.time);
-  const latest = sorted.at(-1);
-  if (latest?.action !== 'Start') return null;
+  const grouped = [];
+  for (const marker of sorted) {
+    const representative = grouped.find(existing =>
+      existing.action === marker.action &&
+      existing.description === marker.description &&
+      Math.abs(marker.time - existing.time) / 1000 <= dedupWindowSeconds
+    );
+    if (!representative) {
+      grouped.push({ ...marker });
+    } else if (marker.action === 'Stop' && marker.time > representative.time) {
+      representative.time = marker.time;
+    }
+  }
 
-  // Several devices fire the same Start; the session began at the first.
-  const startTime = sorted.find(marker =>
-    marker.action === 'Start' &&
-    marker.description === latest.description &&
-    (latest.time - marker.time) / 1000 <= dedupWindowSeconds
-  ).time;
+  grouped.sort((a, b) => a.time - b.time);
+  const latest = grouped.at(-1);
+  if (latest?.action !== 'Start') return null;
+  const startTime = latest.time;
 
   if (now - startTime > maxHours * 3600000) return null;
   return { description: latest.description, startTime };
@@ -56,11 +65,35 @@ export async function readInboxSession(inboxDir, options) {
     throw error;
   }
 
-  const contents = await Promise.all(
-    filenames
-      .filter(name => name.startsWith('time-tracking-') && (name.endsWith('.txt') || name.endsWith('.md')))
-      // The plugin can trash a marker between the listing and the read.
-      .map(name => fs.readFile(path.join(inboxDir, name), 'utf8').catch(() => ''))
-  );
+  const markerPaths = markerFilePaths(inboxDir, filenames);
+  const trashDir = path.join(inboxDir, '.trash');
+  try {
+    const trashEntries = await fs.readdir(trashDir, { withFileTypes: true });
+    const trashDirectories = trashEntries
+      .filter(entry => entry.isDirectory())
+      .map(entry => path.join(trashDir, entry.name));
+    const trashFiles = await Promise.all(trashDirectories.map(async directory => {
+      try {
+        return markerFilePaths(directory, await fs.readdir(directory));
+      } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+      }
+    }));
+    markerPaths.push(...trashFiles.flat());
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+
+  const contents = await Promise.all(markerPaths.map(filePath =>
+    // The plugin can trash a marker between listing and reading.
+    fs.readFile(filePath, 'utf8').catch(() => '')
+  ));
   return findInboxSession(contents.map(parseMarker).filter(Boolean), options);
+}
+
+function markerFilePaths(directory, filenames) {
+  return filenames
+    .filter(name => name.startsWith('time-tracking-') && (name.endsWith('.txt') || name.endsWith('.md')))
+    .map(name => path.join(directory, name));
 }

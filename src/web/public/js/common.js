@@ -462,6 +462,12 @@ window.addEventListener('resize', () => {
 // Timer functionality
 function updateTimerDuration() {
   for (const timerCard of document.querySelectorAll('[data-timer-start]')) {
+    const expiresAt = timerCard.dataset.timerExpiry;
+    if (expiresAt && Date.now() > new Date(expiresAt).getTime()) {
+      timerCard.remove();
+      continue;
+    }
+
     const durationSpan = timerCard.querySelector('.timer-duration');
     if (!durationSpan) continue;
 

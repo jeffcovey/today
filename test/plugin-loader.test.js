@@ -25,6 +25,7 @@ const { getFullConfig } = await import('../src/config.js');
 const {
   discoverPlugins,
   getPluginSources,
+  applyPluginSettingsDefaults,
   getEnabledPlugins,
   getPluginAccess,
   tryAcquireSyncLock,
@@ -179,6 +180,21 @@ describe('Plugin Loader', () => {
 
       expect(sources).toHaveLength(1);
       expect(sources[0].sourceName).toBe('local');
+    });
+  });
+
+  describe('applyPluginSettingsDefaults', () => {
+    test('uses plugin defaults unless the source config overrides them', () => {
+      const plugin = {
+        settings: {
+          inbox_directory: { default: 'vault/inbox' },
+          dedup_window_seconds: { default: 30 }
+        }
+      };
+      expect(applyPluginSettingsDefaults(plugin, { dedup_window_seconds: 45 })).toEqual({
+        inbox_directory: 'vault/inbox',
+        dedup_window_seconds: 45
+      });
     });
   });
 

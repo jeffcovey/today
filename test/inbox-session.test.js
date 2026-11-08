@@ -61,6 +61,15 @@ describe('findInboxSession', () => {
     expect(session.startTime).toEqual(new Date('2026-11-08T17:32:42Z'));
   });
 
+  test('groups Starts chronologically against each earliest representative', () => {
+    const session = findInboxSession([
+      marker('Start', '2026-11-08T17:00:00Z'),
+      marker('Start', '2026-11-08T17:00:20Z'),
+      marker('Start', '2026-11-08T17:00:40Z')
+    ], { now, dedupWindowSeconds: 30 });
+    expect(session.startTime).toEqual(new Date('2026-11-08T17:00:40Z'));
+  });
+
   test('a different activity moments earlier is not a duplicate', () => {
     const session = findInboxSession([
       marker('Start', '2026-11-08T17:32:42Z', 'Reviews'),
@@ -104,6 +113,16 @@ describe('readInboxSession', () => {
       description: 'Hosting',
       startTime: new Date('2026-11-08T17:32:42Z')
     });
+  });
+
+  test('a trashed Start/Stop pair prevents an older inbox Start from returning', async () => {
+    fs.writeFileSync(path.join(dir, 'time-tracking-a.txt'), 'Start\n2026-11-08T17:00:00Z\nReviews\n');
+    const trashDir = path.join(dir, '.trash', '2026-11-08');
+    fs.mkdirSync(trashDir, { recursive: true });
+    fs.writeFileSync(path.join(trashDir, 'time-tracking-b-start.txt'), 'Start\n2026-11-08T17:30:00Z\nHosting\n');
+    fs.writeFileSync(path.join(trashDir, 'time-tracking-b-stop.txt'), 'Stop\n2026-11-08T17:45:00Z\nHosting\n');
+
+    expect(await readInboxSession(dir, { now })).toBeNull();
   });
 
   test('a missing inbox is no session', async () => {

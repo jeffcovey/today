@@ -92,4 +92,14 @@ describe('the inbox session card', () => {
     const ticker = commonSource.slice(commonSource.indexOf('function updateTimerDuration'));
     expect(ticker).toMatch(/^function updateTimerDuration\(\) \{\n\s+for \(const \w+ of document\.querySelectorAll\('\[data-timer-start\]'\)\)/);
   });
+
+  test('the browser removes an expired inbox session without stopping other clocks', () => {
+    const ticker = commonSource.slice(commonSource.indexOf('function updateTimerDuration'));
+    expect(ticker).toContain('timerCard.dataset.timerExpiry');
+    expect(ticker).toContain('timerCard.remove()');
+    expect(ticker).toContain('continue;');
+    const source = widgetSource('getInboxSessionWidget');
+    expect(source).toContain('INBOX_SESSION_MAX_HOURS');
+    expect(source).toContain('data-timer-expiry="${expires}"');
+  });
 });
