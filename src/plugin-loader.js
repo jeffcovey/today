@@ -241,6 +241,18 @@ export async function getPlugin(name) {
   return plugins.get(name) || null;
 }
 
+export function applyPluginSettingsDefaults(plugin, sourceConfig = {}) {
+  const settingsDefaults = {};
+  if (plugin?.settings) {
+    for (const [key, def] of Object.entries(plugin.settings)) {
+      if (def.default !== undefined) {
+        settingsDefaults[key] = def.default;
+      }
+    }
+  }
+  return { ...settingsDefaults, ...sourceConfig };
+}
+
 /**
  * Determine if we should offer to update a file based on content similarity
  * @param {string} srcContent - New skeleton/template content
@@ -429,16 +441,7 @@ async function runPluginCommand(plugin, command, sourceConfig, extraEnv = {}, so
     return { success: false, error: `Command not found: ${fullPath}` };
   }
 
-  // Apply plugin.toml settings defaults, then user config overrides
-  const settingsDefaults = {};
-  if (plugin.settings) {
-    for (const [key, def] of Object.entries(plugin.settings)) {
-      if (def.default !== undefined) {
-        settingsDefaults[key] = def.default;
-      }
-    }
-  }
-  const mergedConfig = { ...settingsDefaults, ...sourceConfig };
+  const mergedConfig = applyPluginSettingsDefaults(plugin, sourceConfig);
 
   // Inject decrypted values for encrypted settings
   const configWithSecrets = sourceName
@@ -535,16 +538,7 @@ export function runInteractivePluginCommand(plugin, command, sourceConfig, extra
     return { success: false, error: `Command not found: ${fullPath}` };
   }
 
-  // Apply plugin.toml settings defaults, then user config overrides
-  const settingsDefaults = {};
-  if (plugin.settings) {
-    for (const [key, def] of Object.entries(plugin.settings)) {
-      if (def.default !== undefined) {
-        settingsDefaults[key] = def.default;
-      }
-    }
-  }
-  const mergedConfig = { ...settingsDefaults, ...sourceConfig };
+  const mergedConfig = applyPluginSettingsDefaults(plugin, sourceConfig);
 
   // Inject decrypted values for encrypted settings
   const configWithSecrets = sourceName
@@ -1695,15 +1689,7 @@ export async function getPluginDataForAI() {
         : null;
 
       // Build config values: plugin settings defaults, then user overrides
-      const settingsDefaults = {};
-      if (plugin.settings) {
-        for (const [key, def] of Object.entries(plugin.settings)) {
-          if (def.default !== undefined) {
-            settingsDefaults[key] = def.default;
-          }
-        }
-      }
-      const mergedConfig = { ...settingsDefaults, ...config };
+      const mergedConfig = applyPluginSettingsDefaults(plugin, config);
 
       // Interpolate {variable} placeholders in aiInstructions with config values
       let aiInstructions = plugin.aiInstructions || null;
