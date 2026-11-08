@@ -9,6 +9,7 @@ import {
 } from './pomodoro.js';
 import { loadTimerState, writeTimerState } from './timer-state-store.js';
 import { getRecentTimerDescriptions, renderRecentTimers } from './recent-timers.js';
+import { readInboxSession } from './inbox-session.js';
 import express from 'express';
 import session from 'express-session';
 import Database from 'better-sqlite3';
@@ -1573,6 +1574,45 @@ const timerEmoji = (glyph, extraClass = '') =>
 const EMOJI_FOCUS = '\u{1F3AF}';
 const EMOJI_TASKS = '\u{1F4CB}';
 const EMOJI_POMODORO = '\u{1F345}';
+const EMOJI_INBOX_SESSION = '\u{1F4F1}';
+
+// Empty unless a phone automation's session is under way. Read-only: the phone
+// that started it is what ends it.
+async function getInboxSessionWidget() {
+  const [source] = getPluginSources('inbox-processing');
+  if (!source) return '';
+
+  let session;
+  try {
+    const inboxDir = path.resolve(__dirname, '..', source.config.inbox_directory || `${getVaultPath()}/inbox`);
+    session = await readInboxSession(inboxDir, { dedupWindowSeconds: source.config.dedup_window_seconds });
+  } catch (error) {
+    console.error('Could not read inbox session:', error.message);
+    return '';
+  }
+  if (!session) return '';
+
+  const elapsedMinutes = Math.max(0, Math.floor((Date.now() - session.startTime) / 60000));
+  const hours = Math.floor(elapsedMinutes / 60);
+  const minutes = elapsedMinutes % 60;
+  const started = session.startTime.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: getConfiguredTimezone()
+  });
+
+  return timerCard({
+    key: 'inbox-session',
+    classes: 'family-time',
+    extraClass: 'timer-card-grow',
+    attrs: ` data-timer-start="${session.startTime.toISOString()}"`,
+    emoji: EMOJI_INBOX_SESSION,
+    title: escapeHtmlEntities(session.description || 'Session'),
+    clock: `<span class="timer-duration">${hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`}</span>`,
+    detail: `<small>Started at ${started}</small>`
+  });
+}
 
 function getPomodoroWidget() {
   const config = getPomodoroConfig();
@@ -1680,12 +1720,13 @@ function getPomodoroWidget() {
 async function getActivityBar({ timer }) {
   const taskTimerHtml = await getTaskTimerWidget();
   const pomodoroHtml = getPomodoroWidget();
+  const inboxSessionHtml = await getInboxSessionWidget();
 
-  // All three on one row, each a card that is one line until you tap it and
+  // All of them on one row, each a card that is one line until you tap it and
   // looks the same whether it is running or not. There is no banner/pill split
   // to decide any more: the state is in the text and the clock, not in two
   // different shapes.
-  const rowed = [getTimerWidget(timer, getRecentTimersFor(timer)), taskTimerHtml, pomodoroHtml].filter(Boolean);
+  const rowed = [inboxSessionHtml, getTimerWidget(timer, getRecentTimersFor(timer)), taskTimerHtml, pomodoroHtml].filter(Boolean);
 
   return `
     <div class="activity-bar mb-3">

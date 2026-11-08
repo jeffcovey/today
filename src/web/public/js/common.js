@@ -461,19 +461,15 @@ window.addEventListener('resize', () => {
 
 // Timer functionality
 function updateTimerDuration() {
-  const timerAlert = document.querySelector('[data-timer-start]');
-  if (!timerAlert) return;
+  for (const timerCard of document.querySelectorAll('[data-timer-start]')) {
+    const durationSpan = timerCard.querySelector('.timer-duration');
+    if (!durationSpan) continue;
 
-  const startTime = new Date(timerAlert.dataset.timerStart);
-  const now = new Date();
-  const diff = Math.floor((now - startTime) / 1000);
+    const diff = Math.floor((new Date() - new Date(timerCard.dataset.timerStart)) / 1000);
+    const hours = Math.floor(diff / 3600);
+    const minutes = Math.floor((diff % 3600) / 60);
+    const seconds = diff % 60;
 
-  const hours = Math.floor(diff / 3600);
-  const minutes = Math.floor((diff % 3600) / 60);
-  const seconds = diff % 60;
-
-  const durationSpan = timerAlert.querySelector('.timer-duration');
-  if (durationSpan) {
     if (hours > 0) {
       durationSpan.textContent = `${hours}h ${minutes}m ${seconds}s`;
     } else if (minutes > 0) {
