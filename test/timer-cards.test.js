@@ -75,3 +75,31 @@ describe('every control that starts or stops a clock is marked', () => {
     expect(widgetSource('pomodoroButton')).toContain('data-timer-action="${action}"');
   });
 });
+
+describe('the inbox session card', () => {
+  test('comes first in the row', () => {
+    expect(webServerSource).toMatch(/const rowed = \[inboxSessionHtml, getTimerWidget\(/);
+  });
+
+  test('has no controls', () => {
+    const source = widgetSource('getInboxSessionWidget');
+    expect(source).toContain('timerCard(');
+    expect(source).not.toContain('data-timer-action');
+    expect(source).not.toContain('fetch(');
+  });
+
+  test('every running clock ticks, not only the first on the page', () => {
+    const ticker = commonSource.slice(commonSource.indexOf('function updateTimerDuration'));
+    expect(ticker).toMatch(/^function updateTimerDuration\(\) \{\n\s+for \(const \w+ of document\.querySelectorAll\('\[data-timer-start\]'\)\)/);
+  });
+
+  test('the browser removes an expired inbox session without stopping other clocks', () => {
+    const ticker = commonSource.slice(commonSource.indexOf('function updateTimerDuration'));
+    expect(ticker).toContain('timerCard.dataset.timerExpiry');
+    expect(ticker).toContain('timerCard.remove()');
+    expect(ticker).toContain('continue;');
+    const source = widgetSource('getInboxSessionWidget');
+    expect(source).toContain('INBOX_SESSION_MAX_HOURS');
+    expect(source).toContain('data-timer-expiry="${expires}"');
+  });
+});
