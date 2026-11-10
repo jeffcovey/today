@@ -132,7 +132,7 @@ export function learnFromFolders(candidates) {
  * Decide what to do with each inbox message.
  *
  * Returns { moves, movedBack, unknown }:
- * - moves:     [{ uid, address, folder }] to file by an existing rule
+ * - moves:     [{ uid, address, folder, flags }] to file by an existing rule
  * - movedBack: [{ uid, address, staleKeywords }] filed earlier, moved back by the user
  * - unknown:   messages with no rule, for the AI
  */
@@ -157,19 +157,22 @@ export function planInbox(messages, senders, folderNames, { keywordsSupported = 
 
     const rule = lookupRule(senders, m.address, folderNames);
     if (!rule) unknown.push(m);
-    else if (rule.folder.toUpperCase() !== INBOX) moves.push({ uid: m.uid, address: normalizeAddress(m.address), folder: rule.folder });
+    else if (rule.folder.toUpperCase() !== INBOX) moves.push({ uid: m.uid, address: normalizeAddress(m.address), folder: rule.folder, flags });
   }
   return { moves, movedBack, unknown };
 }
 
 /**
- * Record a rule. A learned rule always wins; an AI rule only fills a gap.
+ * Record a rule. A learned rule wins; AI only fills a gap or replaces an
+ * obsolete AI rule whose folder is no longer configured.
  * Returns true when the rules changed.
  */
-export function setRule(senders, address, folder, source) {
+export function setRule(senders, address, folder, source, folderNames) {
   const key = normalizeAddress(address);
   const existing = senders[key];
-  if (source === 'ai' && existing) return false;
+  const isConfigured = (name) => name.toUpperCase() === INBOX || folderNames.includes(name);
+  const canReplaceObsoleteAi = existing?.source === 'ai' && !isConfigured(existing.folder);
+  if (source === 'ai' && existing && !canReplaceObsoleteAi) return false;
   if (existing && existing.folder === folder && existing.source === source) return false;
   senders[key] = { folder, source };
   return true;
@@ -187,7 +190,7 @@ export function planJunk(messages, senders, folderNames) {
     if (!m.address || (m.flags || []).includes('\\Deleted')) continue;
     const rule = lookupRule(senders, m.address, folderNames);
     if (!rule || rule.source === 'ai') continue;
-    rescues.push({ uid: m.uid, address: normalizeAddress(m.address), folder: rule.folder.toUpperCase() === INBOX ? INBOX : rule.folder });
+    rescues.push({ uid: m.uid, address: normalizeAddress(m.address), folder: rule.folder.toUpperCase() === INBOX ? INBOX : rule.folder, flags: m.flags || [] });
   }
   return rescues;
 }

@@ -84,11 +84,26 @@ describe('lookupRule', () => {
 describe('setRule', () => {
   test('a learned rule overrides; an AI rule only fills a gap', () => {
     const senders = {};
-    expect(setRule(senders, 'a@x.com', 'Receipts', 'ai')).toBe(true);
-    expect(setRule(senders, 'a@x.com', 'Newsletters', 'ai')).toBe(false);
-    expect(setRule(senders, 'A@x.com', 'Newsletters', 'learned')).toBe(true);
+    expect(setRule(senders, 'a@x.com', 'Receipts', 'ai', FOLDERS)).toBe(true);
+    expect(setRule(senders, 'a@x.com', 'Newsletters', 'ai', FOLDERS)).toBe(false);
+    expect(setRule(senders, 'A@x.com', 'Newsletters', 'learned', FOLDERS)).toBe(true);
     expect(senders['a@x.com']).toEqual({ folder: 'Newsletters', source: 'learned' });
-    expect(setRule(senders, 'a@x.com', 'Newsletters', 'learned')).toBe(false);
+    expect(setRule(senders, 'a@x.com', 'Newsletters', 'learned', FOLDERS)).toBe(false);
+  });
+
+  test('an AI rule for a removed folder can be replaced, but user rules stay protected', () => {
+    const senders = {
+      'obsolete@x.com': { folder: 'Old Folder', source: 'ai' },
+      'obsolete-inbox@x.com': { folder: 'Old Folder', source: 'ai' },
+      'learned@x.com': { folder: 'Old Folder', source: 'learned' },
+      'manual@x.com': { folder: 'Old Folder', source: 'manual' },
+    };
+    expect(setRule(senders, 'obsolete@x.com', 'Receipts', 'ai', FOLDERS)).toBe(true);
+    expect(setRule(senders, 'obsolete-inbox@x.com', INBOX, 'ai', FOLDERS)).toBe(true);
+    expect(setRule(senders, 'learned@x.com', 'Receipts', 'ai', FOLDERS)).toBe(false);
+    expect(setRule(senders, 'manual@x.com', 'Receipts', 'ai', FOLDERS)).toBe(false);
+    expect(senders['obsolete@x.com']).toEqual({ folder: 'Receipts', source: 'ai' });
+    expect(senders['obsolete-inbox@x.com']).toEqual({ folder: INBOX, source: 'ai' });
   });
 });
 
@@ -126,7 +141,7 @@ describe('planInbox', () => {
       { uid: 4, address: 'shop@x.com', flags: ['\\Deleted'] },
       { uid: 5, address: '', flags: [] },
     ], senders, FOLDERS);
-    expect(plan.moves).toEqual([{ uid: 1, address: 'shop@x.com', folder: 'Receipts' }]);
+    expect(plan.moves).toEqual([{ uid: 1, address: 'shop@x.com', folder: 'Receipts', flags: [] }]);
     expect(plan.unknown.map(m => m.uid)).toEqual([3]);
     expect(plan.movedBack).toEqual([]);
   });
@@ -201,8 +216,8 @@ describe('planJunk', () => {
       { uid: 5, address: 'shop@x.com', flags: ['\\Deleted'] },
     ], senders, FOLDERS);
     expect(rescues).toEqual([
-      { uid: 1, address: 'shop@x.com', folder: 'Receipts' },
-      { uid: 2, address: 'friend@x.com', folder: INBOX },
+      { uid: 1, address: 'shop@x.com', folder: 'Receipts', flags: ['$Junk'] },
+      { uid: 2, address: 'friend@x.com', folder: INBOX, flags: [] },
     ]);
   });
 });

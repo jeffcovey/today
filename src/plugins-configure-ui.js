@@ -360,6 +360,8 @@ function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave
         if (onOpenEditor) {
           onOpenEditor(currentField.key, currentField.value);
         }
+      } else if (currentField.type === 'table') {
+        return;
       } else if (currentField.type === 'encrypted') {
         // For encrypted settings, decrypt and show the actual value for editing
         const decryptedValue = getEnvVar(currentField.envVarName) || '';
@@ -402,6 +404,9 @@ function EditSourceDialog({ pluginName, sourceName, plugin, sourceConfig, onSave
     } else if (f.type === 'encrypted') {
       // Show masked value for encrypted settings
       displayValue = f.value || '(not set)';
+    } else if (f.type === 'table') {
+      const count = f.value && typeof f.value === 'object' ? Object.keys(f.value).length : 0;
+      displayValue = `${count} entries — edit in the config file`;
     } else {
       displayValue = f.value || '(not set)';
     }

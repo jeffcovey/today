@@ -66,14 +66,26 @@ function readRulesFile(file) {
   }
 }
 
-// Re-apply this sync's changes on top of whatever is on disk, so an edit made
-// while the sync ran is kept.
-function saveRules(file, changes) {
+function sameRule(a, b) {
+  if (!a || !b) return a === b;
+  return a.folder === b.folder && a.source === b.source;
+}
+
+// Re-apply changes only where the sender still matches the sync-start snapshot.
+function saveRules(file, changes, initialSenders, configuredFolders) {
   for (let attempt = 0; attempt < 5; attempt++) {
     const before = readRulesFile(file);
     const all = parseRules(before || '');
-    const senders = (all[sourceName] ||= {});
-    for (const { address, folder, source } of changes) setRule(senders, address, folder, source);
+    const senders = all[sourceName] || {};
+    const replayable = new Set(changes
+      .filter(({ address }) => sameRule(senders[address], initialSenders[address]))
+      .map(({ address }) => address));
+    let changed = false;
+    for (const { address, folder, source } of changes) {
+      if (replayable.has(address) && setRule(senders, address, folder, source, configuredFolders)) changed = true;
+    }
+    if (!changed) return;
+    all[sourceName] = senders;
     fs.mkdirSync(path.dirname(file), { recursive: true });
     if (!writeFileAtomicCAS(file, serializeRules(all), before).conflict) return;
   }
@@ -147,10 +159,41 @@ async function moveMessages(client, moves, paths, { keywordsSupported, extraAdd 
     }
     const range = group.map(mv => mv.uid).join(',');
     if (keywordsSupported) {
-      if (extraRemove.length) await client.messageFlagsRemove(range, extraRemove, { uid: true });
-      await client.messageFlagsAdd(range, [folderKeyword(folder), ...extraAdd], { uid: true });
+      const destinationKeyword = folderKeyword(folder);
+      const removeFlags = [...new Set([
+        ...extraRemove,
+        ...group.flatMap(mv => (mv.flags || []).filter(flag => isFilingKeyword(flag) && flag !== destinationKeyword)),
+      ])];
+      const addFlags = [...new Set([destinationKeyword, ...extraAdd])];
+      if (removeFlags.length) await client.messageFlagsRemove(range, removeFlags, { uid: true });
+      await client.messageFlagsAdd(range, addFlags, { uid: true });
+      try {
+        await client.messageMove(range, paths[folder]?.path || INBOX, { uid: true });
+      } catch (err) {
+        for (const mv of group) {
+          const originalFlags = mv.flags || [];
+          const added = addFlags.filter(flag => !originalFlags.includes(flag));
+          const removed = removeFlags.filter(flag => originalFlags.includes(flag));
+          if (added.length) {
+            try {
+              await client.messageFlagsRemove(String(mv.uid), added, { uid: true });
+            } catch (restoreErr) {
+              log(`  Could not remove new filing keywords for message ${mv.uid}: ${restoreErr.message}`);
+            }
+          }
+          if (removed.length) {
+            try {
+              await client.messageFlagsAdd(String(mv.uid), removed, { uid: true });
+            } catch (restoreErr) {
+              log(`  Could not restore filing keywords for message ${mv.uid}: ${restoreErr.message}`);
+            }
+          }
+        }
+        throw err;
+      }
+    } else {
+      await client.messageMove(range, paths[folder]?.path || INBOX, { uid: true });
     }
-    await client.messageMove(range, paths[folder]?.path || INBOX, { uid: true });
   }
 }
 
@@ -197,10 +240,21 @@ async function main() {
 
   const file = rulesPath();
   const allRules = parseRules(readRulesFile(file) || '');
-  const senders = { ...(allRules[sourceName] || {}) };
+  const initialSenders = { ...(allRules[sourceName] || {}) };
+  const senders = { ...initialSenders };
   const changes = [];
+  let ruleChangeCount = 0;
   const record = (address, folder, source) => {
-    if (setRule(senders, address, folder, source)) changes.push({ address, folder, source });
+    if (setRule(senders, address, folder, source, folderNames)) {
+      changes.push({ address, folder, source });
+      ruleChangeCount++;
+    }
+  };
+  const persistChanges = () => {
+    if (changes.length && !dryRun) {
+      saveRules(file, changes, initialSenders, folderNames);
+      changes.length = 0;
+    }
   };
 
   const client = new ImapFlow({ ...imapSettings(), logger: false });
@@ -219,22 +273,28 @@ async function main() {
     const keywordsSupported = !inboxBox.permanentFlags || inboxBox.permanentFlags.has('\\*');
     if (!keywordsSupported) log('  Server does not allow custom keywords; learning from moves is off');
 
-    // 1. Learn from messages the user moved into the folders.
+    // 1. Gather folder-learning evidence across folders before applying it.
+    const folderCandidates = [];
     if (keywordsSupported) {
       const since = new Date(Date.now() - learnDays * 86400000);
       for (const name of folderNames) {
         if (!paths[name].exists) continue;
         await client.mailboxOpen(paths[name].path);
         const candidates = await fetchMessages(client, name, { since, unKeyword: folderKeyword(name) });
-        for (const { address, folder } of learnFromFolders(candidates)) {
-          record(address, folder, 'learned');
-        }
-        if (!dryRun) {
-          for (const m of candidates) await retag(client, m.uid, m.flags, name);
-        }
+        folderCandidates.push(...candidates);
         learned += candidates.length;
       }
-      await client.mailboxOpen(INBOX);
+      for (const { address, folder } of learnFromFolders(folderCandidates)) {
+        record(address, folder, 'learned');
+      }
+      persistChanges();
+      if (!dryRun) {
+        for (const name of folderNames) {
+          for (const m of folderCandidates.filter(candidate => candidate.folder === name)) {
+            await retag(client, m.uid, m.flags, name);
+          }
+        }
+      }
     }
 
     // 2. Rescue mail from senders you have ruled on out of the junk folder.
@@ -257,15 +317,22 @@ async function main() {
       await client.mailboxOpen(INBOX);
     }
 
-    // 3. File the inbox.
+    // 3. Learn from messages moved back to the inbox before consuming evidence.
+    await client.mailboxOpen(INBOX);
     const inbox = await fetchMessages(client, INBOX, { all: true });
-    const plan = planInbox(inbox, senders, folderNames, { keywordsSupported });
+    let plan = planInbox(inbox, senders, folderNames, { keywordsSupported });
 
     for (const m of plan.movedBack) {
       record(m.address, INBOX, 'learned');
-      if (!dryRun) await client.messageFlagsRemove(String(m.uid), m.staleKeywords, { uid: true });
       learned++;
     }
+    persistChanges();
+    if (!dryRun) {
+      for (const m of plan.movedBack) {
+        await client.messageFlagsRemove(String(m.uid), m.staleKeywords, { uid: true });
+      }
+    }
+    plan = planInbox(inbox, senders, folderNames, { keywordsSupported });
 
     const decisions = await classify(plan.unknown);
     const moves = [...plan.moves];
@@ -273,7 +340,7 @@ async function main() {
       const folder = decisions.get(m.address.toLowerCase());
       if (!folder) continue;
       record(m.address, folder, 'ai');
-      if (folder !== INBOX) moves.push({ uid: m.uid, address: m.address, folder, subject: m.subject });
+      if (folder !== INBOX) moves.push({ uid: m.uid, address: m.address, folder, subject: m.subject, flags: m.flags || [] });
     }
 
     const subjects = new Map(inbox.map(m => [m.uid, m.subject]));
@@ -285,11 +352,11 @@ async function main() {
     await client.logout().catch(() => {});
   }
 
-  if (changes.length && !dryRun) saveRules(file, changes);
+  persistChanges();
   const parts = [`${dryRun ? 'Would file' : 'Filed'} ${filed - rescuedCount} message(s)`];
   if (rescuedCount) parts.push(`${dryRun ? 'would rescue' : 'rescued'} ${rescuedCount} from junk`);
   if (learned) parts.push(`learned from ${learned} moved message(s)`);
-  if (changes.length) parts.push(`${changes.length} rule change(s)${dryRun ? ' (not saved)' : ''}`);
+  if (ruleChangeCount) parts.push(`${ruleChangeCount} rule change(s)${dryRun ? ' (not saved)' : ''}`);
   finish(filed, parts.join('; '));
 }
 
