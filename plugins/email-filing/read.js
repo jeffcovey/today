@@ -33,6 +33,14 @@ const folderNames = folders.map(f => f.name);
 
 const log = (msg) => console.error(msg);
 
+// A dry run's decisions, returned in the summary so `bin/plugins sync`,
+// which shows only the summary, lists them too.
+const report = [];
+const note = (line) => {
+  log(line);
+  if (dryRun) report.push(line);
+};
+
 function finish(cleaned, message, success = true) {
   console.log(JSON.stringify(success ? { cleaned, message } : { success: false, error: message }));
 }
@@ -142,9 +150,9 @@ async function moveMessages(client, moves, paths, { keywordsSupported, extraAdd 
     byFolder.get(mv.folder).push(mv);
   }
   for (const [folder, group] of byFolder) {
-    log(`  ${dryRun ? dryVerb : verb} ${group.length} message(s) into ${folder}`);
+    note(`  ${dryRun ? dryVerb : verb} ${group.length} message(s) into ${folder}`);
     if (dryRun) {
-      for (const mv of group) log(`    ${mv.address}${mv.subject ? ` — ${mv.subject}` : ''}`);
+      for (const mv of group) note(`    ${mv.address}${mv.subject ? ` — ${mv.subject}` : ''}`);
       continue;
     }
     const target = folder === INBOX ? { path: INBOX, exists: true } : paths[folder];
@@ -241,6 +249,7 @@ async function main() {
   let ruleChangeCount = 0;
   const record = (address, folder, source) => {
     if (setRule(senders, address, folder, source, folderNames)) {
+      if (source === 'learned') note(`  ${dryRun ? 'Would learn' : 'Learned'}: ${address} → ${folder}`);
       changes.push({ address, folder, source });
       ruleChangeCount++;
     }
@@ -355,7 +364,7 @@ async function main() {
   if (rescuedCount) parts.push(`${dryRun ? 'would rescue' : 'rescued'} ${rescuedCount} from junk`);
   if (learned) parts.push(`learned from ${learned} moved message(s)`);
   if (ruleChangeCount) parts.push(`${ruleChangeCount} rule change(s)${dryRun ? ' (not saved)' : ''}`);
-  finish(filed, parts.join('; '));
+  finish(filed, [parts.join('; '), ...report].join('\n'));
 }
 
 main().catch((err) => {
