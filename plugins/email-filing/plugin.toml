@@ -1,0 +1,60 @@
+# Email Filing Plugin
+# Files inbox mail into described folders and learns from manual moves
+
+name = "email-filing"
+displayName = "Email Filing"
+description = "File inbox mail into folders you describe, learning from the messages you move"
+type = "utility"
+
+longDescription = """
+Moves mail out of an IMAP inbox into folders you name, each with a plain
+description of what belongs there. Runs on every sync and reuses the server
+and password of an imap-email source.
+
+For each message in the inbox:
+
+1. A sender rule decides, if there is one (the address, then its domain).
+2. Otherwise the background AI provider picks a folder from your descriptions,
+   or keeps the message in the inbox when it is personal or unclear. The
+   decision becomes a rule, so each sender is classified once.
+
+Folders are created when first needed. Mail already in the inbox is filed on
+the first run.
+
+Teach it by moving mail: drag a message into one of the folders and its
+sender's mail goes there from now on; move a filed message back to the inbox
+and that sender stays in the inbox. Your moves always override the AI.
+
+Junk rescue: mail in the server's junk folder from a sender whose rule you made
+(by moving a message, or by hand) is moved to that rule's folder, or back to
+the inbox, and marked $NotJunk so the server's filter can learn. Rules the AI
+made don't count, so a forged sender can't pull spam out.
+
+Rules live in email-rules.toml in the vault's app directory (today/ by
+default), where you can read and edit them. Which folder the plugin last saw a
+message in is kept on the server as an IMAP keyword ($TodayIn_...), so nothing
+is lost if the database is deleted. Learning from moves needs a server that
+allows custom keywords; filing works without it.
+
+Example:
+
+    [plugins.email-filing.personal]
+    enabled = true
+    email_source = "personal"
+
+    [plugins.email-filing.personal.folders]
+    "Newsletters" = "Bulk mail, marketing, digests and announcements"
+    "Receipts" = "Order confirmations, receipts, invoices and shipping notices"
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+email_source = { type = "string", default = "", required = true, description = "Name of the imap-email source whose server and password to use" }
+folders = { type = "table", default = {}, description = "Folder names mapped to descriptions of the mail that belongs in each" }
+learn_days = { type = "number", default = 30, description = "How many days back to look in the folders for messages you moved" }
+max_ai_messages = { type = "number", default = 100, description = "Most messages to send to the AI per sync (the rest wait for the next sync)" }
+dry_run = { type = "boolean", default = false, description = "Log what would be filed and learned without moving mail or writing rules" }
+rescue_junk = { type = "boolean", default = true, description = "Move mail out of the junk folder when its sender has a rule you made (learned or hand-written)" }
+junk_folder = { type = "string", default = "", description = "Junk mailbox path (empty = find the one marked \\Junk, or named Junk or Spam)" }
