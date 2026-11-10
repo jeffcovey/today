@@ -16,7 +16,7 @@ import { createCompletion, isAIAvailable } from '../../src/ai-provider.js';
 import {
   INBOX, folderKeyword, isFilingKeyword, parseFolders, parseRules, serializeRules,
   learnFromFolders, planInbox, planJunk, findJunkMailbox, setRule, buildClassificationPrompt,
-  parseClassification, resolveMailboxPath,
+  parseClassification, resolveMailboxPath, mergeRuleChanges,
 } from './filing.js';
 
 export const RULES_FILENAME = 'email-rules.toml';
@@ -66,28 +66,23 @@ function readRulesFile(file) {
   }
 }
 
-function sameRule(a, b) {
-  if (!a || !b) return a === b;
-  return a.folder === b.folder && a.source === b.source;
-}
-
 // Re-apply changes only where the sender still matches the sync-start snapshot.
 function saveRules(file, changes, initialSenders, configuredFolders) {
   for (let attempt = 0; attempt < 5; attempt++) {
     const before = readRulesFile(file);
     const all = parseRules(before || '');
     const senders = all[sourceName] || {};
-    const replayable = new Set(changes
-      .filter(({ address }) => sameRule(senders[address], initialSenders[address]))
-      .map(({ address }) => address));
-    let changed = false;
-    for (const { address, folder, source } of changes) {
-      if (replayable.has(address) && setRule(senders, address, folder, source, configuredFolders)) changed = true;
-    }
+    const { changed, nextSnapshot } = mergeRuleChanges(senders, changes, initialSenders, configuredFolders);
     if (!changed) return;
     all[sourceName] = senders;
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    if (!writeFileAtomicCAS(file, serializeRules(all), before).conflict) return;
+    if (!writeFileAtomicCAS(file, serializeRules(all), before).conflict) {
+      for (const address of Object.keys(initialSenders)) {
+        if (!Object.hasOwn(nextSnapshot, address)) delete initialSenders[address];
+      }
+      Object.assign(initialSenders, nextSnapshot);
+      return;
+    }
   }
   throw new Error(`Could not write ${file}: it kept changing`);
 }
@@ -290,7 +285,10 @@ async function main() {
       persistChanges();
       if (!dryRun) {
         for (const name of folderNames) {
-          for (const m of folderCandidates.filter(candidate => candidate.folder === name)) {
+          const candidates = folderCandidates.filter(candidate => candidate.folder === name);
+          if (candidates.length === 0) continue;
+          await client.mailboxOpen(paths[name].path);
+          for (const m of candidates) {
             await retag(client, m.uid, m.flags, name);
           }
         }

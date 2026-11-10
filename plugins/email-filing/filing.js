@@ -179,6 +179,30 @@ export function setRule(senders, address, folder, source, folderNames) {
 }
 
 /**
+ * Replay rule changes only where the disk entry matches this sync's snapshot.
+ * The returned snapshot should replace the caller's snapshot after persistence.
+ */
+export function mergeRuleChanges(senders, changes, snapshot, folderNames) {
+  const sameRule = (a, b) => !a || !b
+    ? a === b
+    : a.folder === b.folder && a.source === b.source;
+  const replayable = new Set(changes
+    .filter(({ address }) => sameRule(senders[address], snapshot[address]))
+    .map(({ address }) => address));
+  let changed = false;
+  for (const { address, folder, source } of changes) {
+    if (replayable.has(address) && setRule(senders, address, folder, source, folderNames)) changed = true;
+  }
+
+  const nextSnapshot = { ...snapshot };
+  for (const address of replayable) {
+    if (Object.hasOwn(senders, address)) nextSnapshot[address] = { ...senders[address] };
+    else delete nextSnapshot[address];
+  }
+  return { changed, nextSnapshot };
+}
+
+/**
  * Messages in the junk folder whose sender has a rule the user made (learned
  * from a move, or written by hand). AI rules don't count: they came from mail
  * that was never judged as spam, and a forged sender could otherwise pull

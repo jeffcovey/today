@@ -1,6 +1,6 @@
 import {
   INBOX, folderKeyword, isFilingKeyword, parseFolders, parseRules, serializeRules,
-  lookupRule, learnFromFolders, planInbox, planJunk, findJunkMailbox, setRule, buildClassificationPrompt,
+  lookupRule, learnFromFolders, planInbox, planJunk, findJunkMailbox, setRule, mergeRuleChanges, buildClassificationPrompt,
   parseClassification, resolveMailboxPath,
 } from '../plugins/email-filing/filing.js';
 
@@ -104,6 +104,40 @@ describe('setRule', () => {
     expect(setRule(senders, 'manual@x.com', 'Receipts', 'ai', FOLDERS)).toBe(false);
     expect(senders['obsolete@x.com']).toEqual({ folder: 'Receipts', source: 'ai' });
     expect(senders['obsolete-inbox@x.com']).toEqual({ folder: INBOX, source: 'ai' });
+  });
+});
+
+describe('mergeRuleChanges', () => {
+  test('advances the snapshot after each persisted update to the same sender', () => {
+    const snapshot = {};
+    const senders = {};
+    const learnedFolder = mergeRuleChanges(senders, [
+      { address: 'shop@x.com', folder: 'Receipts', source: 'learned' },
+    ], snapshot, FOLDERS);
+    expect(learnedFolder.changed).toBe(true);
+    Object.assign(snapshot, learnedFolder.nextSnapshot);
+
+    const movedBack = mergeRuleChanges(senders, [
+      { address: 'shop@x.com', folder: INBOX, source: 'learned' },
+    ], snapshot, FOLDERS);
+    expect(movedBack.changed).toBe(true);
+    expect(senders['shop@x.com']).toEqual({ folder: INBOX, source: 'learned' });
+  });
+
+  test('preserves a concurrent edit while merging an unrelated sender', () => {
+    const snapshot = {
+      'shop@x.com': { folder: 'Receipts', source: 'ai' },
+    };
+    const senders = {
+      'shop@x.com': { folder: 'Newsletters', source: 'manual' },
+    };
+    const result = mergeRuleChanges(senders, [
+      { address: 'shop@x.com', folder: INBOX, source: 'learned' },
+      { address: 'friend@x.com', folder: INBOX, source: 'learned' },
+    ], snapshot, FOLDERS);
+    expect(senders['shop@x.com']).toEqual({ folder: 'Newsletters', source: 'manual' });
+    expect(senders['friend@x.com']).toEqual({ folder: INBOX, source: 'learned' });
+    expect(result.nextSnapshot['friend@x.com']).toEqual({ folder: INBOX, source: 'learned' });
   });
 });
 
