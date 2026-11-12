@@ -17,7 +17,7 @@ import http from 'http';
 import Database from 'better-sqlite3';
 import { writeFileAtomic, writeFileAtomicCAS } from '../../src/fs-atomic.js';
 import { getConfiguredTimezone } from '../../src/date-utils.js';
-import { currentEdge, decide, localNow } from './status.js';
+import { currentEdge, decide, localNow, occupancyDateBounds } from './status.js';
 
 // Get plugin configuration from environment
 const configStr = process.env.PLUGIN_CONFIG || '{}';
@@ -277,20 +277,21 @@ function shouldUpdateName(nameUpdates, sourceKey) {
 }
 
 // Function to get occupancy from calendar source in events database
-function getOccupancyFromCalendarSource(calendarSource, propertyName) {
+function getOccupancyFromCalendarSource(calendarSource, propertyName, today) {
   if (!db || !calendarSource) return [];
 
   try {
+    const { earliestEnd, latestStart } = occupancyDateBounds(today);
     const stmt = db.prepare(`
-      SELECT title, start_date, end_date, description, location
+      SELECT title, start_date, end_date, start_timezone, end_timezone, description, location
       FROM events
       WHERE source = ?
-        AND date(end_date) >= date('now')
-        AND date(start_date) <= date('now', '+30 days')
+        AND date(end_date) >= ?
+        AND date(start_date) <= ?
       ORDER BY start_date
     `);
 
-    const events = stmt.all(calendarSource);
+    const events = stmt.all(calendarSource, earliestEnd, latestStart);
 
     return events.map(event => {
       // Extract reservation URL from description if present
@@ -305,6 +306,8 @@ function getOccupancyFromCalendarSource(calendarSource, propertyName) {
       return {
         start: event.start_date,
         end: event.end_date,
+        start_timezone: event.start_timezone,
+        end_timezone: event.end_timezone,
         title: event.title,
         description: event.description,
         location: event.location,
@@ -493,14 +496,15 @@ async function processProperty() {
 
   // Validate and get calendar occupancy from referenced calendar source
   const calendarValidation = validateCalendarSource(config.calendar_source);
-  const calendarEvents = getOccupancyFromCalendarSource(config.calendar_source, propertyName);
+  const timezone = getConfiguredTimezone();
+  const now = localNow(timezone);
+  const calendarEvents = getOccupancyFromCalendarSource(config.calendar_source, propertyName, now.today);
 
   let currentStatus = config.status || 'Prepared';
   const checkinTime = config.checkin_time || '15:00';
   const checkoutTime = config.checkout_time || '11:00';
 
-  const timezone = getConfiguredTimezone();
-  const edge = currentEdge(calendarEvents, { ...localNow(timezone), checkinTime, checkoutTime, timezone });
+  const edge = currentEdge(calendarEvents, { ...now, checkinTime, checkoutTime, timezone });
   const lastKey = fs.existsSync(statusStatePath(sourceKey)) ? readLastEdgeKey(sourceKey) : undefined;
   const { write, record } = decide(edge, lastKey);
   if (write && edge.status !== currentStatus) {
@@ -510,7 +514,7 @@ async function processProperty() {
       writeLastEdgeKey(sourceKey, edge.key);
     }
   } else if (record) {
-    writeLastEdgeKey(sourceKey, edge.key);
+    writeLastEdgeKey(sourceKey, edge?.key ?? null);
   }
 
   // Get recent emails

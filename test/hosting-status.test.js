@@ -1,4 +1,4 @@
-import { currentEdge, decide, localDate, localNow } from '../plugins/hosting/status.js';
+import { currentEdge, decide, localDate, localNow, occupancyDateBounds } from '../plugins/hosting/status.js';
 
 const tz = 'America/New_York';
 const times = { checkinTime: '15:00', checkoutTime: '12:00', timezone: tz };
@@ -31,6 +31,25 @@ describe('hosting status edges', () => {
     expect(localDate('2026-11-13T02:00:00Z', tz)).toBe('2026-11-12');
   });
 
+  test('offsetless booking datetimes use their event time zone', () => {
+    const event = { start: '2026-11-13T00:00:00', end: '2026-11-14T00:00:00', start_timezone: tz, end_timezone: tz };
+    expect(localDate(event.start, 'UTC', event.start_timezone)).toBe('2026-11-13');
+    expect(localDate(event.start, tz)).toBe('2026-11-13');
+    expect(currentEdge([event], at('2026-11-13', '15:00'))).toEqual({ status: 'Occupied', key: 'Occupied:2026-11-13' });
+  });
+
+  test('checkout dates use the event end time zone', () => {
+    const event = { start: '2026-11-10', end: '2026-11-13T00:00:00', end_timezone: tz };
+    expect(currentEdge([event], at('2026-11-13', '12:00'))).toEqual({ status: 'Dirty', key: 'Dirty:2026-11-13' });
+  });
+
+  test('occupancy query bounds use the local day with a UTC date-conversion buffer', () => {
+    expect(occupancyDateBounds('2026-11-13')).toEqual({
+      earliestEnd: '2026-11-12',
+      latestStart: '2026-12-14',
+    });
+  });
+
   test('localNow reports local date and time, not UTC', () => {
     expect(localNow(tz, new Date('2026-11-13T00:30:00Z'))).toEqual({ today: '2026-11-12', time: '19:30' });
   });
@@ -51,7 +70,15 @@ describe('decide', () => {
     expect(decide(edge, undefined)).toEqual({ write: false, record: true });
   });
 
-  test('no edge, no change', () => {
-    expect(decide(null, 'Occupied:2026-11-09')).toEqual({ write: false, record: false });
+  test('the first run with no edge records an initialized state', () => {
+    expect(decide(null, undefined)).toEqual({ write: false, record: true });
+  });
+
+  test('an edge after an initialized no-edge state is written', () => {
+    expect(decide(edge, null)).toEqual({ write: true, record: true });
+  });
+
+  test('no edge after initialization does not change state', () => {
+    expect(decide(null, null)).toEqual({ write: false, record: false });
   });
 });
