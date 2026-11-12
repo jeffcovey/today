@@ -14,6 +14,8 @@ This plugin shows:
 - Check-in and check-out times
 - Recent email activity related to each property
 - Instructions for AI to edit status in config.toml when requested
+- Automatic status changes when a booking starts (Occupied) or ends (Dirty);
+  a status set by hand is left alone until the next start or end
 
 Configure properties in config.toml under [plugins.hosting.*] sections.
 """

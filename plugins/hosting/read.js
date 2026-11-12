@@ -15,7 +15,9 @@ import path from 'path';
 import https from 'https';
 import http from 'http';
 import Database from 'better-sqlite3';
-import { writeFileAtomicCAS } from '../../src/fs-atomic.js';
+import { writeFileAtomic, writeFileAtomicCAS } from '../../src/fs-atomic.js';
+import { getConfiguredTimezone } from '../../src/date-utils.js';
+import { currentEdge, decide, localNow } from './status.js';
 
 // Get plugin configuration from environment
 const configStr = process.env.PLUGIN_CONFIG || '{}';
@@ -373,39 +375,24 @@ function updatePropertyStatus(sourceKey, newStatus) {
   }
 }
 
-// Function to determine automatic status based on calendar events and timing
-function determineAutomaticStatus(calendarEvents, currentStatus, checkinTime, checkoutTime) {
-  const now = new Date();
-  const today = now.toISOString().split('T')[0];
-  const currentTimeStr = now.toTimeString().slice(0, 5); // HH:MM format
+function statusStatePath(sourceKey) {
+  return path.join(projectRoot, '.data', `hosting-status-${sourceKey}.json`);
+}
 
-  // Find active reservation (ongoing or starting today)
-  const activeReservation = calendarEvents.find(event => {
-    const startDate = event.start.split('T')[0];
-    const endDate = event.end.split('T')[0];
-    return startDate <= today && endDate >= today;
-  });
-
-  // Find reservation ending today
-  const reservationEndingToday = calendarEvents.find(event => {
-    const endDate = event.end.split('T')[0];
-    return endDate === today;
-  });
-
-  // Check if past check-in time
-  const isPastCheckinTime = currentTimeStr >= checkinTime;
-
-  // Determine new status
-  if (activeReservation && isPastCheckinTime) {
-    // Active reservation and past check-in time → should be Occupied
-    return 'Occupied';
-  } else if (reservationEndingToday && currentStatus === 'Occupied') {
-    // Reservation ending today and currently Occupied → should be Dirty
-    return 'Dirty';
+function readLastEdgeKey(sourceKey) {
+  try {
+    return JSON.parse(fs.readFileSync(statusStatePath(sourceKey), 'utf-8')).last_edge ?? null;
+  } catch {
+    return null;
   }
+}
 
-  // No automatic change needed
-  return null;
+function writeLastEdgeKey(sourceKey, key) {
+  try {
+    writeFileAtomic(statusStatePath(sourceKey), JSON.stringify({ last_edge: key }) + '\n');
+  } catch (error) {
+    console.error(`Failed to record status edge: ${error.message}`);
+  }
 }
 
 // Function to get recent emails mentioning a property name
@@ -508,18 +495,22 @@ async function processProperty() {
   const calendarValidation = validateCalendarSource(config.calendar_source);
   const calendarEvents = getOccupancyFromCalendarSource(config.calendar_source, propertyName);
 
-  // Automatic status management based on reservations and timing
   let currentStatus = config.status || 'Prepared';
   const checkinTime = config.checkin_time || '15:00';
   const checkoutTime = config.checkout_time || '11:00';
 
-  const automaticStatus = determineAutomaticStatus(calendarEvents, currentStatus, checkinTime, checkoutTime);
-  if (automaticStatus && automaticStatus !== currentStatus) {
-    const updateSuccess = updatePropertyStatus(sourceKey, automaticStatus);
-    if (updateSuccess) {
-      currentStatus = automaticStatus;
-      console.error(`  🔄 Status automatically changed to "${automaticStatus}" for ${sourceKey}`);
+  const timezone = getConfiguredTimezone();
+  const edge = currentEdge(calendarEvents, { ...localNow(timezone), checkinTime, checkoutTime, timezone });
+  const lastKey = fs.existsSync(statusStatePath(sourceKey)) ? readLastEdgeKey(sourceKey) : undefined;
+  const { write, record } = decide(edge, lastKey);
+  if (write && edge.status !== currentStatus) {
+    if (updatePropertyStatus(sourceKey, edge.status)) {
+      currentStatus = edge.status;
+      console.error(`  🔄 Status automatically changed to "${edge.status}" for ${sourceKey}`);
+      writeLastEdgeKey(sourceKey, edge.key);
     }
+  } else if (record) {
+    writeLastEdgeKey(sourceKey, edge.key);
   }
 
   // Get recent emails
