@@ -15,7 +15,9 @@ import path from 'path';
 import https from 'https';
 import http from 'http';
 import Database from 'better-sqlite3';
-import { writeFileAtomicCAS } from '../../src/fs-atomic.js';
+import { writeFileAtomic, writeFileAtomicCAS } from '../../src/fs-atomic.js';
+import { getConfiguredTimezone } from '../../src/date-utils.js';
+import { currentEdge, decide, localNow, occupancyDateBounds } from './status.js';
 
 // Get plugin configuration from environment
 const configStr = process.env.PLUGIN_CONFIG || '{}';
@@ -275,20 +277,21 @@ function shouldUpdateName(nameUpdates, sourceKey) {
 }
 
 // Function to get occupancy from calendar source in events database
-function getOccupancyFromCalendarSource(calendarSource, propertyName) {
+function getOccupancyFromCalendarSource(calendarSource, propertyName, today) {
   if (!db || !calendarSource) return [];
 
   try {
+    const { earliestEnd, latestStart } = occupancyDateBounds(today);
     const stmt = db.prepare(`
-      SELECT title, start_date, end_date, description, location
+      SELECT title, start_date, end_date, start_timezone, end_timezone, description, location
       FROM events
       WHERE source = ?
-        AND date(end_date) >= date('now')
-        AND date(start_date) <= date('now', '+30 days')
+        AND date(end_date) >= ?
+        AND date(start_date) <= ?
       ORDER BY start_date
     `);
 
-    const events = stmt.all(calendarSource);
+    const events = stmt.all(calendarSource, earliestEnd, latestStart);
 
     return events.map(event => {
       // Extract reservation URL from description if present
@@ -303,6 +306,8 @@ function getOccupancyFromCalendarSource(calendarSource, propertyName) {
       return {
         start: event.start_date,
         end: event.end_date,
+        start_timezone: event.start_timezone,
+        end_timezone: event.end_timezone,
         title: event.title,
         description: event.description,
         location: event.location,
@@ -373,39 +378,24 @@ function updatePropertyStatus(sourceKey, newStatus) {
   }
 }
 
-// Function to determine automatic status based on calendar events and timing
-function determineAutomaticStatus(calendarEvents, currentStatus, checkinTime, checkoutTime) {
-  const now = new Date();
-  const today = now.toISOString().split('T')[0];
-  const currentTimeStr = now.toTimeString().slice(0, 5); // HH:MM format
+function statusStatePath(sourceKey) {
+  return path.join(projectRoot, '.data', `hosting-status-${sourceKey}.json`);
+}
 
-  // Find active reservation (ongoing or starting today)
-  const activeReservation = calendarEvents.find(event => {
-    const startDate = event.start.split('T')[0];
-    const endDate = event.end.split('T')[0];
-    return startDate <= today && endDate >= today;
-  });
-
-  // Find reservation ending today
-  const reservationEndingToday = calendarEvents.find(event => {
-    const endDate = event.end.split('T')[0];
-    return endDate === today;
-  });
-
-  // Check if past check-in time
-  const isPastCheckinTime = currentTimeStr >= checkinTime;
-
-  // Determine new status
-  if (activeReservation && isPastCheckinTime) {
-    // Active reservation and past check-in time → should be Occupied
-    return 'Occupied';
-  } else if (reservationEndingToday && currentStatus === 'Occupied') {
-    // Reservation ending today and currently Occupied → should be Dirty
-    return 'Dirty';
+function readLastEdgeKey(sourceKey) {
+  try {
+    return JSON.parse(fs.readFileSync(statusStatePath(sourceKey), 'utf-8')).last_edge ?? null;
+  } catch {
+    return null;
   }
+}
 
-  // No automatic change needed
-  return null;
+function writeLastEdgeKey(sourceKey, key) {
+  try {
+    writeFileAtomic(statusStatePath(sourceKey), JSON.stringify({ last_edge: key }) + '\n');
+  } catch (error) {
+    console.error(`Failed to record status edge: ${error.message}`);
+  }
 }
 
 // Function to get recent emails mentioning a property name
@@ -506,20 +496,25 @@ async function processProperty() {
 
   // Validate and get calendar occupancy from referenced calendar source
   const calendarValidation = validateCalendarSource(config.calendar_source);
-  const calendarEvents = getOccupancyFromCalendarSource(config.calendar_source, propertyName);
+  const timezone = getConfiguredTimezone();
+  const now = localNow(timezone);
+  const calendarEvents = getOccupancyFromCalendarSource(config.calendar_source, propertyName, now.today);
 
-  // Automatic status management based on reservations and timing
   let currentStatus = config.status || 'Prepared';
   const checkinTime = config.checkin_time || '15:00';
   const checkoutTime = config.checkout_time || '11:00';
 
-  const automaticStatus = determineAutomaticStatus(calendarEvents, currentStatus, checkinTime, checkoutTime);
-  if (automaticStatus && automaticStatus !== currentStatus) {
-    const updateSuccess = updatePropertyStatus(sourceKey, automaticStatus);
-    if (updateSuccess) {
-      currentStatus = automaticStatus;
-      console.error(`  🔄 Status automatically changed to "${automaticStatus}" for ${sourceKey}`);
+  const edge = currentEdge(calendarEvents, { ...now, checkinTime, checkoutTime, timezone });
+  const lastKey = fs.existsSync(statusStatePath(sourceKey)) ? readLastEdgeKey(sourceKey) : undefined;
+  const { write, record } = decide(edge, lastKey);
+  if (write && edge.status !== currentStatus) {
+    if (updatePropertyStatus(sourceKey, edge.status)) {
+      currentStatus = edge.status;
+      console.error(`  🔄 Status automatically changed to "${edge.status}" for ${sourceKey}`);
+      writeLastEdgeKey(sourceKey, edge.key);
     }
+  } else if (record) {
+    writeLastEdgeKey(sourceKey, edge?.key ?? null);
   }
 
   // Get recent emails
