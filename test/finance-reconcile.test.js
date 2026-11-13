@@ -150,10 +150,10 @@ describe('reconcileFinanceSources', () => {
     insert(db, [
       { id: 'a1', source: API, date: '2026-05-01', account: 'Chase', payee: 'Now', amount: -1, metadata: '{"budget_name":"Household"}' },
       // the rule's date_next has rolled on to next year's occurrence
-      { id: 'as', source: API, date: '2027-11-12', account: 'Chase', payee: 'Broward County Tax', amount: -10368.54, scheduled: 1, metadata: '{"budget_name":"Household"}' },
+      { id: 'as', source: API, date: '2100-11-12', account: 'Chase', payee: 'Broward County Tax', amount: -10368.54, scheduled: 1, metadata: '{"budget_name":"Household"}' },
       // the CSV froze this year's projection — different date, so no key match,
       // and outside the API's real-transaction window, so rule 2 cannot apply
-      { id: 'c1', source: CSV, date: '2026-11-12', account: 'Chase', payee: 'Broward County Tax', amount: -10368.54, metadata: '{"source_file":"Household as of 2026-05-02 12-00 - Register.csv"}' }
+      { id: 'c1', source: CSV, date: '2099-11-12', account: 'Chase', payee: 'Broward County Tax', amount: -10368.54, metadata: '{"source_file":"Household as of 2026-05-02 12-00 - Register.csv"}' }
     ]);
     const report = reconcileFinanceSources(db, CONFIG, PLUGINS);
 
