@@ -113,12 +113,12 @@ export async function runNightlyTaskMaintenance({ projectRoot, now = new Date(),
       continue;
     }
     const data = result.data || {};
+    for (const line of data.restored || []) log(`${sourceId}: ↩︎ restored lost task: ${line}`);
+    for (const line of data.removed || []) log(`${sourceId}: ✂︎ removed duplicate task: ${line}`);
     if (data.files_skipped_due_to_conflict?.length) {
       log(`${sourceId}: skipped on conflict: ${data.files_skipped_due_to_conflict.join(', ')}; will retry`);
       continue;
     }
-    for (const line of data.restored || []) log(`${sourceId}: ↩︎ restored lost task: ${line}`);
-    for (const line of data.removed || []) log(`${sourceId}: ✂︎ removed duplicate task: ${line}`);
     log(`${sourceId}: night of ${decision.night} (window ${window} ${timeZone}): archived ${data.archived || 0}, `
       + `${data.rebalanced ? `rebalanced (${data.rebalance_info?.files_written} file(s) written)` : 'already in order'}`);
 
