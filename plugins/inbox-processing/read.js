@@ -17,6 +17,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { format } from 'date-fns';
 import { writeFileAtomic, writeFileAtomicCAS } from '../../src/fs-atomic.js';
+import { hasNumberedSiblings, planSortedInsert } from '../../src/task-files.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -368,7 +369,7 @@ function processConcernNote(filePath, content, basename) {
 }
 
 /**
- * Process a task-only file - append to tasks.md
+ * Process a task-only file - insert into the task files (sorted) or append to tasks.md
  */
 function processTaskOnlyFile(filePath, content, basename) {
   // Ensure tasks directory exists
@@ -377,7 +378,22 @@ function processTaskOnlyFile(filePath, content, basename) {
     fs.mkdirSync(tasksDir, { recursive: true });
   }
 
-  if (fs.existsSync(tasksPath)) {
+  if (fs.existsSync(tasksPath) && hasNumberedSiblings(tasksPath)) {
+    // Alphabetized task files: each task goes to its sorted place. Lines
+    // already present are skipped, so a retry after a conflict can't duplicate.
+    const plan = planSortedInsert(tasksPath, content.split('\n'), { skipExisting: true });
+    for (const file of plan) {
+      const { conflict } = writeFileAtomicCAS(file.path, file.lines.join('\n') + '\n', file.original ?? '');
+      if (conflict) {
+        return {
+          action: 'deferred',
+          type: 'tasks',
+          reason: 'concurrent update to tasks file',
+          file: basename
+        };
+      }
+    }
+  } else if (fs.existsSync(tasksPath)) {
     const existing = fs.readFileSync(tasksPath, 'utf-8');
     if (existing.includes('# Archive')) {
       const parts = existing.split('# Archive');

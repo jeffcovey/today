@@ -1,0 +1,20 @@
+#!/usr/bin/env node
+
+// Archive completed tasks and re-sort the task files once a night, inside the
+// sleep window, when the files are quiet. Scheduled every 15 minutes; idle
+// ticks exit at once. --now skips the window and the once-a-night check.
+
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { runNightlyTaskMaintenance } from '../src/task-nightly.js';
+
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+process.chdir(projectRoot);
+
+try {
+  await runNightlyTaskMaintenance({ projectRoot, force: process.argv.includes('--now') });
+  process.exit(0);
+} catch (error) {
+  console.error(`tasks-nightly: ${error.message}`);
+  process.exit(1);
+}

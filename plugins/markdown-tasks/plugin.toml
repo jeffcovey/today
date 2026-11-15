@@ -45,5 +45,5 @@ supports_priority_classification = { type = "boolean", default = true, descripti
 auto_classify_stages = { type = "boolean", default = false, description = "Automatically add stage tags to tasks on sync" }
 auto_add_date_created = { type = "boolean", default = false, description = "Automatically add created date (➕) to tasks on sync" }
 auto_add_priority = { type = "boolean", default = false, description = "Automatically add priority emojis to tasks on sync" }
-auto_archive_completed = { type = "boolean", default = false, description = "Automatically archive completed tasks and rebalance files on sync" }
-max_tasks_per_file = { type = "number", default = 50, description = "Maximum tasks per file before rebalancing to numbered files" }
+auto_archive_completed = { type = "boolean", default = false, description = "Keep the task files alphabetized: new tasks go to their sorted place, completed tasks are archived and the files re-sorted once a night (bin/tasks-nightly), and each sync repairs what a file sync undid after that" }
+max_tasks_per_file = { type = "number", default = 50, description = "Maximum tasks per file before the nightly rebalance spreads them across more numbered files" }
