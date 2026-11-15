@@ -126,7 +126,7 @@ export function planSortedInsert(baseFile, newLines, { skipExisting = false } = 
  * rebalance moved in (with the exact line, so it can be put back) and what it
  * moved out (by key, to spot a file that a sync brought back in its old version).
  */
-export function buildLedger({ before, after, archived = [], archiveLength = 0, now = Date.now() }) {
+export function buildLedger({ before, after, archiveLength = 0, now = Date.now() }) {
   const names = new Set([...Object.keys(before), ...Object.keys(after)]);
   const files = {};
   for (const name of names) {
@@ -140,7 +140,6 @@ export function buildLedger({ before, after, archived = [], archiveLength = 0, n
     version: 1,
     created_at: new Date(now).toISOString(),
     archive_length: archiveLength,
-    archived,
     files
   };
 }

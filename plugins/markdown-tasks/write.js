@@ -966,6 +966,17 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
         const { conflict } = writeFileAtomicCAS(filePath, lines.length ? lines.join('\n') + '\n' : '', originals.get(name) ?? '');
         if (conflict) {
           filesSkippedDueToConflict.push(rel(filePath));
+          if (action === 'archive-completed') {
+            console.log(JSON.stringify({
+              success: false,
+              error: 'Concurrent update while repairing task files; retry',
+              concurrent_update: true,
+              file: filePath,
+              files_modified: Array.from(filesModified),
+              files_skipped_due_to_conflict: filesSkippedDueToConflict
+            }));
+            process.exit(1);
+          }
           continue;
         }
         filesModified.add(rel(filePath));
@@ -992,10 +1003,8 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
     // 2. Archive completed tasks from the family and repeating.md.
     const repeatingFile = path.join(taskDir, 'repeating.md');
     const archiveSources = [...listTaskFamily(taskFile), ...(fs.existsSync(repeatingFile) ? [repeatingFile] : [])];
-    // A completed line archived by the previous run and back in a source file
-    // (a sync reverted the truncation) is dropped from the source, not archived twice.
-    const alreadyArchived = new Set(ledger?.archived || []);
     const archiveContent = readOrNull(archiveFile);
+    const archivedLines = new Set(nonBlank(archiveContent));
     const sourceUpdates = [];
     const pendingArchive = [];
     const pendingSet = new Set();
@@ -1012,7 +1021,7 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
       if (completed.length === 0) continue;
       sourceUpdates.push({ filePath, originalContent: content, remainingContent: remaining.join('\n') + '\n' });
       for (const line of completed) {
-        if (alreadyArchived.has(line) || pendingSet.has(line)) continue;
+        if (archivedLines.has(line) || pendingSet.has(line)) continue;
         pendingSet.add(line);
         pendingArchive.push(line);
       }
@@ -1066,7 +1075,6 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
     const anyFileOverflows = familyLines.some(lines => lines.length > maxTasksPerFile);
     const sortAll = entry.sort_all === true;
 
-    let newLedger = null;
     if (allTasks.length > 0 && (anyFileOverflows || sortAll)) {
       const sorted = [...allTasks].sort(compareTaskLines);
       const numberedPattern = new RegExp(`^${taskBaseName}-(\\d+)\\.md$`);
@@ -1099,7 +1107,7 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
       });
 
       if (toWrite.length > 0) {
-        newLedger = buildLedger({ before, after, archived: pendingArchive, archiveLength });
+        const newLedger = buildLedger({ before, after, archiveLength });
         fs.mkdirSync(path.dirname(ledgerFile), { recursive: true });
         writeFileAtomic(ledgerFile, JSON.stringify(newLedger, null, 2) + '\n');
 
@@ -1154,15 +1162,6 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
           distribution: targets.map(t => ({ file: path.basename(t.path), task_count: t.lines.length }))
         };
       }
-    }
-
-    // Without a rebalance, still remember what was archived so a reverted
-    // truncation can't archive it twice; keep the old ledger's moves.
-    if (!newLedger && pendingArchive.length > 0) {
-      const kept = ledger || buildLedger({ before: {}, after: {}, archiveLength });
-      const merged = { ...kept, archived: [...(kept.archived || []), ...pendingArchive] };
-      fs.mkdirSync(path.dirname(ledgerFile), { recursive: true });
-      writeFileAtomic(ledgerFile, JSON.stringify(merged, null, 2) + '\n');
     }
 
     console.log(JSON.stringify({

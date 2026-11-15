@@ -14,6 +14,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { execFileSync } from 'child_process';
 
@@ -25,7 +26,7 @@ const RELATIVE_TASKS_PATH = 'tasks/tasks.md';
 // The plugin joins PROJECT_ROOT with the relative default_task_file path, so
 // the runner points PROJECT_ROOT at the per-test temp vault and uses a
 // relative task path inside it.
-function runWrite(entry, { vaultPath, config = {} } = {}) {
+function runWrite(entry, { vaultPath, config = {}, extraEnv = {} } = {}) {
   const env = {
     ...process.env,
     PROJECT_ROOT: vaultPath,
@@ -36,6 +37,7 @@ function runWrite(entry, { vaultPath, config = {} } = {}) {
       ...config,
     }),
     ENTRY_JSON: JSON.stringify(entry),
+    ...extraEnv,
   };
   let stdout;
   try {
@@ -308,5 +310,73 @@ describe('markdown-tasks/write.js alphabetized files and ledger guard', () => {
     expect(second.archived).toBe(0);
     expect(lines('tasks.md')).toEqual(['- [ ] Alpha']);
     expect(lines('tasks-archive.md')).toEqual(['- [x] Done thing']);
+  });
+
+  test('archives a completion when source and archive both revert to pre-archive contents', () => {
+    write('tasks.md', ['- [x] Previously done']);
+    write('tasks-archive.md', ['- [x] Older archived task']);
+    expect(runWrite({ action: 'archive-completed' }, { vaultPath }).archived).toBe(1);
+
+    write('tasks.md', ['- [x] Previously done']);
+    write('tasks-archive.md', ['- [x] Older archived task']);
+    const result = runWrite({ action: 'archive-completed' }, { vaultPath });
+
+    expect(result.archived).toBe(1);
+    expect(lines('tasks.md')).toEqual([]);
+    expect(lines('tasks-archive.md')).toEqual(['- [x] Older archived task', '- [x] Previously done']);
+  });
+
+  test('repair conflict aborts maintenance and preserves the movement ledger', () => {
+    write('tasks.md', ['- [ ] Delta']);
+    write('tasks-1.md', ['- [ ] Bravo', '- [ ] Delta']);
+    const ledgerName = `${crypto.createHash('sha1').update(file('tasks.md')).digest('hex').slice(0, 12)}.json`;
+    const ledgerFile = path.join(vaultPath, '.data', 'task-ledgers', ledgerName);
+    fs.mkdirSync(path.dirname(ledgerFile), { recursive: true });
+    const ledger = {
+      version: 1,
+      created_at: new Date().toISOString(),
+      archive_length: 0,
+      files: {
+        'tasks.md': {
+          moved_in: [{ key: 'alpha', line: '- [ ] Alpha' }],
+          moved_out: ['delta']
+        }
+      }
+    };
+    fs.writeFileSync(ledgerFile, JSON.stringify(ledger));
+    const ledgerBefore = fs.readFileSync(ledgerFile, 'utf8');
+    const preloadFile = path.join(vaultPath, 'race-preload.mjs');
+    fs.writeFileSync(preloadFile, `
+      import fs from 'node:fs';
+      const readFileSync = fs.readFileSync.bind(fs);
+      let injected = false;
+      fs.readFileSync = function (filePath, ...args) {
+        const content = readFileSync(filePath, ...args);
+        if (!injected && String(filePath) === process.env.TASK_RACE_FILE) {
+          injected = true;
+          fs.writeFileSync(filePath, process.env.TASK_RACE_CONTENT, 'utf8');
+        }
+        return content;
+      };
+    `);
+
+    const result = runWrite(
+      { action: 'archive-completed', sort_all: true },
+      {
+        vaultPath,
+        extraEnv: {
+          NODE_OPTIONS: `${process.env.NODE_OPTIONS || ''} --import=${preloadFile}`,
+          TASK_RACE_FILE: file('tasks.md'),
+          TASK_RACE_CONTENT: '- [ ] Concurrent update\n'
+        }
+      }
+    );
+
+    expect(result).toMatchObject({ success: false, concurrent_update: true });
+    expect(result.files_skipped_due_to_conflict).toContain('tasks/tasks.md');
+    expect(fs.readFileSync(ledgerFile, 'utf8')).toBe(ledgerBefore);
+    expect(fs.readFileSync(file('tasks.md'), 'utf8')).toBe('- [ ] Concurrent update\n');
+    expect(lines('tasks-1.md')).toEqual(['- [ ] Bravo', '- [ ] Delta']);
+    expect(fs.existsSync(file('tasks-archive.md'))).toBe(false);
   });
 });
