@@ -140,3 +140,43 @@ describe('inbox-processing time-tracking marker cleanup', () => {
     expect(remainingMarkers()).toHaveLength(0);
   });
 });
+
+describe('inbox-processing task-only files', () => {
+  let tempRoot;
+  let inboxDir;
+  let tasksDir;
+  const lines = name => fs.readFileSync(path.join(tasksDir, name), 'utf8').split('\n').filter(l => l.trim());
+
+  beforeEach(() => {
+    tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'inbox-processing-tasks-'));
+    inboxDir = path.join(tempRoot, 'vault', 'inbox');
+    tasksDir = path.join(tempRoot, 'vault', 'tasks');
+    fs.mkdirSync(inboxDir, { recursive: true });
+    fs.mkdirSync(tasksDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  test('inserts each task at its sorted place when the task files are split', () => {
+    fs.writeFileSync(path.join(tasksDir, 'tasks.md'), '- [ ] Alpha\n- [ ] Charlie\n');
+    fs.writeFileSync(path.join(tasksDir, 'tasks-1.md'), '- [ ] Mike\n- [ ] Zulu\n');
+    fs.writeFileSync(path.join(inboxDir, 'new-tasks.md'), '- [ ] Bravo\n- [ ] November\n- [ ] Alpha\n');
+
+    runReadPlugin(tempRoot, { tasks_file: 'vault/tasks/tasks.md' });
+
+    expect(lines('tasks.md')).toEqual(['- [ ] Alpha', '- [ ] Bravo', '- [ ] Charlie']);
+    expect(lines('tasks-1.md')).toEqual(['- [ ] Mike', '- [ ] November', '- [ ] Zulu']);
+    expect(fs.existsSync(path.join(inboxDir, 'new-tasks.md'))).toBe(false);
+  });
+
+  test('still appends to a single tasks.md', () => {
+    fs.writeFileSync(path.join(tasksDir, 'tasks.md'), '- [ ] Zulu\n');
+    fs.writeFileSync(path.join(inboxDir, 'new-tasks.md'), '- [ ] Alpha\n');
+
+    runReadPlugin(tempRoot, { tasks_file: 'vault/tasks/tasks.md' });
+
+    expect(lines('tasks.md')).toEqual(['- [ ] Zulu', '- [ ] Alpha']);
+  });
+});
