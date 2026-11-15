@@ -5702,14 +5702,15 @@ ${cleanContent}
             const currentContent = document.querySelector('.card-body.markdown-content');
             
             if (newContent && currentContent) {
-              // Preserve scroll position and which callouts are open
+              // Preserve scroll position and callout state across the refresh
               const scrollTop = currentContent.scrollTop;
               const detailsState = captureDetailsState(currentContent);
+              const deferredDetailsState = captureDeferredDetailsState(currentContent);
               
               // Replace the content
               currentContent.innerHTML = newContent.innerHTML;
               restoreDetailsState(currentContent, detailsState);
-              loadDeferredBlocks(currentContent);
+              loadDeferredBlocks(currentContent, deferredDetailsState);
               
               // Restore scroll position
               currentContent.scrollTop = scrollTop;
@@ -5761,18 +5762,19 @@ ${cleanContent}
         }
         
         // Fill in query blocks the server left as placeholders (see src/deferred-blocks.js)
-        function loadDeferredBlocks(root) {
-          root.querySelectorAll('.deferred-block[data-deferred-src]').forEach(async function(block) {
+        function loadDeferredBlocks(root, deferredDetailsState = new Map()) {
+          return Promise.all(deferredBlocksByKey(root).map(async function({ block, key }) {
             try {
               const response = await fetch(block.dataset.deferredSrc, { credentials: 'same-origin' });
               // A redirect means the session expired and we got the login page
               if (response.redirected) { location.reload(); return; }
-              block.outerHTML = await response.text();
+              block.innerHTML = await response.text();
+              restoreDeferredDetailsState(block, deferredDetailsState.get(key));
             } catch (error) {
               console.error('Error loading deferred block:', error);
               block.innerHTML = '<span class="text-danger small">Could not load this section. <a href="javascript:location.reload()">Reload</a></span>';
             }
-          });
+          }));
         }
         document.addEventListener('DOMContentLoaded', function() {
           loadDeferredBlocks(document);

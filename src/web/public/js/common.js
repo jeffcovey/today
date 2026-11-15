@@ -922,9 +922,12 @@ function restoreCollapseStates() {
 // Which callouts (<details>) are open, so a content refresh can keep them as
 // the user left them. Each is keyed by its summary text plus how many earlier
 // ones share that text, which survives re-rendering the same page.
-function detailsByKey(root) {
+function detailsByKey(root, excludeDeferred = false) {
   const seen = new Map();
-  return Array.from(root.querySelectorAll('details')).map(details => {
+  const detailsList = Array.from(root.querySelectorAll('details')).filter(details =>
+    !excludeDeferred || !details.closest('.deferred-block[data-deferred-src]')
+  );
+  return detailsList.map(details => {
     const summary = details.querySelector('summary');
     const label = summary ? summary.textContent.trim() : '';
     const n = seen.get(label) || 0;
@@ -935,12 +938,41 @@ function detailsByKey(root) {
 
 function captureDetailsState(root) {
   const state = new Map();
-  for (const { details, key } of detailsByKey(root)) state.set(key, details.open);
+  for (const { details, key } of detailsByKey(root, true)) state.set(key, details.open);
   return state;
 }
 
 function restoreDetailsState(root, state) {
-  for (const { details, key } of detailsByKey(root)) {
+  for (const { details, key } of detailsByKey(root, true)) {
+    if (state.has(key)) details.open = state.get(key);
+  }
+}
+
+function deferredBlocksByKey(root) {
+  const seen = new Map();
+  return Array.from(root.querySelectorAll('.deferred-block[data-deferred-src]')).map(block => {
+    const identity = block.dataset.deferredSrc;
+    const n = seen.get(identity) || 0;
+    seen.set(identity, n + 1);
+    return { block, key: identity + '#' + n };
+  });
+}
+
+function captureDeferredDetailsState(root) {
+  const state = new Map();
+  for (const { block, key } of deferredBlocksByKey(root)) {
+    const blockState = new Map();
+    for (const { details, key: detailsKey } of detailsByKey(block)) {
+      blockState.set(detailsKey, details.open);
+    }
+    state.set(key, blockState);
+  }
+  return state;
+}
+
+function restoreDeferredDetailsState(block, state) {
+  if (!state) return;
+  for (const { details, key } of detailsByKey(block)) {
     if (state.has(key)) details.open = state.get(key);
   }
 }
