@@ -47,6 +47,14 @@ const MAINTENANCE_JOBS = [
     // no-status-file guard inside the script makes it a safe no-op on any
     // deployment that has never run unison-sync.
     description: 'Check Unison sync is running and surface failures in the vault'
+  },
+  {
+    name: 'tasks-nightly',
+    // Acts once a night, inside the sleep window from config, when the task
+    // files are quiet; other ticks exit at once.
+    schedule: '*/15 * * * *',
+    command: 'bin/tasks-nightly',
+    description: 'Archive completed tasks and re-sort the task files'
   }
 ];
 
