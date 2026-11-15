@@ -14,6 +14,14 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import { writeFileAtomic, writeFileAtomicCAS } from '../../src/fs-atomic.js';
+import {
+  buildLedger,
+  compareTaskLines,
+  ledgerExpired,
+  listTaskFamily,
+  planSortedInsert,
+  repairFromLedger
+} from '../../src/task-files.js';
 
 // Read config from environment
 const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
@@ -47,7 +55,7 @@ try {
 
 // Validate action
 const action = entry.action || 'add';
-if (!['add', 'complete', 'update', 'classify-stages', 'add-date-created', 'add-priority', 'archive-completed'].includes(action)) {
+if (!['add', 'complete', 'update', 'classify-stages', 'add-date-created', 'add-priority', 'archive-completed', 'guard-ledger'].includes(action)) {
   console.log(JSON.stringify({ success: false, error: `Invalid action: ${action}` }));
   process.exit(1);
 }
@@ -183,6 +191,30 @@ try {
 
     // Build task line
     const taskLine = buildTaskLine(entry);
+
+    // Alphabetized task files: put the task at its sorted place in the file
+    // whose range covers it, so the nightly rebalance has little to move.
+    if (config.auto_archive_completed && fs.existsSync(taskFile)) {
+      const [planned] = planSortedInsert(taskFile, [taskLine]);
+      const { conflict } = writeFileAtomicCAS(planned.path, planned.lines.join('\n') + '\n', planned.original ?? '');
+      if (conflict) {
+        console.log(JSON.stringify({
+          success: false,
+          error: 'Concurrent update to task file; retry',
+          concurrent_update: true,
+          file: planned.path
+        }));
+        process.exit(1);
+      }
+      console.log(JSON.stringify({
+        success: true,
+        action: 'add',
+        file: planned.path,
+        line: taskLine,
+        needs_sync: true
+      }));
+      process.exit(0);
+    }
 
     // Read existing content
     let content = '';
@@ -865,289 +897,250 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
       needs_sync: filesModified.length > 0
     }));
 
-  } else if (action === 'archive-completed') {
-    // Archive completed tasks and rebalance task files
+  } else if (action === 'archive-completed' || action === 'guard-ledger') {
+    // guard-ledger (every sync): put back what a file sync undid after the
+    // last rebalance, using the ledger that rebalance wrote.
+    // archive-completed (nightly): the same repair, then archive completed
+    // tasks, then sort the family across its files — when a file overflows,
+    // or always with sort_all. A ledger is written before any file moves.
     // Uses default_task_file as the base for naming:
     //   tasks.md -> tasks-archive.md, tasks-1.md, tasks-2.md, ...
-    //   inbox.md -> inbox-archive.md, inbox-1.md, inbox-2.md, ...
     const maxTasksPerFile = entry.max_tasks_per_file || 50;
 
     const taskFile = path.join(projectRoot, defaultTaskFile);
     const taskDir = path.dirname(taskFile);
     const taskBaseName = path.basename(taskFile, '.md');
     const archiveFile = path.join(taskDir, `${taskBaseName}-archive.md`);
+    const ledgerFile = path.join(
+      projectRoot,
+      '.data',
+      'task-ledgers',
+      `${crypto.createHash('sha1').update(taskFile).digest('hex').slice(0, 12)}.json`
+    );
+    const rel = filePath => path.relative(projectRoot, filePath);
+    const nonBlank = content => (content ?? '').split('\n').filter(line => line.trim());
+    const readOrNull = filePath => {
+      try {
+        return fs.readFileSync(filePath, 'utf8');
+      } catch (error) {
+        if (error.code === 'ENOENT') return null;
+        throw error;
+      }
+    };
 
-    // Ensure directory exists
     if (!fs.existsSync(taskDir)) {
       fs.mkdirSync(taskDir, { recursive: true });
-    }
-
-    // Read current archive file
-    let archiveContent = '';
-    let archiveExisted = true;
-    try {
-      archiveContent = fs.readFileSync(archiveFile, 'utf8');
-    } catch {
-      // Archive file doesn't exist yet
-      archiveExisted = false;
-    }
-
-    let archiveTasks = archiveContent.split('\n').filter(line => line.trim());
-    let totalArchived = 0;
-
-    // Find all task files: base file, numbered files, and repeating.md
-    let allFiles;
-    try {
-      allFiles = fs.readdirSync(taskDir);
-    } catch {
-      allFiles = [];
-    }
-
-    // Match: tasks.md, tasks-1.md, tasks-2.md, repeating.md (but not tasks-archive.md)
-    const taskFilePattern = new RegExp(`^(${taskBaseName}\\.md|${taskBaseName}-(\\d+)\\.md|repeating\\.md)$`);
-    const taskFiles = allFiles
-      .filter(f => taskFilePattern.test(f) && !f.includes('-archive'))
-      .map(f => path.join(taskDir, f))
-      .sort();
-
-    if (taskFiles.length === 0) {
-      console.log(JSON.stringify({
-        success: true,
-        action: 'archive-completed',
-        archived: 0,
-        rebalanced: false,
-        files_modified: [],
-        needs_sync: false
-      }));
-      process.exit(0);
     }
 
     const filesModified = new Set();
     const filesSkippedDueToConflict = [];
 
-    const sourceUpdates = [];
-    let pendingArchiveTasks = [];
+    // 1. Repair from the last ledger.
+    let ledger = null;
+    try {
+      ledger = JSON.parse(fs.readFileSync(ledgerFile, 'utf8'));
+    } catch {
+      ledger = null;
+    }
+    if (ledger && ledgerExpired(ledger)) {
+      try { fs.unlinkSync(ledgerFile); } catch { /* already gone */ }
+      ledger = null;
+    }
 
-    // First pass: collect completed tasks + source truncation plans in memory.
-    for (const filePath of taskFiles) {
-      let content;
-      try {
-        content = fs.readFileSync(filePath, 'utf8');
-      } catch {
-        continue;
-      }
-
-      const lines = content.split('\n');
-
-      // Separate completed from incomplete tasks
-      const completedTasks = [];
-      const remainingLines = [];
-
-      for (const line of lines) {
-        if (line.match(/^- \[x\]/i)) {
-          completedTasks.push(line);
-        } else if (line.trim()) {
-          remainingLines.push(line);
+    let restored = [];
+    let removed = [];
+    if (ledger) {
+      const family = listTaskFamily(taskFile);
+      const originals = new Map(family.map(filePath => [path.basename(filePath), readOrNull(filePath)]));
+      const current = family.map(filePath => ({
+        name: path.basename(filePath),
+        lines: nonBlank(originals.get(path.basename(filePath)))
+      }));
+      const archiveLines = nonBlank(readOrNull(archiveFile));
+      const archiveSince = archiveLines.length >= ledger.archive_length
+        ? archiveLines.slice(ledger.archive_length)
+        : archiveLines;
+      const repair = repairFromLedger(ledger, current, archiveSince);
+      for (const [name, lines] of Object.entries(repair.files)) {
+        const filePath = path.join(taskDir, name);
+        const { conflict } = writeFileAtomicCAS(filePath, lines.length ? lines.join('\n') + '\n' : '', originals.get(name) ?? '');
+        if (conflict) {
+          filesSkippedDueToConflict.push(rel(filePath));
+          continue;
         }
+        filesModified.add(rel(filePath));
       }
-
-      // Stage completed tasks for archive write.
-      if (completedTasks.length > 0) {
-        sourceUpdates.push({
-          filePath,
-          originalContent: content,
-          remainingContent: remainingLines.join('\n') + '\n'
-        });
-        pendingArchiveTasks = pendingArchiveTasks.concat(completedTasks);
+      if (filesSkippedDueToConflict.length === 0) {
+        restored = repair.restored;
+        removed = repair.removed;
       }
     }
 
-    if (pendingArchiveTasks.length > 0) {
+    if (action === 'guard-ledger') {
+      console.log(JSON.stringify({
+        success: true,
+        action: 'guard-ledger',
+        restored,
+        removed,
+        files_modified: Array.from(filesModified),
+        files_skipped_due_to_conflict: filesSkippedDueToConflict,
+        needs_sync: filesModified.size > 0
+      }));
+      process.exit(0);
+    }
+
+    // 2. Archive completed tasks from the family and repeating.md.
+    const repeatingFile = path.join(taskDir, 'repeating.md');
+    const archiveSources = [...listTaskFamily(taskFile), ...(fs.existsSync(repeatingFile) ? [repeatingFile] : [])];
+    // A completed line archived by the previous run and back in a source file
+    // (a sync reverted the truncation) is dropped from the source, not archived twice.
+    const alreadyArchived = new Set(ledger?.archived || []);
+    const archiveContent = readOrNull(archiveFile);
+    const sourceUpdates = [];
+    const pendingArchive = [];
+    const pendingSet = new Set();
+
+    for (const filePath of archiveSources) {
+      const content = readOrNull(filePath);
+      if (content === null) continue;
+      const completed = [];
+      const remaining = [];
+      for (const line of content.split('\n')) {
+        if (/^- \[x\]/i.test(line)) completed.push(line);
+        else if (line.trim()) remaining.push(line);
+      }
+      if (completed.length === 0) continue;
+      sourceUpdates.push({ filePath, originalContent: content, remainingContent: remaining.join('\n') + '\n' });
+      for (const line of completed) {
+        if (alreadyArchived.has(line) || pendingSet.has(line)) continue;
+        pendingSet.add(line);
+        pendingArchive.push(line);
+      }
+    }
+
+    let archiveLength = nonBlank(archiveContent).length;
+    if (pendingArchive.length > 0) {
       // Write archive first so we never lose completed tasks.
-      archiveTasks = archiveTasks.concat(pendingArchiveTasks);
-      totalArchived = pendingArchiveTasks.length;
+      const archiveTasks = nonBlank(archiveContent).concat(pendingArchive);
+      archiveLength = archiveTasks.length;
       const archiveBytes = archiveTasks.join('\n') + '\n';
-      let archiveConflict = false;
-      if (archiveExisted) {
-        archiveConflict = writeFileAtomicCAS(archiveFile, archiveBytes, archiveContent).conflict;
+      if (archiveContent !== null) {
+        if (writeFileAtomicCAS(archiveFile, archiveBytes, archiveContent).conflict) {
+          console.log(JSON.stringify({
+            success: false,
+            error: 'Concurrent update to archive file; retry',
+            concurrent_update: true,
+            file: archiveFile,
+            files_modified: Array.from(filesModified),
+            files_skipped_due_to_conflict: filesSkippedDueToConflict
+          }));
+          process.exit(1);
+        }
       } else {
         writeFileAtomic(archiveFile, archiveBytes);
       }
-      if (archiveConflict) {
-        console.log(JSON.stringify({
-          success: false,
-          error: 'Concurrent update to archive file; retry',
-          concurrent_update: true,
-          file: archiveFile,
-          files_modified: [],
-          files_skipped_due_to_conflict: filesSkippedDueToConflict
-        }));
-        process.exit(1);
-      }
-      filesModified.add(path.relative(projectRoot, archiveFile));
-
-      // Second pass: CAS-truncate source files. Conflicts here leave benign
-      // duplicates (still-completed source lines + archived copy), never loss.
-      for (const update of sourceUpdates) {
-        const { conflict } = writeFileAtomicCAS(
-          update.filePath,
-          update.remainingContent,
-          update.originalContent
-        );
-        if (conflict) {
-          filesSkippedDueToConflict.push(path.relative(projectRoot, update.filePath));
-          continue;
-        }
-        filesModified.add(path.relative(projectRoot, update.filePath));
-      }
+      filesModified.add(rel(archiveFile));
     }
 
-    // Now rebalance ALL task files (main + numbered) if any exceed max tasks
+    // CAS-truncate source files. Conflicts here leave benign duplicates
+    // (still-completed source lines + archived copy), never loss.
+    for (const update of sourceUpdates) {
+      const { conflict } = writeFileAtomicCAS(update.filePath, update.remainingContent, update.originalContent);
+      if (conflict) {
+        filesSkippedDueToConflict.push(rel(update.filePath));
+        continue;
+      }
+      filesModified.add(rel(update.filePath));
+    }
+
+    // 3. Sort and spread the family across its files.
     let rebalanced = false;
     let rebalanceInfo = null;
 
-    // Collect all tasks from main file and existing numbered files
-    const allTasks = [];
-    const filesToRebalance = [taskFile]; // Start with main file
+    const family = listTaskFamily(taskFile);
+    const familyContents = family.map(readOrNull);
+    const familyLines = familyContents.map(nonBlank);
+    const allTasks = familyLines.flat();
+    // Never consolidate underflow into fewer files: that silently deleted
+    // numbered files the user was still using (#289).
+    const anyFileOverflows = familyLines.some(lines => lines.length > maxTasksPerFile);
+    const sortAll = entry.sort_all === true;
 
-    // Find all existing numbered files
-    const numberedFilePattern = new RegExp(`^${taskBaseName}-(\\d+)\\.md$`);
-    const numberedFiles = allFiles
-      .filter(f => numberedFilePattern.test(f))
-      .map(f => path.join(taskDir, f))
-      .sort();
+    let newLedger = null;
+    if (allTasks.length > 0 && (anyFileOverflows || sortAll)) {
+      const sorted = [...allTasks].sort(compareTaskLines);
+      const numberedPattern = new RegExp(`^${taskBaseName}-(\\d+)\\.md$`);
+      const targets = [];
 
-    filesToRebalance.push(...numberedFiles);
-
-    // Collect all tasks from all files
-    for (const filePath of filesToRebalance) {
-      if (fs.existsSync(filePath)) {
-        const content = fs.readFileSync(filePath, 'utf8');
-        const lines = content.split('\n').filter(line => line.trim());
-        allTasks.push(...lines);
-      }
-    }
-
-    // Only rebalance when an existing file actually overflows. Auto-consolidating
-    // underflow into a single file (the previous behavior) silently deletes
-    // numbered files even when the user is still using them, which is the
-    // bug tracked in #289.
-    const anyFileOverflows = filesToRebalance.some(f => {
-      if (!fs.existsSync(f)) return false;
-      const taskCount = fs.readFileSync(f, 'utf8').split('\n').filter(line => line.trim()).length;
-      return taskCount > maxTasksPerFile;
-    });
-
-    if (allTasks.length > 0 && anyFileOverflows) {
-
-        // Sort tasks alphabetically (case-insensitive) so they distribute a-z across files
-        allTasks.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-
-        // Calculate number of files needed. Never go below the existing count —
-        // we only split forward; we don't consolidate underflow.
-        const minFilesNeeded = Math.ceil(allTasks.length / maxTasksPerFile);
-        const numFilesNeeded = Math.max(minFilesNeeded, 1 + numberedFiles.length);
-
-        // Get existing numbered file numbers
-        const existingNums = numberedFiles
-          .map(f => parseInt(path.basename(f).match(numberedFilePattern)[1]))
-          .sort((a, b) => a - b);
-
-        // Always rewrite every existing numbered file (so its content is part of
-        // the redistribution and we don't end up with duplicates); add new file
-        // numbers for any extra files we need beyond what exists.
-        const targetFileNums = [...existingNums];
-        let nextNum = Math.max(0, ...existingNums) + 1;
-        while (targetFileNums.length < numFilesNeeded - 1) {
-          targetFileNums.push(nextNum++);
+      if (anyFileOverflows) {
+        const numFiles = Math.max(Math.ceil(sorted.length / maxTasksPerFile), family.length);
+        // Spread evenly so no file is anywhere near the max afterwards.
+        const perFile = Math.ceil(sorted.length / numFiles);
+        let nextNum = Math.max(0, ...family.slice(1).map(f => Number(path.basename(f).match(numberedPattern)[1]))) + 1;
+        for (let i = 0; i < numFiles; i++) {
+          const filePath = family[i] || path.join(taskDir, `${taskBaseName}-${nextNum++}.md`);
+          targets.push({ path: filePath, lines: sorted.slice(i * perFile, (i + 1) * perFile) });
         }
-
-        // Distribute tasks across files
-        const filesToWrite = [];
-
-        // Spread tasks evenly across the available files so no single file is
-        // anywhere near `maxTasksPerFile` after the rebalance.
-        const perFile = Math.ceil(allTasks.length / numFilesNeeded);
-
-        // Main file gets first chunk
-        const mainChunk = allTasks.slice(0, perFile);
-        filesToWrite.push({
-          path: taskFile,
-          tasks: mainChunk,
-          name: path.basename(taskFile)
+      } else {
+        // Keep each file's size so only order moves.
+        let offset = 0;
+        family.forEach((filePath, i) => {
+          targets.push({ path: filePath, lines: sorted.slice(offset, offset + familyLines[i].length) });
+          offset += familyLines[i].length;
         });
+      }
 
-        // Remaining tasks go to numbered files (every existing one + any extras)
-        let taskIndex = perFile;
-        for (const fileNum of targetFileNums) {
-          const filePath = path.join(taskDir, `${taskBaseName}-${fileNum}.md`);
-          const chunk = allTasks.slice(taskIndex, taskIndex + perFile);
+      const before = Object.fromEntries(family.map((filePath, i) => [path.basename(filePath), familyLines[i]]));
+      const after = Object.fromEntries(targets.map(t => [path.basename(t.path), t.lines]));
+      const toWrite = targets.filter(t => {
+        const index = family.indexOf(t.path);
+        const existing = index === -1 ? null : familyContents[index];
+        return existing !== t.lines.join('\n') + '\n';
+      });
 
-          filesToWrite.push({
-            path: filePath,
-            tasks: chunk,
-            name: path.basename(filePath)
-          });
-          taskIndex += perFile;
-        }
+      if (toWrite.length > 0) {
+        newLedger = buildLedger({ before, after, archived: pendingArchive, archiveLength });
+        fs.mkdirSync(path.dirname(ledgerFile), { recursive: true });
+        writeFileAtomic(ledgerFile, JSON.stringify(newLedger, null, 2) + '\n');
 
         // Crash-safe write: rename each target to a .rebalance-bak-<ts> first,
         // then write the new distribution, then drop the backups. If a write
         // throws, restore the backups so the vault is never left with deleted-
-        // but-unreplaced files. unlinkSync was the previous behavior — it left
-        // a window where an interrupted run could lose data.
+        // but-unreplaced files.
         const backups = [];
         const rebalanceSuffix = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-        for (const fileInfo of filesToWrite) {
-          if (fs.existsSync(fileInfo.path)) {
-            const backupPath = `${fileInfo.path}.rebalance-bak-${rebalanceSuffix}`;
-            try {
-              fs.renameSync(fileInfo.path, backupPath);
-              backups.push({ original: fileInfo.path, backup: backupPath });
-            } catch (renameError) {
-              if (renameError.code === 'ENOENT') {
-                // File vanished between exists() and rename(); safe to skip.
-              } else {
-                // Permission error, destination collision, etc. — abort the
-                // entire rebalance so we never write a file we can't roll back.
-                throw renameError;
-              }
-            }
+        for (const target of toWrite) {
+          if (!fs.existsSync(target.path)) continue;
+          const backupPath = `${target.path}.rebalance-bak-${rebalanceSuffix}`;
+          try {
+            fs.renameSync(target.path, backupPath);
+            backups.push({ original: target.path, backup: backupPath });
+          } catch (renameError) {
+            // File vanished between exists() and rename(); safe to skip.
+            if (renameError.code !== 'ENOENT') throw renameError;
           }
         }
 
-        const distributionInfo = [];
         const writtenPaths = [];
         try {
-          for (const fileInfo of filesToWrite) {
-            writeFileAtomic(fileInfo.path, fileInfo.tasks.join('\n') + '\n');
-            writtenPaths.push(fileInfo.path);
-            filesModified.add(path.relative(projectRoot, fileInfo.path));
-
-            distributionInfo.push({
-              file: fileInfo.name,
-              task_count: fileInfo.tasks.length
-            });
+          for (const target of toWrite) {
+            writeFileAtomic(target.path, target.lines.length ? target.lines.join('\n') + '\n' : '');
+            writtenPaths.push(target.path);
+            filesModified.add(rel(target.path));
           }
         } catch (writeError) {
-          // Roll back: remove any newly written distribution files, then restore
-          // originals from backups before re-throwing. Without removing the
-          // successful writes first, a later failure can leave brand-new
-          // numbered files behind beside the restored originals.
+          // Remove the new writes first, then restore the originals, so a
+          // late failure can't leave new numbered files beside restored ones.
           for (const filePath of writtenPaths) {
-            try {
-              if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-            } catch {
-              // Best effort cleanup before backup restore.
-            }
+            try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch { /* best effort */ }
           }
           for (const { original, backup } of backups) {
             try { fs.renameSync(backup, original); } catch { /* best effort */ }
           }
+          try { fs.unlinkSync(ledgerFile); } catch { /* best effort */ }
           throw writeError;
         }
 
-        // All writes succeeded — drop the backups.
         for (const { backup } of backups) {
           try { fs.unlinkSync(backup); } catch { /* best effort */ }
         }
@@ -1155,18 +1148,31 @@ ${JSON.stringify(batch.map((t, idx) => ({ index: idx, title: t.title })), null, 
         rebalanced = true;
         rebalanceInfo = {
           total_tasks: allTasks.length,
-          files_created: filesToWrite.length,
+          files_created: targets.length,
+          files_written: toWrite.length,
           max_per_file: maxTasksPerFile,
-          distribution: distributionInfo
+          distribution: targets.map(t => ({ file: path.basename(t.path), task_count: t.lines.length }))
         };
+      }
+    }
+
+    // Without a rebalance, still remember what was archived so a reverted
+    // truncation can't archive it twice; keep the old ledger's moves.
+    if (!newLedger && pendingArchive.length > 0) {
+      const kept = ledger || buildLedger({ before: {}, after: {}, archiveLength });
+      const merged = { ...kept, archived: [...(kept.archived || []), ...pendingArchive] };
+      fs.mkdirSync(path.dirname(ledgerFile), { recursive: true });
+      writeFileAtomic(ledgerFile, JSON.stringify(merged, null, 2) + '\n');
     }
 
     console.log(JSON.stringify({
       success: true,
       action: 'archive-completed',
-      archived: totalArchived,
+      archived: pendingArchive.length,
       rebalanced,
       rebalance_info: rebalanceInfo,
+      restored,
+      removed,
       files_modified: Array.from(filesModified),
       files_skipped_due_to_conflict: filesSkippedDueToConflict,
       needs_sync: filesModified.size > 0

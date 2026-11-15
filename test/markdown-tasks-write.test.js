@@ -218,3 +218,95 @@ describe('markdown-tasks/write.js (fs-atomic rollout)', () => {
     expect(fs.readdirSync(path.dirname(tasksFile)).filter(f => f.includes('.rebalance-bak-'))).toEqual([]);
   });
 });
+
+describe('markdown-tasks/write.js alphabetized files and ledger guard', () => {
+  let vaultPath;
+  let tasksDir;
+  const sorted = { auto_archive_completed: true };
+  const file = name => path.join(tasksDir, name);
+  const lines = name => fs.readFileSync(file(name), 'utf8').split('\n').filter(l => l.trim());
+  const write = (name, list) => fs.writeFileSync(file(name), list.join('\n') + '\n');
+
+  beforeEach(() => {
+    vaultPath = fs.mkdtempSync(path.join(os.tmpdir(), 'md-tasks-ledger-'));
+    tasksDir = path.join(vaultPath, 'tasks');
+    fs.mkdirSync(tasksDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(vaultPath, { recursive: true, force: true });
+  });
+
+  test('add inserts at the sorted place in the file whose range covers it', () => {
+    write('tasks.md', ['- [ ] Alpha', '- [ ] Charlie']);
+    write('tasks-1.md', ['- [ ] Mike', '- [ ] Zulu']);
+
+    const early = runWrite({ action: 'add', title: 'Bravo' }, { vaultPath, config: sorted });
+    const late = runWrite({ action: 'add', title: 'November' }, { vaultPath, config: sorted });
+
+    expect(early.file).toBe(file('tasks.md'));
+    expect(late.file).toBe(file('tasks-1.md'));
+    expect(lines('tasks.md').map(l => l.trim())).toEqual(['- [ ] Alpha', '- [ ] Bravo', '- [ ] Charlie']);
+    expect(lines('tasks-1.md')[1]).toMatch(/^- \[ \] November/);
+  });
+
+  test('add still appends when the source does not rebalance', () => {
+    write('tasks.md', ['- [ ] Zulu']);
+    runWrite({ action: 'add', title: 'Alpha' }, { vaultPath });
+    expect(lines('tasks.md')[0]).toBe('- [ ] Zulu');
+  });
+
+  test('sort_all re-sorts without changing file sizes and writes only changed files', () => {
+    write('tasks.md', ['- [ ] Bravo', '- [ ] Alpha']);
+    write('tasks-1.md', ['- [ ] Mike', '- [ ] Zulu']);
+    const before = fs.statSync(file('tasks-1.md')).mtimeMs;
+
+    const result = runWrite({ action: 'archive-completed', sort_all: true }, { vaultPath });
+
+    expect(result.rebalanced).toBe(true);
+    expect(result.rebalance_info.files_written).toBe(1);
+    expect(lines('tasks.md')).toEqual(['- [ ] Alpha', '- [ ] Bravo']);
+    expect(fs.statSync(file('tasks-1.md')).mtimeMs).toBe(before);
+  });
+
+  test('a sync reverting one rebalanced file is repaired by the next guard', () => {
+    const oldMain = ['- [ ] Mike', '- [ ] Delta', '- [ ] Zulu'];
+    const oldOne = ['- [ ] Alpha', '- [ ] Bravo', '- [ ] Charlie'];
+    write('tasks.md', oldMain);
+    write('tasks-1.md', oldOne);
+
+    const nightly = runWrite({ action: 'archive-completed', sort_all: true }, { vaultPath });
+    expect(nightly.rebalanced).toBe(true);
+    expect(lines('tasks.md')).toEqual(['- [ ] Alpha', '- [ ] Bravo', '- [ ] Charlie']);
+
+    // Another device's older tasks.md wins the file sync, with one new task.
+    write('tasks.md', [...oldMain, '- [ ] Echo']);
+
+    const guard = runWrite({ action: 'guard-ledger' }, { vaultPath });
+    expect(guard.restored).toEqual(['- [ ] Alpha', '- [ ] Bravo', '- [ ] Charlie']);
+    expect(guard.removed.sort()).toEqual(['- [ ] Delta', '- [ ] Mike', '- [ ] Zulu']);
+    expect(lines('tasks.md')).toEqual(['- [ ] Alpha', '- [ ] Bravo', '- [ ] Charlie', '- [ ] Echo']);
+    expect(lines('tasks-1.md')).toEqual(['- [ ] Delta', '- [ ] Mike', '- [ ] Zulu']);
+
+    const again = runWrite({ action: 'guard-ledger' }, { vaultPath });
+    expect(again.files_modified).toEqual([]);
+  });
+
+  test('guard-ledger does nothing without a ledger', () => {
+    write('tasks.md', ['- [ ] Alpha']);
+    const result = runWrite({ action: 'guard-ledger' }, { vaultPath });
+    expect(result).toMatchObject({ success: true, restored: [], removed: [], files_modified: [] });
+  });
+
+  test('a completed task brought back by a sync is not archived twice', () => {
+    write('tasks.md', ['- [ ] Alpha', '- [x] Done thing']);
+    expect(runWrite({ action: 'archive-completed' }, { vaultPath }).archived).toBe(1);
+
+    write('tasks.md', ['- [ ] Alpha', '- [x] Done thing']);
+    const second = runWrite({ action: 'archive-completed' }, { vaultPath });
+
+    expect(second.archived).toBe(0);
+    expect(lines('tasks.md')).toEqual(['- [ ] Alpha']);
+    expect(lines('tasks-archive.md')).toEqual(['- [x] Done thing']);
+  });
+});
