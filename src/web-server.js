@@ -5702,11 +5702,13 @@ ${cleanContent}
             const currentContent = document.querySelector('.card-body.markdown-content');
             
             if (newContent && currentContent) {
-              // Preserve scroll position
+              // Preserve scroll position and which callouts are open
               const scrollTop = currentContent.scrollTop;
+              const detailsState = captureDetailsState(currentContent);
               
               // Replace the content
               currentContent.innerHTML = newContent.innerHTML;
+              restoreDetailsState(currentContent, detailsState);
               loadDeferredBlocks(currentContent);
               
               // Restore scroll position

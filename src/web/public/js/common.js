@@ -919,6 +919,32 @@ function restoreCollapseStates() {
   });
 }
 
+// Which callouts (<details>) are open, so a content refresh can keep them as
+// the user left them. Each is keyed by its summary text plus how many earlier
+// ones share that text, which survives re-rendering the same page.
+function detailsByKey(root) {
+  const seen = new Map();
+  return Array.from(root.querySelectorAll('details')).map(details => {
+    const summary = details.querySelector('summary');
+    const label = summary ? summary.textContent.trim() : '';
+    const n = seen.get(label) || 0;
+    seen.set(label, n + 1);
+    return { details, key: label + '#' + n };
+  });
+}
+
+function captureDetailsState(root) {
+  const state = new Map();
+  for (const { details, key } of detailsByKey(root)) state.set(key, details.open);
+  return state;
+}
+
+function restoreDetailsState(root, state) {
+  for (const { details, key } of detailsByKey(root)) {
+    if (state.has(key)) details.open = state.get(key);
+  }
+}
+
 // Task checkbox toggle
 async function toggleTaskCheckbox(checkbox) {
   const taskId = checkbox.dataset.taskId;
