@@ -14,6 +14,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { execFileSync } from 'child_process';
 
@@ -25,7 +26,7 @@ const RELATIVE_TASKS_PATH = 'tasks/tasks.md';
 // The plugin joins PROJECT_ROOT with the relative default_task_file path, so
 // the runner points PROJECT_ROOT at the per-test temp vault and uses a
 // relative task path inside it.
-function runWrite(entry, { vaultPath, config = {} } = {}) {
+function runWrite(entry, { vaultPath, config = {}, extraEnv = {} } = {}) {
   const env = {
     ...process.env,
     PROJECT_ROOT: vaultPath,
@@ -36,6 +37,7 @@ function runWrite(entry, { vaultPath, config = {} } = {}) {
       ...config,
     }),
     ENTRY_JSON: JSON.stringify(entry),
+    ...extraEnv,
   };
   let stdout;
   try {
@@ -216,5 +218,165 @@ describe('markdown-tasks/write.js (fs-atomic rollout)', () => {
     expect(fs.readFileSync(tasksFile, 'utf8')).toBe(beforeMain);
     expect(fs.readFileSync(overflowPath, 'utf8')).toBe(beforeOverflow);
     expect(fs.readdirSync(path.dirname(tasksFile)).filter(f => f.includes('.rebalance-bak-'))).toEqual([]);
+  });
+});
+
+describe('markdown-tasks/write.js alphabetized files and ledger guard', () => {
+  let vaultPath;
+  let tasksDir;
+  const sorted = { auto_archive_completed: true };
+  const file = name => path.join(tasksDir, name);
+  const lines = name => fs.readFileSync(file(name), 'utf8').split('\n').filter(l => l.trim());
+  const write = (name, list) => fs.writeFileSync(file(name), list.join('\n') + '\n');
+
+  beforeEach(() => {
+    vaultPath = fs.mkdtempSync(path.join(os.tmpdir(), 'md-tasks-ledger-'));
+    tasksDir = path.join(vaultPath, 'tasks');
+    fs.mkdirSync(tasksDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(vaultPath, { recursive: true, force: true });
+  });
+
+  test('add inserts at the sorted place in the file whose range covers it', () => {
+    write('tasks.md', ['- [ ] Alpha', '- [ ] Charlie']);
+    write('tasks-1.md', ['- [ ] Mike', '- [ ] Zulu']);
+
+    const early = runWrite({ action: 'add', title: 'Bravo' }, { vaultPath, config: sorted });
+    const late = runWrite({ action: 'add', title: 'November' }, { vaultPath, config: sorted });
+
+    expect(early.file).toBe(file('tasks.md'));
+    expect(late.file).toBe(file('tasks-1.md'));
+    expect(lines('tasks.md').map(l => l.trim())).toEqual(['- [ ] Alpha', '- [ ] Bravo', '- [ ] Charlie']);
+    expect(lines('tasks-1.md')[1]).toMatch(/^- \[ \] November/);
+  });
+
+  test('add still appends when the source does not rebalance', () => {
+    write('tasks.md', ['- [ ] Zulu']);
+    runWrite({ action: 'add', title: 'Alpha' }, { vaultPath });
+    expect(lines('tasks.md')[0]).toBe('- [ ] Zulu');
+  });
+
+  test('sort_all re-sorts without changing file sizes and writes only changed files', () => {
+    write('tasks.md', ['- [ ] Bravo', '- [ ] Alpha']);
+    write('tasks-1.md', ['- [ ] Mike', '- [ ] Zulu']);
+    const before = fs.statSync(file('tasks-1.md')).mtimeMs;
+
+    const result = runWrite({ action: 'archive-completed', sort_all: true }, { vaultPath });
+
+    expect(result.rebalanced).toBe(true);
+    expect(result.rebalance_info.files_written).toBe(1);
+    expect(lines('tasks.md')).toEqual(['- [ ] Alpha', '- [ ] Bravo']);
+    expect(fs.statSync(file('tasks-1.md')).mtimeMs).toBe(before);
+  });
+
+  test('a sync reverting one rebalanced file is repaired by the next guard', () => {
+    const oldMain = ['- [ ] Mike', '- [ ] Delta', '- [ ] Zulu'];
+    const oldOne = ['- [ ] Alpha', '- [ ] Bravo', '- [ ] Charlie'];
+    write('tasks.md', oldMain);
+    write('tasks-1.md', oldOne);
+
+    const nightly = runWrite({ action: 'archive-completed', sort_all: true }, { vaultPath });
+    expect(nightly.rebalanced).toBe(true);
+    expect(lines('tasks.md')).toEqual(['- [ ] Alpha', '- [ ] Bravo', '- [ ] Charlie']);
+
+    // Another device's older tasks.md wins the file sync, with one new task.
+    write('tasks.md', [...oldMain, '- [ ] Echo']);
+
+    const guard = runWrite({ action: 'guard-ledger' }, { vaultPath });
+    expect(guard.restored).toEqual(['- [ ] Alpha', '- [ ] Bravo', '- [ ] Charlie']);
+    expect(guard.removed.sort()).toEqual(['- [ ] Delta', '- [ ] Mike', '- [ ] Zulu']);
+    expect(lines('tasks.md')).toEqual(['- [ ] Alpha', '- [ ] Bravo', '- [ ] Charlie', '- [ ] Echo']);
+    expect(lines('tasks-1.md')).toEqual(['- [ ] Delta', '- [ ] Mike', '- [ ] Zulu']);
+
+    const again = runWrite({ action: 'guard-ledger' }, { vaultPath });
+    expect(again.files_modified).toEqual([]);
+  });
+
+  test('guard-ledger does nothing without a ledger', () => {
+    write('tasks.md', ['- [ ] Alpha']);
+    const result = runWrite({ action: 'guard-ledger' }, { vaultPath });
+    expect(result).toMatchObject({ success: true, restored: [], removed: [], files_modified: [] });
+  });
+
+  test('a completed task brought back by a sync is not archived twice', () => {
+    write('tasks.md', ['- [ ] Alpha', '- [x] Done thing']);
+    expect(runWrite({ action: 'archive-completed' }, { vaultPath }).archived).toBe(1);
+
+    write('tasks.md', ['- [ ] Alpha', '- [x] Done thing']);
+    const second = runWrite({ action: 'archive-completed' }, { vaultPath });
+
+    expect(second.archived).toBe(0);
+    expect(lines('tasks.md')).toEqual(['- [ ] Alpha']);
+    expect(lines('tasks-archive.md')).toEqual(['- [x] Done thing']);
+  });
+
+  test('archives a completion when source and archive both revert to pre-archive contents', () => {
+    write('tasks.md', ['- [x] Previously done']);
+    write('tasks-archive.md', ['- [x] Older archived task']);
+    expect(runWrite({ action: 'archive-completed' }, { vaultPath }).archived).toBe(1);
+
+    write('tasks.md', ['- [x] Previously done']);
+    write('tasks-archive.md', ['- [x] Older archived task']);
+    const result = runWrite({ action: 'archive-completed' }, { vaultPath });
+
+    expect(result.archived).toBe(1);
+    expect(lines('tasks.md')).toEqual([]);
+    expect(lines('tasks-archive.md')).toEqual(['- [x] Older archived task', '- [x] Previously done']);
+  });
+
+  test('repair conflict aborts maintenance and preserves the movement ledger', () => {
+    write('tasks.md', ['- [ ] Delta']);
+    write('tasks-1.md', ['- [ ] Bravo', '- [ ] Delta']);
+    const ledgerName = `${crypto.createHash('sha1').update(file('tasks.md')).digest('hex').slice(0, 12)}.json`;
+    const ledgerFile = path.join(vaultPath, '.data', 'task-ledgers', ledgerName);
+    fs.mkdirSync(path.dirname(ledgerFile), { recursive: true });
+    const ledger = {
+      version: 1,
+      created_at: new Date().toISOString(),
+      archive_length: 0,
+      files: {
+        'tasks.md': {
+          moved_in: [{ key: 'alpha', line: '- [ ] Alpha' }],
+          moved_out: ['delta']
+        }
+      }
+    };
+    fs.writeFileSync(ledgerFile, JSON.stringify(ledger));
+    const ledgerBefore = fs.readFileSync(ledgerFile, 'utf8');
+    const preloadFile = path.join(vaultPath, 'race-preload.mjs');
+    fs.writeFileSync(preloadFile, `
+      import fs from 'node:fs';
+      const readFileSync = fs.readFileSync.bind(fs);
+      let injected = false;
+      fs.readFileSync = function (filePath, ...args) {
+        const content = readFileSync(filePath, ...args);
+        if (!injected && String(filePath) === process.env.TASK_RACE_FILE) {
+          injected = true;
+          fs.writeFileSync(filePath, process.env.TASK_RACE_CONTENT, 'utf8');
+        }
+        return content;
+      };
+    `);
+
+    const result = runWrite(
+      { action: 'archive-completed', sort_all: true },
+      {
+        vaultPath,
+        extraEnv: {
+          NODE_OPTIONS: `${process.env.NODE_OPTIONS || ''} --import=${preloadFile}`,
+          TASK_RACE_FILE: file('tasks.md'),
+          TASK_RACE_CONTENT: '- [ ] Concurrent update\n'
+        }
+      }
+    );
+
+    expect(result).toMatchObject({ success: false, concurrent_update: true });
+    expect(result.files_skipped_due_to_conflict).toContain('tasks/tasks.md');
+    expect(fs.readFileSync(ledgerFile, 'utf8')).toBe(ledgerBefore);
+    expect(fs.readFileSync(file('tasks.md'), 'utf8')).toBe('- [ ] Concurrent update\n');
+    expect(lines('tasks-1.md')).toEqual(['- [ ] Bravo', '- [ ] Delta']);
+    expect(fs.existsSync(file('tasks-archive.md'))).toBe(false);
   });
 });
