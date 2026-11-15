@@ -1484,6 +1484,8 @@ function writeHooksMessage({ taggingResult, archiveResult, dateCreatedResult, cl
   return [
     archiveResult?.archived ? `, archived ${archiveResult.archived}` : '',
     archiveResult?.rebalanced ? `, rebalanced` : '',
+    archiveResult?.restored?.length ? `, restored ${archiveResult.restored.length} lost task(s)` : '',
+    archiveResult?.removed?.length ? `, removed ${archiveResult.removed.length} duplicate(s)` : '',
     taggingResult?.tagged ? `, tagged ${taggingResult.tagged}` : '',
     dateCreatedResult?.added ? `, dated ${dateCreatedResult.added}` : '',
     classificationResult?.classified ? `, classified ${classificationResult.classified}` : '',
@@ -2167,32 +2169,36 @@ async function runAutoStageClassification(options) {
 // - auto_classify_stages: Adds #stage/... tags during sync
 // - auto_add_date_created: Adds ➕ YYYY-MM-DD markers during sync
 // - auto_add_priority: Adds priority emojis during sync
-// - auto_archive_completed: Archives completed tasks and rebalances files during sync
+// - auto_archive_completed: bin/tasks-nightly archives completed tasks and
+//   rebalances files once a night; each sync only repairs from its ledger
 // Enable in config.toml under [plugins.markdown-tasks.<source>]
 
 /**
- * Internal function for auto-archiving during sync
- * Called when auto_archive_completed is enabled in source config
- * Archives completed tasks and rebalances task files
- * @param {object} options - { plugin, sourceName, sourceConfig }
- * @returns {Promise<{archived: number, rebalanced: boolean, files_modified: string[]}>}
+ * Per-sync guard for alphabetized task files. Archiving and rebalancing run
+ * nightly (bin/tasks-nightly); a sync only puts back what a file sync undid
+ * since that rebalance, per the ledger it wrote.
+ * @param {object} options - { plugin, sourceName }
+ * @returns {Promise<{archived: number, rebalanced: boolean, restored: string[], removed: string[], files_modified: string[]}>}
  */
 async function runAutoArchive(options) {
-  const { plugin, sourceName, sourceConfig } = options;
+  const { plugin, sourceName } = options;
 
-  // Call the write command with archive-completed action
-  const writeResult = await writePluginEntry(plugin.name, sourceName, {
-    action: 'archive-completed',
-    max_tasks_per_file: sourceConfig.max_tasks_per_file || 50
-  });
+  const writeResult = await writePluginEntry(plugin.name, sourceName, { action: 'guard-ledger' });
 
   if (!writeResult.success) {
     throw new Error(writeResult.error);
   }
 
+  const restored = writeResult.data?.restored || [];
+  const removed = writeResult.data?.removed || [];
+  for (const line of restored) console.log(`    ↩︎ restored lost task: ${line}`);
+  for (const line of removed) console.log(`    ✂︎ removed duplicate task: ${line}`);
+
   return {
-    archived: writeResult.data?.archived || 0,
-    rebalanced: writeResult.data?.rebalanced || false,
+    archived: 0,
+    rebalanced: false,
+    restored,
+    removed,
     files_modified: writeResult.data?.files_modified || []
   };
 }
