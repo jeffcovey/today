@@ -59,10 +59,11 @@ const sources = {
           const rows = db.prepare(
             "SELECT DISTINCT category_group FROM financial_transactions WHERE category_group IS NOT NULL AND category_group != '' ORDER BY category_group"
           ).all();
-          const categories = rows.map(r => ({
-            name: r.category_group,
-            description: `Category group: ${r.category_group}`
-          }));
+          const categories = rows.flatMap(r => [
+            { name: r.category_group, description: `Category group: ${r.category_group} (net)` },
+            { name: `${r.category_group}: Income`, description: `Category group: ${r.category_group}, inflows only` },
+            { name: `${r.category_group}: Expenses`, description: `Category group: ${r.category_group}, outflows only` }
+          ]);
           return [...builtIn, ...categories];
         } catch {
           return builtIn;
@@ -75,18 +76,38 @@ const sources = {
     },
     buildQuery(metric, dateModifier) {
       const monthExpr = "strftime('%Y-%m', date)";
+      const quote = (s) => `'${String(s).replace(/'/g, "''")}'`;
       let amountFilter;
+
+      // "<group>: Income" and "<group>: Expenses" split one category group by
+      // direction, so a group holding both, like a side business whose income
+      // has its own category, can be graphed as income against expenses.
+      const split = metric.match(/^(.+):\s*(Income|Expenses)$/);
 
       if (metric === 'Expenses') {
         amountFilter = 'amount < 0';
       } else if (metric === 'Income') {
         amountFilter = 'amount > 0';
+      } else if (split) {
+        const [, group, direction] = split;
+        amountFilter = `category_group = ${quote(group.trim())} AND amount ${direction === 'Income' ? '>' : '<'} 0`;
       } else {
         // Treat as a category_group name
-        amountFilter = `category_group = '${metric.replace(/'/g, "''")}'`;
+        amountFilter = `category_group = ${quote(metric)}`;
       }
 
-      return `SELECT ${monthExpr} as month, ABS(SUM(amount)) as total, '$' as units FROM financial_transactions WHERE ${amountFilter} AND date >= DATE('now', '${dateModifier}') GROUP BY ${monthExpr} ORDER BY month ASC`;
+      // Count only what happened, once, as bin/finance does: not a row a
+      // higher-precedence source superseded (the same transaction from a
+      // second plugin), not a scheduled or future projection, and not a
+      // transfer between accounts, which is neither income nor expense.
+      const reportable = [
+        'superseded_by IS NULL',
+        'IFNULL(scheduled, 0) = 0',
+        'IFNULL(transfer, 0) = 0',
+        "date <= DATE('now')"
+      ].join(' AND ');
+
+      return `SELECT ${monthExpr} as month, ABS(SUM(amount)) as total, '$' as units FROM financial_transactions WHERE ${amountFilter} AND ${reportable} AND date >= DATE('now', '${dateModifier}') GROUP BY ${monthExpr} ORDER BY month ASC`;
     }
   },
 
