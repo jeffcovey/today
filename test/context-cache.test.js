@@ -11,7 +11,7 @@ jest.unstable_mockModule('../src/config.js', () => ({
   getTimezone: jest.fn().mockReturnValue('America/New_York'),
   getConfigPath: jest.fn().mockReturnValue('config.toml'),
   getFullConfig: jest.fn().mockReturnValue({}),
-  getAbsoluteVaultPath: jest.fn(() => contextVault),
+  getVaultPath: jest.fn(() => contextVault),
 }));
 
 // Mock plugin-loader so context gathering sees no enabled plugins and spawns

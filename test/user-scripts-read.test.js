@@ -123,6 +123,17 @@ console.log(process.env.VAULT_PATH);
       expect(output.context).toBe('from the real vault');
     });
 
+    test('reads names that only start with two dots', () => {
+      const vaultDir = path.join(tempRoot, 'vault');
+      fs.mkdirSync(path.join(vaultDir, '..context'), { recursive: true });
+      fs.writeFileSync(path.join(vaultDir, '..reading.md'), 'one');
+      fs.writeFileSync(path.join(vaultDir, '..context', 'b.md'), 'two');
+
+      const { output } = runContextOnly({ context_files: ['..reading.md', '..context/b.md'] });
+
+      expect(output.context).toBe('one\n\ntwo');
+    });
+
     test('cuts a long file at 8 KB', () => {
       const vaultDir = path.join(tempRoot, 'vault');
       fs.mkdirSync(vaultDir, { recursive: true });

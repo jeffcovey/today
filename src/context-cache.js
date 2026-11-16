@@ -23,21 +23,19 @@ const execAsync = promisify(exec);
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
- * The vault the context runners read context_files from: VAULT_PATH when set
- * (resolved against the project root, as user-scripts does), else the
- * configured vault.
+ * The vault the context runners read context_files from: VAULT_PATH when
+ * set, else the configured vault, resolved against the project root
+ * the way user-scripts resolves it (an absolute path stays as it is).
  */
 export function getContextVaultPath() {
-  return process.env.VAULT_PATH
-    ? path.resolve(REPO_ROOT, process.env.VAULT_PATH)
-    : getAbsoluteVaultPath();
+  return path.resolve(REPO_ROOT, process.env.VAULT_PATH || getVaultPath());
 }
 
 import { getPluginTypes, getAIMetadata, generateAIContextBlock, schemas } from './plugin-schemas.js';
 import {
   getAIInstructionsByType, getPluginSources, runContextPlugins, getContextSources, getSourceContextFiles
 } from './plugin-loader.js';
-import { getConfigPath, getTimezone, getAbsoluteVaultPath } from './config.js';
+import { getConfigPath, getTimezone, getVaultPath } from './config.js';
 import { fileURLToPath } from 'url';
 import { getTodayDate } from './date-utils.js';
 

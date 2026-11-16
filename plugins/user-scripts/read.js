@@ -13,7 +13,7 @@
  */
 
 import { readdirSync, statSync, chmodSync, existsSync, realpathSync, openSync, readSync, closeSync } from 'fs';
-import { join, resolve, relative, isAbsolute } from 'path';
+import { join, resolve, relative, isAbsolute, sep } from 'path';
 import { spawnSync } from 'child_process';
 
 const config   = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
@@ -33,7 +33,7 @@ const CONTEXT_FILE_MAX_BYTES = 8 * 1024;
  */
 function isInside(root, target) {
   const rel = relative(root, target);
-  return Boolean(rel) && !rel.startsWith('..') && !isAbsolute(rel);
+  return Boolean(rel) && rel !== '..' && !rel.startsWith('..' + sep) && !isAbsolute(rel);
 }
 
 function readContextFiles(files) {
