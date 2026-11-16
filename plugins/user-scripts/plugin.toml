@@ -44,6 +44,19 @@ output. A non-zero exit code marks that script as failed.
 Scripts are not run when CONTEXT_ONLY is set (i.e. during AI context
 gathering). They only run on explicit syncs.
 
+FEEDING AI CONTEXT
+
+A script can put what it works out in front of the AI by writing it to a
+file and listing that file in `context_files` (paths relative to the
+vault). During context gathering (`bin/today`, `bin/context`, the MCP
+get_context tool) the plugin runs no scripts; it reads those files and
+includes their contents in the context. Missing files are skipped, paths
+outside the vault are refused, and each file is cut at 8 KB.
+
+  [plugins.user-scripts.default]
+  enabled = true
+  context_files = ["today/context/reading-challenge.md"]
+
 SETUP
 
 1. Place executable scripts in the configured directory (default:
@@ -81,3 +94,4 @@ read = "./read.js"
 [settings]
 scripts_directory = { type = "string", default = "vault/scripts/user-scripts", description = "Directory containing user scripts to run (relative to project root)" }
 timeout_seconds = { type = "number", default = 30, description = "Maximum seconds to wait for each script" }
+context_files = { type = "array", default = [], description = "Vault-relative files whose contents go into AI context (e.g. ones your scripts write)" }

@@ -38,6 +38,12 @@ describe('readLiveContext', () => {
     expect(text).toContain('vault-changes/default failed or ran too long.');
   });
 
+  test('a source with empty context adds no heading', async () => {
+    const run = async entry => ({ data: { context: entry.pluginName === 'stages' ? 'stages says hi' : '' } });
+    const text = await readLiveContext({ config: {}, getSources, run });
+    expect(text).toBe('### stages\n\nstages says hi');
+  });
+
   test('weather runs when location is shared (it is by default)', () => {
     const { run, skipped } = selectContextSources(sources, {});
     expect(run.map(s => s.sourceId)).toContain('weather-context/default');
