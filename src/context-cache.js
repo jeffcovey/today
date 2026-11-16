@@ -20,14 +20,28 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+/**
+ * The vault the context runners read context_files from: VAULT_PATH when
+ * set, else the configured vault, resolved against the project root
+ * the way user-scripts resolves it (an absolute path stays as it is).
+ */
+export function getContextVaultPath() {
+  return path.resolve(REPO_ROOT, process.env.VAULT_PATH || getVaultPath());
+}
+
 import { getPluginTypes, getAIMetadata, generateAIContextBlock, schemas } from './plugin-schemas.js';
-import { getAIInstructionsByType, getPluginSources, runContextPlugins } from './plugin-loader.js';
-import { getConfigPath, getTimezone } from './config.js';
+import {
+  getAIInstructionsByType, getPluginSources, runContextPlugins, getContextSources, getSourceContextFiles
+} from './plugin-loader.js';
+import { getConfigPath, getTimezone, getVaultPath } from './config.js';
+import { fileURLToPath } from 'url';
 import { getTodayDate } from './date-utils.js';
 
 // Bump when the gather logic below changes in a way that should invalidate
 // every existing cache entry across an upgrade.
-export const CONTEXT_CACHE_VERSION = 2;
+export const CONTEXT_CACHE_VERSION = 3;
 
 // How many cache rows to retain (one per distinct fingerprint: live + a few
 // historical-date lookups). Older rows are pruned on each write.
@@ -148,6 +162,41 @@ function serializeSourceConfigs(instructionsByType) {
 }
 
 /**
+ * Snapshot the vault files that enabled sources feed into context through
+ * `context_files` (user-scripts): size and modification time of each, or
+ * null when missing. A script rewrites these on every sync without changing
+ * any row count, so without this a cached gather would hide its new output.
+ * @param {Map} instructionsByType
+ * @param {string} [vaultPath]
+ * @returns {Array}
+ */
+export function serializeContextFiles(instructionsByType, vaultPath = getContextVaultPath()) {
+  const files = new Set();
+  for (const data of instructionsByType.values()) {
+    for (const sourceId of (data.sources || [])) {
+      const [pluginName, sourceName] = sourceId.split('/');
+      let config = null;
+      try {
+        config = getPluginSources(pluginName).find(s => s.sourceName === sourceName)?.config ?? null;
+      } catch {
+        config = null;
+      }
+      for (const file of getSourceContextFiles(config)) files.add(file);
+    }
+  }
+
+  if (files.size === 0) return [];
+  return [vaultPath, ...[...files].sort().map(file => {
+    try {
+      const stat = fs.statSync(path.resolve(vaultPath, file));
+      return [file, stat.size, stat.mtimeMs];
+    } catch {
+      return [file, null, null];
+    }
+  })];
+}
+
+/**
  * Compute the cache key for the current context. All inputs are cheap (a config
  * read plus one indexed query) — no plugin commands run.
  * @param {object} params
@@ -164,6 +213,7 @@ export function computeContextCacheKey({ db, instructionsByType, dayKey, targetD
     dayKey,
     instructions: serializeInstructions(instructionsByType),
     sourceConfigs: serializeSourceConfigs(instructionsByType),
+    contextFiles: serializeContextFiles(instructionsByType),
     sync: getSyncSnapshot(db)
   };
   return crypto.createHash('sha256').update(JSON.stringify(fingerprint)).digest('hex');
@@ -206,15 +256,18 @@ export function setCachedContext(db, key, content) {
 
 /**
  * Gather contextual data from the "context" plugin type (read.js sources).
- * Moved verbatim from bin/today.
+ * Originally moved from bin/today; also gathers sources that feed context
+ * from vault files (see getContextSources).
  */
 async function getContextPluginsData(typeData, projectRoot) {
-  if (!typeData || typeData.sources.length === 0) return null;
+  // Context plugins, plus any source feeding context from vault files
+  const { sources } = await getContextSources();
+  if (sources.length === 0) return null;
 
   const lines = ['## Contextual Information', ''];
 
   // Include user ai_instructions for context plugins
-  if (typeData.instructions && typeData.instructions.length > 0) {
+  if (typeData?.instructions && typeData.instructions.length > 0) {
     lines.push('**Specific instructions from the user:**');
     for (const { sourceId, text } of typeData.instructions) {
       lines.push(`From ${sourceId}:`);
@@ -223,16 +276,11 @@ async function getContextPluginsData(typeData, projectRoot) {
     }
   }
 
-  const entries = typeData.sources.map(sourceId => {
-    const [pluginName, sourceName] = sourceId.split('/');
-    let config = {};
-    try {
-      config = getPluginSources(pluginName).find(s => s.sourceName === sourceName)?.config || {};
-    } catch {
-      config = {};
-    }
-    return { sourceId, pluginName, config };
-  });
+  const entries = sources.map(({ sourceId, plugin, config }) => ({
+    sourceId,
+    pluginName: plugin.name,
+    config: config || {}
+  }));
 
   const quiet = process.env.TODAY_QUIET === '1';
   const results = await runContextPlugins(

@@ -6,12 +6,14 @@
  * Runs every executable file in the configured vault directory, in
  * alphabetical order. Scripts are responsible for their own idempotency.
  *
- * Skipped entirely during CONTEXT_ONLY (AI context gathering) — scripts
- * only run on explicit syncs.
+ * Scripts never run during CONTEXT_ONLY (AI context gathering) — they only
+ * run on explicit syncs. In that mode the plugin instead reads the vault
+ * files listed in `context_files` (typically written by these scripts) and
+ * prints their contents as `context`.
  */
 
-import { readdirSync, statSync, chmodSync, existsSync } from 'fs';
-import { join, resolve } from 'path';
+import { readdirSync, statSync, chmodSync, existsSync, realpathSync, openSync, readSync, closeSync } from 'fs';
+import { join, resolve, relative, isAbsolute, sep } from 'path';
 import { spawnSync } from 'child_process';
 
 const config   = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
@@ -20,9 +22,80 @@ const contextOnly = process.env.CONTEXT_ONLY === 'true';
 const vaultPath = resolve(projectRoot, process.env.VAULT_PATH || 'vault');
 const defaultScriptsDirectory = join(process.env.VAULT_PATH || 'vault', 'scripts', 'user-scripts');
 
-// Skip during AI context gathering
+// Largest slice of any one context file that goes into context.
+const CONTEXT_FILE_MAX_BYTES = 8 * 1024;
+
+/**
+ * Read the configured context files. Paths are relative to the vault; any
+ * that resolve outside it, directly or through a symlink, are refused, since
+ * context can reach MCP callers.
+ * Missing files are skipped quietly (a script may not have run yet).
+ */
+function isInside(root, target) {
+  const rel = relative(root, target);
+  return Boolean(rel) && rel !== '..' && !rel.startsWith('..' + sep) && !isAbsolute(rel);
+}
+
+function readContextFiles(files) {
+  const parts = [];
+  const notes = [];
+  let realVault = null;
+  try {
+    realVault = realpathSync(vaultPath);
+  } catch {
+    return { context: '', notes };
+  }
+  for (const file of files) {
+    const full = resolve(vaultPath, file);
+    if (!isInside(vaultPath, full)) {
+      notes.push(`${file}: refused, outside the vault`);
+      continue;
+    }
+    let text;
+    try {
+      // Check again after following symlinks, so a link can't reach outside
+      const real = realpathSync(full);
+      if (!isInside(realVault, real)) {
+        notes.push(`${file}: refused, links outside the vault`);
+        continue;
+      }
+      const stat = statSync(real);
+      if (!stat.isFile()) continue;
+      // Read no more than the slice that goes into context
+      const buffer = Buffer.alloc(Math.min(stat.size, CONTEXT_FILE_MAX_BYTES));
+      const fd = openSync(real, 'r');
+      let bytes;
+      try {
+        bytes = readSync(fd, buffer, 0, buffer.length, 0);
+      } finally {
+        closeSync(fd);
+      }
+      text = buffer.subarray(0, bytes).toString('utf8').replace(/\uFFFD$/, '');
+      if (stat.size > CONTEXT_FILE_MAX_BYTES) text += `\n(${file} truncated at ${CONTEXT_FILE_MAX_BYTES / 1024} KB)`;
+    } catch {
+      continue;
+    }
+    text = text.trim();
+    if (text) parts.push(text);
+  }
+  return { context: parts.join('\n\n'), notes };
+}
+
+// During AI context gathering: run no scripts, just report the context files
 if (contextOnly) {
-  console.log(JSON.stringify({ ran: 0, failed: 0, scripts: [], message: 'Skipped (context-only mode)' }));
+  const listed = config.context_files;
+  const files = (Array.isArray(listed) ? listed : (typeof listed === 'string' ? [listed] : []))
+    .map(f => String(f).trim())
+    .filter(Boolean);
+  const { context, notes } = readContextFiles(files);
+  for (const note of notes) process.stderr.write(`  [user-scripts] ${note}\n`);
+  console.log(JSON.stringify({
+    ran: 0,
+    failed: 0,
+    scripts: [],
+    context,
+    message: 'Scripts skipped (context-only mode)'
+  }));
   process.exit(0);
 }
 
