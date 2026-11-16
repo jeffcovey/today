@@ -4724,7 +4724,49 @@ function renderRoutineSummaryItem(task) {
   return `<li class="routine-summary"><a href="/${escapeHtmlEntities(encodeURI(task.filePath))}">${escapeHtmlEntities(task.text)}</a>${remaining}</li>\n`;
 }
 
-function renderTasksQueryListHtml(queryResult, showPostpone) {
+// One task in a ```tasks block's result list.
+//
+// An embed gets the same checkbox, priority and text, but none of what only
+// the page's own script can use: the ids, the file and line, the link to the
+// task page and the postpone button. Those were most of each item's bytes,
+// and the TRMNL display's polling refuses a page over 100 KB, which a day
+// with a long "Completed Today" list was enough to pass.
+function renderQueryTaskItem(task, { embed = false } = {}) {
+  if (task.type === 'routine') return renderRoutineSummaryItem(task);
+
+  const checkbox = task.isDone ? 'checked' : '';
+  const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
+  const priorityIcon = priorityMarker(task);
+  // Strip blockquote markers from task text (tasks inside callouts have "> - [ ] text")
+  let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, '')));
+  if (task.isDone && task.doneDate) {
+    const dateStr = formatDate(task.doneDate);
+    displayText += ` ✅ ${dateStr}`;
+  }
+  // Add cancelled indicator if task is cancelled
+  if (task.isCancelled) {
+    displayText += ` <span class="text-muted task-cancelled-suffix">(cancelled)</span>`;
+  }
+
+  if (embed) {
+    const classAttr = taskClass ? ` class="${taskClass}"` : '';
+    return `<li${classAttr}><input type="checkbox" ${checkbox} class="task-checkbox"> ${priorityIcon}${displayText}</li>\n`;
+  }
+
+  const taskLink = task.id ? `/task/${task.id}` : '';
+  let html = `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
+  html += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
+  if (taskLink) {
+    html += `<a href="${taskLink}" style="text-decoration: none; color: inherit;">${priorityIcon}${displayText}</a>`;
+  } else {
+    html += `${priorityIcon}${displayText}`;
+  }
+  html += taskPostponeButton(task);
+  html += `</li>\n`;
+  return html;
+}
+
+function renderTasksQueryListHtml(queryResult, { embed = false } = {}) {
   let tasksHtml = '';
   if (queryResult.grouped) {
     for (const [groupKey, tasks] of queryResult.grouped) {
@@ -4752,33 +4794,7 @@ function renderTasksQueryListHtml(queryResult, showPostpone) {
 
       tasksHtml += `<h4>${dateHeader}</h4>\n<ul>\n`;
       for (const task of tasks) {
-        if (task.type === 'routine') {
-          tasksHtml += renderRoutineSummaryItem(task);
-          continue;
-        }
-        const checkbox = task.isDone ? 'checked' : '';
-        const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
-        const priorityIcon = priorityMarker(task);
-        // Strip blockquote markers from task text (tasks inside callouts have "> - [ ] text")
-        let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text.replace(/^>\s*-\s*\[([ xX-])\]\s*/, '')));
-        if (task.isDone && task.doneDate) {
-          const dateStr = formatDate(task.doneDate);
-          displayText += ` ✅ ${dateStr}`;
-        }
-        // Add cancelled indicator if task is cancelled
-        if (task.isCancelled) {
-          displayText += ` <span class="text-muted task-cancelled-suffix">(cancelled)</span>`;
-        }
-        const taskLink = task.id ? `/task/${task.id}` : '';
-        tasksHtml += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
-        tasksHtml += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
-        if (taskLink) {
-          tasksHtml += `<a href="${taskLink}" style="text-decoration: none; color: inherit;">${priorityIcon}${displayText}</a>`;
-        } else {
-          tasksHtml += `${priorityIcon}${displayText}`;
-        }
-        if (showPostpone) tasksHtml += taskPostponeButton(task);
-        tasksHtml += `</li>\n`;
+        tasksHtml += renderQueryTaskItem(task, { embed });
       }
       tasksHtml += '</ul>\n';
     }
@@ -4786,32 +4802,7 @@ function renderTasksQueryListHtml(queryResult, showPostpone) {
     if (queryResult.tasks.length > 0) {
       tasksHtml += '<ul>\n';
       for (const task of queryResult.tasks) {
-        if (task.type === 'routine') {
-          tasksHtml += renderRoutineSummaryItem(task);
-          continue;
-        }
-        const checkbox = task.isDone ? 'checked' : '';
-        const taskClass = task.isCancelled ? 'task-cancelled' : (task.isDone ? 'task-done' : '');
-        const priorityIcon = priorityMarker(task);
-        let displayText = renderMarkdownLinks(replaceTagsWithEmojis(task.text));
-        if (task.isDone && task.doneDate) {
-          const dateStr = formatDate(task.doneDate);
-          displayText += ` ✅ ${dateStr}`;
-        }
-        // Add cancelled indicator if task is cancelled
-        if (task.isCancelled) {
-          displayText += ` <span class="text-muted task-cancelled-suffix">(cancelled)</span>`;
-        }
-        const taskLink = task.id ? `/task/${task.id}` : '';
-        tasksHtml += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
-        tasksHtml += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
-        if (taskLink) {
-          tasksHtml += `<a href="${taskLink}" style="text-decoration: none; color: inherit;">${priorityIcon}${displayText}</a>`;
-        } else {
-          tasksHtml += `${priorityIcon}${displayText}`;
-        }
-        if (showPostpone) tasksHtml += taskPostponeButton(task);
-        tasksHtml += `</li>\n`;
+        tasksHtml += renderQueryTaskItem(task, { embed });
       }
       tasksHtml += '</ul>\n';
     } else {
@@ -4821,10 +4812,10 @@ function renderTasksQueryListHtml(queryResult, showPostpone) {
   return tasksHtml;
 }
 
-async function renderTasksQueryResult(query, urlPath, showPostpone) {
+async function renderTasksQueryResult(query, urlPath, { embed = false } = {}) {
   const queryResult = await executeTasksQuery(query, buildTasksQueryContext(urlPath));
   // Query results are inserted after the page-wide emoji conversion has run.
-  return `<div class="tasks-query-result">\n${convertEmojisToIcons(renderTasksQueryListHtml(queryResult, showPostpone))}</div>`;
+  return `<div class="tasks-query-result">\n${convertEmojisToIcons(renderTasksQueryListHtml(queryResult, { embed }))}</div>`;
 }
 
 // Uncached Markdown rendering (original implementation)
@@ -4999,7 +4990,7 @@ async function renderMarkdownUncached(filePath, urlPath, options = {}) {
       // Execute the tasks query, or leave a placeholder the browser fills in
       const tasksResultHtml = options.deferBlocks
         ? deferredBlockPlaceholder(urlPath, deferredBlocks.register(urlPath, filePath, 'tasks', query, fileMtime))
-        : await renderTasksQueryResult(query, urlPath, showPostpone);
+        : await renderTasksQueryResult(query, urlPath, { embed: options.embed });
 
       // Build the callout HTML
       const calloutType = type.toLowerCase();
@@ -5058,7 +5049,7 @@ ${cleanContent}
     for (const { fullMatch, query } of matches) {
       const replacement = options.deferBlocks
         ? deferredBlockPlaceholder(urlPath, deferredBlocks.register(urlPath, filePath, 'tasks', query, fileMtime))
-        : await renderTasksQueryResult(query, urlPath, showPostpone);
+        : await renderTasksQueryResult(query, urlPath, { embed: options.embed });
       result = result.replace(fullMatch, replacement);
     }
 
@@ -5996,7 +5987,7 @@ app.get(DEFERRED_BLOCK_ENDPOINT, authMiddleware, async (req, res) => {
     }
 
     const html = block.kind === 'tasks'
-      ? await renderTasksQueryResult(block.source, block.urlPath, true)
+      ? await renderTasksQueryResult(block.source, block.urlPath)
       : await renderMarkdownUncached(block.filePath, block.urlPath, { bodyMarkdown: block.source, bodyOnly: true });
     res.send(html);
   } catch (error) {
