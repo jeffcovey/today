@@ -158,6 +158,31 @@ describe('context cache', () => {
       expect(computeContextCacheKey({ db, instructionsByType: instructions, dayKey: '2026-11-15' })).toBe(after);
     });
 
+    test('fingerprints the VAULT_PATH override, which the runners read', () => {
+      const override = fs.mkdtempSync(path.join(os.tmpdir(), 'context-cache-override-'));
+      const file = path.join(override, 'reading.md');
+      fs.writeFileSync(file, '52 of 70');
+      fs.utimesSync(file, new Date('2026-11-15T12:00:00Z'), new Date('2026-11-15T12:00:00Z'));
+      getPluginSources.mockReturnValue([
+        { sourceName: 'default', config: { enabled: true, context_files: ['reading.md'] } }
+      ]);
+      const instructions = makeInstructions([
+        ['utility', { sources: ['user-scripts/default'], instructions: [] }]
+      ]);
+      const key = () => computeContextCacheKey({ db, instructionsByType: instructions, dayKey: '2026-11-15' });
+
+      process.env.VAULT_PATH = override;
+      try {
+        const before = key();
+        fs.writeFileSync(file, '53 of 70');
+        fs.utimesSync(file, new Date('2026-11-15T13:00:00Z'), new Date('2026-11-15T13:00:00Z'));
+        expect(key()).not.toBe(before);
+      } finally {
+        delete process.env.VAULT_PATH;
+        fs.rmSync(override, { recursive: true, force: true });
+      }
+    });
+
     test('changes when sync_metadata changes (the core invalidation signal)', () => {
       const before = computeContextCacheKey(base());
       db.prepare(

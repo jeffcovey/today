@@ -20,11 +20,25 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+/**
+ * The vault the context runners read context_files from: VAULT_PATH when set
+ * (resolved against the project root, as user-scripts does), else the
+ * configured vault.
+ */
+export function getContextVaultPath() {
+  return process.env.VAULT_PATH
+    ? path.resolve(REPO_ROOT, process.env.VAULT_PATH)
+    : getAbsoluteVaultPath();
+}
+
 import { getPluginTypes, getAIMetadata, generateAIContextBlock, schemas } from './plugin-schemas.js';
 import {
   getAIInstructionsByType, getPluginSources, runContextPlugins, getContextSources, getSourceContextFiles
 } from './plugin-loader.js';
 import { getConfigPath, getTimezone, getAbsoluteVaultPath } from './config.js';
+import { fileURLToPath } from 'url';
 import { getTodayDate } from './date-utils.js';
 
 // Bump when the gather logic below changes in a way that should invalidate
@@ -158,7 +172,7 @@ function serializeSourceConfigs(instructionsByType) {
  * @param {string} [vaultPath]
  * @returns {Array}
  */
-export function serializeContextFiles(instructionsByType, vaultPath = getAbsoluteVaultPath()) {
+export function serializeContextFiles(instructionsByType, vaultPath = getContextVaultPath()) {
   const files = new Set();
   for (const data of instructionsByType.values()) {
     for (const sourceId of (data.sources || [])) {
@@ -173,14 +187,15 @@ export function serializeContextFiles(instructionsByType, vaultPath = getAbsolut
     }
   }
 
-  return [...files].sort().map(file => {
+  if (files.size === 0) return [];
+  return [vaultPath, ...[...files].sort().map(file => {
     try {
       const stat = fs.statSync(path.resolve(vaultPath, file));
       return [file, stat.size, stat.mtimeMs];
     } catch {
       return [file, null, null];
     }
-  });
+  })];
 }
 
 /**

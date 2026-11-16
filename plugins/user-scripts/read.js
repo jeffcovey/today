@@ -12,7 +12,7 @@
  * prints their contents as `context`.
  */
 
-import { readdirSync, statSync, chmodSync, existsSync, readFileSync, realpathSync } from 'fs';
+import { readdirSync, statSync, chmodSync, existsSync, realpathSync, openSync, readSync, closeSync } from 'fs';
 import { join, resolve, relative, isAbsolute } from 'path';
 import { spawnSync } from 'child_process';
 
@@ -59,10 +59,19 @@ function readContextFiles(files) {
         notes.push(`${file}: refused, links outside the vault`);
         continue;
       }
-      if (!statSync(real).isFile()) continue;
-      const buffer = readFileSync(real);
-      text = buffer.subarray(0, CONTEXT_FILE_MAX_BYTES).toString('utf8').replace(/\uFFFD$/, '');
-      if (buffer.length > CONTEXT_FILE_MAX_BYTES) text += `\n(${file} truncated at ${CONTEXT_FILE_MAX_BYTES / 1024} KB)`;
+      const stat = statSync(real);
+      if (!stat.isFile()) continue;
+      // Read no more than the slice that goes into context
+      const buffer = Buffer.alloc(Math.min(stat.size, CONTEXT_FILE_MAX_BYTES));
+      const fd = openSync(real, 'r');
+      let bytes;
+      try {
+        bytes = readSync(fd, buffer, 0, buffer.length, 0);
+      } finally {
+        closeSync(fd);
+      }
+      text = buffer.subarray(0, bytes).toString('utf8').replace(/\uFFFD$/, '');
+      if (stat.size > CONTEXT_FILE_MAX_BYTES) text += `\n(${file} truncated at ${CONTEXT_FILE_MAX_BYTES / 1024} KB)`;
     } catch {
       continue;
     }
