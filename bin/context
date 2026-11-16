@@ -9,7 +9,7 @@
 
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getSourcesForType, runContextPlugins } from '../src/plugin-loader.js';
+import { getContextSources, runContextPlugins } from '../src/plugin-loader.js';
 import { colors } from '../src/cli-utils.js';
 import { program } from 'commander';
 
@@ -35,7 +35,7 @@ function formatDefault(pluginName, data) {
 
 // Default command - show all context plugin outputs
 async function cmdDefault(options = {}) {
-  const { sources, allSources } = await getSourcesForType('context', options.source);
+  const { sources, allSources } = await getContextSources(options.source);
 
   if (sources.length === 0) {
     if (options.source) {
@@ -77,6 +77,9 @@ async function cmdDefault(options = {}) {
       continue;
     }
 
+    // A source whose context files are empty or missing has nothing to show
+    if (data.context === '') continue;
+
     // Display plugin output using its context field
     formatDefault(pluginName, data);
 
@@ -91,7 +94,7 @@ async function cmdDefault(options = {}) {
 
 // List command - show available context plugins
 async function cmdList() {
-  const { sources } = await getSourcesForType('context');
+  const { sources } = await getContextSources();
 
   if (sources.length === 0) {
     console.log(colors.blue('ℹ') + ' No context plugins enabled');

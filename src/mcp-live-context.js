@@ -1,8 +1,9 @@
 /**
  * Live context-plugin output for the MCP get_context tool.
  *
- * Runs each enabled context plugin's read.js directly, the way bin/context
- * does, with three differences for a remote caller:
+ * Runs each enabled context plugin's read.js (and each source that feeds
+ * context from vault files, see getContextSources) directly, the way
+ * bin/context does, with three differences for a remote caller:
  *   - each plugin runs in its own process group, so a timeout tears down
  *     anything it spawned (see src/process-group.js);
  *   - plugins run with TZ set to the user's configured zone, so "today" in
@@ -18,7 +19,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getSourcesForType } from './plugin-loader.js';
+import { getContextSources } from './plugin-loader.js';
 import { getConfigPath } from './config.js';
 import { getConfiguredTimezone } from './date-utils.js';
 import { execGroup } from './process-group.js';
@@ -104,14 +105,14 @@ export async function readLiveContext({
   readOnly = false,
   config,
   timezone = getConfiguredTimezone(),
-  getSources = getSourcesForType,
+  getSources = getContextSources,
   run = runContextSource,
 } = {}) {
   if (readOnly) return READ_ONLY_NOTE;
 
   let sources;
   try {
-    ({ sources } = await getSources('context'));
+    ({ sources } = await getSources());
   } catch {
     return null;
   }
@@ -126,7 +127,8 @@ export async function readLiveContext({
 
   const parts = [];
   results.forEach((result, i) => {
-    if (result?.data) parts.push(formatResult(entries[i].pluginName, result.data));
+    // A source with nothing to say (an empty context file) adds no heading.
+    if (result?.data && result.data.context !== '') parts.push(formatResult(entries[i].pluginName, result.data));
   });
   const notes = [
     ...skipped.map(s => `${s.sourceId} was left out because ${s.reason}.`),

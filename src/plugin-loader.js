@@ -1792,6 +1792,55 @@ export async function getSourcesForType(pluginType, sourceFilter = null) {
 }
 
 /**
+ * The setting a plugin of any type declares to feed AI context from vault
+ * files (user-scripts uses it). A source of such a plugin with files listed
+ * is gathered alongside the `context` plugins: its read.js runs with
+ * CONTEXT_ONLY=true and prints those files' contents as `context`.
+ */
+export const CONTEXT_FILES_SETTING = 'context_files';
+
+/**
+ * The context_files a source lists, or [] when it lists none.
+ * @param {object} config - Source config
+ * @returns {string[]}
+ */
+export function getSourceContextFiles(config) {
+  const value = config?.[CONTEXT_FILES_SETTING];
+  const list = Array.isArray(value) ? value : (typeof value === 'string' ? [value] : []);
+  return list.map(v => String(v).trim()).filter(Boolean);
+}
+
+/**
+ * Every source that context gathering runs: enabled sources of `context`
+ * plugins, plus enabled sources of any other plugin that declares a
+ * `context_files` setting and lists at least one file.
+ * Same shape as getSourcesForType.
+ * @param {string|null} sourceFilter - Optional filter for source ID
+ * @returns {Promise<{sources: Array, allSources: Array}>}
+ */
+export async function getContextSources(sourceFilter = null) {
+  const { sources, allSources } = await getSourcesForType('context', sourceFilter);
+  const plugins = await discoverPlugins();
+
+  for (const [name, plugin] of plugins) {
+    if (plugin.type === 'context') continue;
+    if (!plugin.settings?.[CONTEXT_FILES_SETTING]) continue;
+
+    for (const { sourceName, config } of getPluginSources(name)) {
+      const merged = applyPluginSettingsDefaults(plugin, config);
+      if (getSourceContextFiles(merged).length === 0) continue;
+      const sourceId = `${name}/${sourceName}`;
+      allSources.push({ sourceId, enabled: true, pluginName: name });
+      if (!sourceFilter || sourceId.includes(sourceFilter)) {
+        sources.push({ sourceId, plugin, sourceName, config: merged });
+      }
+    }
+  }
+
+  return { sources, allSources };
+}
+
+/**
  * Run one context plugin's read.js and return its parsed output.
  *
  * Always sets CONTEXT_ONLY=true: these are display/gather reads, and some

@@ -1,10 +1,17 @@
 import { jest } from '@jest/globals';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+
+// Vault that context_files resolve against in these tests.
+const contextVault = fs.mkdtempSync(path.join(os.tmpdir(), 'context-cache-vault-'));
 
 // Mock config so timezone/config path are deterministic and don't read disk.
 jest.unstable_mockModule('../src/config.js', () => ({
   getTimezone: jest.fn().mockReturnValue('America/New_York'),
   getConfigPath: jest.fn().mockReturnValue('config.toml'),
   getFullConfig: jest.fn().mockReturnValue({}),
+  getAbsoluteVaultPath: jest.fn(() => contextVault),
 }));
 
 // Mock plugin-loader so context gathering sees no enabled plugins and spawns
@@ -12,10 +19,14 @@ jest.unstable_mockModule('../src/config.js', () => ({
 const getAIInstructionsByType = jest.fn();
 const getPluginSources = jest.fn().mockReturnValue([]);
 const runContextPlugins = jest.fn().mockResolvedValue([]);
+const getContextSources = jest.fn().mockResolvedValue({ sources: [], allSources: [] });
+const getSourceContextFiles = config => (Array.isArray(config?.context_files) ? config.context_files : []);
 jest.unstable_mockModule('../src/plugin-loader.js', () => ({
   getAIInstructionsByType,
   getPluginSources,
   runContextPlugins,
+  getContextSources,
+  getSourceContextFiles,
 }));
 
 const Database = (await import('better-sqlite3')).default;
@@ -125,6 +136,26 @@ describe('context cache', () => {
       const b = computeContextCacheKey(params);
 
       expect(a).not.toBe(b);
+    });
+
+    test('changes when a context file a source lists is rewritten', () => {
+      const file = path.join(contextVault, 'reading.md');
+      fs.writeFileSync(file, '52 of 70');
+      fs.utimesSync(file, new Date('2026-11-15T12:00:00Z'), new Date('2026-11-15T12:00:00Z'));
+      getPluginSources.mockReturnValue([
+        { sourceName: 'default', config: { enabled: true, context_files: ['reading.md'] } }
+      ]);
+      const instructions = makeInstructions([
+        ['utility', { sources: ['user-scripts/default'], instructions: [] }]
+      ]);
+      const before = computeContextCacheKey({ db, instructionsByType: instructions, dayKey: '2026-11-15' });
+
+      fs.writeFileSync(file, '53 of 70');
+      fs.utimesSync(file, new Date('2026-11-15T13:00:00Z'), new Date('2026-11-15T13:00:00Z'));
+      const after = computeContextCacheKey({ db, instructionsByType: instructions, dayKey: '2026-11-15' });
+
+      expect(after).not.toBe(before);
+      expect(computeContextCacheKey({ db, instructionsByType: instructions, dayKey: '2026-11-15' })).toBe(after);
     });
 
     test('changes when sync_metadata changes (the core invalidation signal)', () => {

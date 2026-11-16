@@ -351,6 +351,18 @@ The markdown-plans plugin generates AI summaries for past days and suggestions f
 
 The goal is fast context gathering (~5-10 seconds) for responsive AI sessions.
 
+### Feeding Context From Other Plugin Types
+
+A plugin that isn't a `context` plugin can still feed AI context by declaring a `context_files` setting (an array of vault-relative paths). Every enabled source of such a plugin that lists at least one file is gathered with the `context` plugins (`bin/today`, `bin/context`, the MCP `get_context` tool): its read command runs with `CONTEXT_ONLY=true` and prints those files' contents as `context`. The `bin/today` context cache folds in each listed file's size and modification time, so a rewritten file isn't hidden by a cached gather.
+
+The user-scripts plugin uses this, so a script can write what it works out to a file in the vault and have it reach the AI:
+
+```toml
+[plugins.user-scripts.default]
+enabled = true
+context_files = ["today/context/reading-challenge.md"]
+```
+
 ## The READ_ONLY Flag
 
 The MCP server freshens the database before it answers a read (`list_tasks`, `habits_today` and the like). That sync is read-only: the loader runs no write hooks (auto-tag, auto-archive, date-created, stage and priority) and starts the read command with `READ_ONLY=true`. A reader that changes things as it reads (resetting overdue routine checkboxes, creating today's diary file, deleting old export files, adding fields on a remote service) must skip those changes when it's set, and report entries as the files and services currently stand. The next full sync (the scheduler's `bin/plugins sync`, the web app, or the MCP `sync_data` tool) does them as before. A read-only sync that stores entries for a source with write hooks enabled marks them owed in `extra_data` (`write_hooks_pending` for the file hooks, `auto_tag_pending` for the auto-tagger), and the next writable sync of the whole source runs them even when its own read finds no changes, since the read-only sync already moved the cursor past what it stored. A writable sync with `skipAutoTag` (a post-write refresh, `ensureSyncForType`'s default) runs the file hooks but leaves the auto-tagger owed for the next sync that tags. A reader that can't report the source as it stands without writing (an export still zipped, no cache yet) answers no change (`incremental: true` with no entries), which keeps the stored rows; empty entries without it are a full snapshot that deletes them.
