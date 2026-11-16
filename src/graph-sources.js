@@ -59,10 +59,20 @@ const sources = {
           const rows = db.prepare(
             "SELECT DISTINCT category_group FROM financial_transactions WHERE category_group IS NOT NULL AND category_group != '' ORDER BY category_group"
           ).all();
-          const categories = rows.flatMap(r => [
-            { name: r.category_group, description: `Category group: ${r.category_group} (net)` },
-            { name: `${r.category_group}: Income`, description: `Category group: ${r.category_group}, inflows only` },
-            { name: `${r.category_group}: Expenses`, description: `Category group: ${r.category_group}, outflows only` }
+          const groups = rows.map(r => r.category_group);
+          const literal = new Set(groups);
+          // A group literally named "X: Income" keeps that name, so the
+          // directional metric it would shadow is not offered (buildQuery
+          // resolves the name to the literal group too).
+          const categories = groups.flatMap(group => [
+            { name: group, description: `${group} (category group, net)` },
+            ...['Income', 'Expenses']
+              .map(direction => `${group}: ${direction}`)
+              .filter(name => !literal.has(name))
+              .map(name => ({
+                name,
+                description: `${name} (category group, ${name.endsWith('Income') ? 'inflows' : 'outflows'} only)`
+              }))
           ]);
           return [...builtIn, ...categories];
         } catch {
@@ -89,8 +99,12 @@ const sources = {
       } else if (metric === 'Income') {
         amountFilter = 'amount > 0';
       } else if (split) {
+        // A category group whose literal name is the metric wins, so a group
+        // named "Business: Income" before this syntax existed still means
+        // what it did; only otherwise is the name split by direction.
         const [, group, direction] = split;
-        amountFilter = `category_group = ${quote(group.trim())} AND amount ${direction === 'Income' ? '>' : '<'} 0`;
+        const directional = `category_group = ${quote(group.trim())} AND amount ${direction === 'Income' ? '>' : '<'} 0`;
+        amountFilter = `(category_group = ${quote(metric)} OR (${directional} AND NOT EXISTS (SELECT 1 FROM financial_transactions WHERE category_group = ${quote(metric)})))`;
       } else {
         // Treat as a category_group name
         amountFilter = `category_group = ${quote(metric)}`;

@@ -89,10 +89,29 @@ describe('finance graph source', () => {
     expect(run(db, "Jeff's Stuff: Expenses")).toEqual([[lastMonth(1).slice(0, 7), 5, '$']]);
   });
 
-  test('each group is listed with its income and expenses metrics', () => {
-    const names = getMetrics('finance', db).map(m => m.name);
+  test('each group is listed with its income and expenses metrics, named in the description', () => {
+    const metrics = getMetrics('finance', db);
+    const names = metrics.map(m => m.name);
     expect(names).toEqual(expect.arrayContaining([
       'OlderGay.Men', 'OlderGay.Men: Income', 'OlderGay.Men: Expenses'
     ]));
+    // bin/graph metrics prints only the description, so it must carry the name
+    for (const m of metrics.filter(m => m.name.startsWith('OlderGay.Men'))) {
+      expect(m.description.startsWith(m.name)).toBe(true);
+    }
+  });
+
+  test('a group literally named "<x>: Income" keeps its meaning', () => {
+    insert(db, [
+      { id: 'lit-1', date: lastMonth(4), category_group: 'Business: Income', amount: -30 },
+      { id: 'lit-2', date: lastMonth(5), category_group: 'Business: Income', amount: 100 },
+      { id: 'biz', date: lastMonth(5), category_group: 'Business', amount: 999 }
+    ]);
+    // Its net total, as before, not Business's inflows
+    expect(run(db, 'Business: Income')).toEqual([[lastMonth(1).slice(0, 7), 70, '$']]);
+    // No directional metric is offered under the literal name, and only once
+    const names = getMetrics('finance', db).map(m => m.name);
+    expect(names.filter(n => n === 'Business: Income')).toHaveLength(1);
+    expect(names).toContain('Business: Expenses');
   });
 });
