@@ -94,6 +94,35 @@ console.log(process.env.VAULT_PATH);
       expect(stderr).toMatch(/\.\.\/\.env: refused, outside the vault/);
     });
 
+    test('refuses symlinks that lead outside the vault, file or directory', () => {
+      const vaultDir = path.join(tempRoot, 'vault');
+      const outside = path.join(tempRoot, 'outside');
+      fs.mkdirSync(vaultDir, { recursive: true });
+      fs.mkdirSync(outside, { recursive: true });
+      fs.writeFileSync(path.join(outside, 'secret.md'), 'SECRET');
+      fs.writeFileSync(path.join(vaultDir, 'ok.md'), 'fine');
+      fs.symlinkSync(path.join(outside, 'secret.md'), path.join(vaultDir, 'file-link.md'));
+      fs.symlinkSync(outside, path.join(vaultDir, 'dir-link'));
+      fs.symlinkSync(path.join(vaultDir, 'ok.md'), path.join(vaultDir, 'inside-link.md'));
+
+      const { output, stderr } = runContextOnly({ context_files: ['file-link.md', 'dir-link/secret.md', 'inside-link.md'] });
+
+      expect(output.context).toBe('fine');
+      expect(stderr).toMatch(/file-link\.md: refused, links outside the vault/);
+      expect(stderr).toMatch(/dir-link\/secret\.md: refused, links outside the vault/);
+    });
+
+    test('reads through a symlinked vault root', () => {
+      const realVault = path.join(tempRoot, 'real-vault');
+      fs.mkdirSync(realVault, { recursive: true });
+      fs.writeFileSync(path.join(realVault, 'a.md'), 'from the real vault');
+      fs.symlinkSync(realVault, path.join(tempRoot, 'vault'));
+
+      const { output } = runContextOnly({ context_files: ['a.md'] });
+
+      expect(output.context).toBe('from the real vault');
+    });
+
     test('cuts a long file at 8 KB', () => {
       const vaultDir = path.join(tempRoot, 'vault');
       fs.mkdirSync(vaultDir, { recursive: true });

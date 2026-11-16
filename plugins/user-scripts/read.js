@@ -12,7 +12,7 @@
  * prints their contents as `context`.
  */
 
-import { readdirSync, statSync, chmodSync, existsSync, readFileSync } from 'fs';
+import { readdirSync, statSync, chmodSync, existsSync, readFileSync, realpathSync } from 'fs';
 import { join, resolve, relative, isAbsolute } from 'path';
 import { spawnSync } from 'child_process';
 
@@ -27,23 +27,40 @@ const CONTEXT_FILE_MAX_BYTES = 8 * 1024;
 
 /**
  * Read the configured context files. Paths are relative to the vault; any
- * that resolve outside it are refused, since context can reach MCP callers.
+ * that resolve outside it, directly or through a symlink, are refused, since
+ * context can reach MCP callers.
  * Missing files are skipped quietly (a script may not have run yet).
  */
+function isInside(root, target) {
+  const rel = relative(root, target);
+  return Boolean(rel) && !rel.startsWith('..') && !isAbsolute(rel);
+}
+
 function readContextFiles(files) {
   const parts = [];
   const notes = [];
+  let realVault = null;
+  try {
+    realVault = realpathSync(vaultPath);
+  } catch {
+    return { context: '', notes };
+  }
   for (const file of files) {
     const full = resolve(vaultPath, file);
-    const rel = relative(vaultPath, full);
-    if (!rel || rel.startsWith('..') || isAbsolute(rel)) {
+    if (!isInside(vaultPath, full)) {
       notes.push(`${file}: refused, outside the vault`);
       continue;
     }
     let text;
     try {
-      if (!statSync(full).isFile()) continue;
-      const buffer = readFileSync(full);
+      // Check again after following symlinks, so a link can't reach outside
+      const real = realpathSync(full);
+      if (!isInside(realVault, real)) {
+        notes.push(`${file}: refused, links outside the vault`);
+        continue;
+      }
+      if (!statSync(real).isFile()) continue;
+      const buffer = readFileSync(real);
       text = buffer.subarray(0, CONTEXT_FILE_MAX_BYTES).toString('utf8').replace(/\uFFFD$/, '');
       if (buffer.length > CONTEXT_FILE_MAX_BYTES) text += `\n(${file} truncated at ${CONTEXT_FILE_MAX_BYTES / 1024} KB)`;
     } catch {

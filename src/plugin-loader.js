@@ -1872,6 +1872,7 @@ async function runContextPluginSource({ sourceId, pluginName, config }, projectR
         CONFIG_PATH: getConfigPath(),
         PLUGIN_CONFIG: JSON.stringify(config || {}),
         SOURCE_ID: sourceId,
+        VAULT_PATH: process.env.VAULT_PATH || getVaultPath(),
         CONTEXT_ONLY: 'true'
       }
     });

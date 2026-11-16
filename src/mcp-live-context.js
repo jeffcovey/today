@@ -20,7 +20,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getContextSources } from './plugin-loader.js';
-import { getConfigPath } from './config.js';
+import { getConfigPath, getVaultPath } from './config.js';
 import { getConfiguredTimezone } from './date-utils.js';
 import { execGroup } from './process-group.js';
 import { getProfileFields } from './mcp-guidance.js';
@@ -77,6 +77,7 @@ export async function runContextSource({ sourceId, pluginName, config }, { timez
         CONFIG_PATH: getConfigPath(),
         PLUGIN_CONFIG: JSON.stringify(config || {}),
         SOURCE_ID: sourceId,
+        VAULT_PATH: process.env.VAULT_PATH || getVaultPath(),
         CONTEXT_ONLY: 'true',
       },
     });
