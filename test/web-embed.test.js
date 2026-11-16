@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { jest } from '@jest/globals';
-import { startServer, PASSWORD } from './helpers/a11y-harness.js';
+import { startServer, PASSWORD, TODAY } from './helpers/a11y-harness.js';
 
 /**
  * A page rendered with ?embed is what the TRMNL display polls, and TRMNL
@@ -42,10 +42,12 @@ beforeAll(async () => {
     const insert = db.prepare(
       'INSERT INTO tasks (id, source, title, status, priority, completed_at, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)'
     );
-    const now = new Date().toISOString();
+    // The vault records a completion as a date in the server's time zone, and
+    // "done today" compares that date, so a UTC timestamp would miss in the
+    // evening.
     for (let line = 1; line <= DONE_TASKS; line++) {
       insert.run(`markdown-tasks/local:vault/tasks/tasks-archive.md:${line}`, 'markdown-tasks/local',
-        `Finished chore number ${line}`, 'completed', 'medium', now,
+        `Finished chore number ${line}`, 'completed', 'medium', TODAY,
         JSON.stringify({ file_path: 'vault/tasks/tasks-archive.md', line_number: line }));
     }
   } finally {
