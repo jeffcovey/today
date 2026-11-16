@@ -15,7 +15,10 @@ Run `bin/graph metrics <source>` to see available metrics.
 
 **Supported Sources:**
 - **health**: Health metrics (Weight, Steps, Sleep, Heart Rate, etc.)
-- **finance**: Financial data (Expenses, Income, or any category group)
+- **finance**: Financial data (Expenses, Income, or any category group). A
+  category group can be split by direction as "<group>: Income" and
+  "<group>: Expenses". Totals leave out transfers, scheduled projections and
+  rows superseded by a higher-precedence source, as bin/finance does.
 - **habits**: Habit completion over time
 - **tasks**: Task completion and creation rates
 - **time-logs**: Time tracked per day
@@ -30,6 +33,17 @@ metrics = ["Income", "Expenses"]
 colors = ["#4CAF50", "#e53935"]
 time_period = "6 months"
 chart_title = "Income vs Expenses"
+```
+
+One category group's own income against its expenses:
+```toml
+[plugins.data-graphing.ogm-income-vs-expenses]
+enabled = true
+source = "finance"
+metrics = ["OlderGay.Men: Income", "OlderGay.Men: Expenses"]
+colors = ["#4CAF50", "#e53935"]
+time_period = "12 months"
+chart_title = "OlderGay.Men: Income vs Expenses"
 ```
 """
 
