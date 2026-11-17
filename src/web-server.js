@@ -98,6 +98,7 @@ import { readTasks, withLazyTasks } from './dataview-tasks.js';
 import { isPostponable, postponeTaskLine } from './task-postpone.js';
 import { injectRoleReplyForms, saveRoleReply, ROLE_REPLY_ENDPOINT } from '../plugins/roles/web-reply.js';
 import { roleBlocksToCards } from '../plugins/roles/web-cards.js';
+import { enableTaskCheckboxes, isCancelledTaskLine, markTaskListItems } from './task-checkboxes.js';
 import { getProjectsDueForReview } from './projects.js';
 import {
   formatInlineDataviewValue,
@@ -4660,7 +4661,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           const taskLink = task.id ? `/task/${task.id}` : '';
 
           replacement += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
-          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
+          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox${task.isCancelled ? ' task-cancelled' : ''}" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
           if (taskLink) {
             replacement += `<a href="${taskLink}" style="text-decoration: none; color: inherit;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${priorityIcon}${displayText}</a>`;
           } else {
@@ -4693,7 +4694,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           const taskLink = task.id ? `/task/${task.id}` : '';
 
           replacement += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
-          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
+          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox${task.isCancelled ? ' task-cancelled' : ''}" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
           if (taskLink) {
             replacement += `<a href="${taskLink}" style="text-decoration: none; color: inherit;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${priorityIcon}${displayText}</a>`;
           } else {
@@ -4755,7 +4756,7 @@ function renderQueryTaskItem(task, { embed = false } = {}) {
 
   const taskLink = task.id ? `/task/${task.id}` : '';
   let html = `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
-  html += `<input type="checkbox" ${checkbox} class="task-checkbox" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
+  html += `<input type="checkbox" ${checkbox} class="task-checkbox${task.isCancelled ? ' task-cancelled' : ''}" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
   if (taskLink) {
     html += `<a href="${taskLink}" style="text-decoration: none; color: inherit;">${priorityIcon}${displayText}</a>`;
   } else {
@@ -5123,27 +5124,14 @@ ${cleanContent}
   );
 
   // Also add data attributes to the parent <li> for easier targeting
-  htmlContent = htmlContent.replace(
-    /<li>([\s\S]*?)<input([^>]*data-file="([^"]+)"[^>]*data-line="(\d+)"[^>]*)>/gi,
-    (match, before, checkboxAttrs, file, line) => {
-      // Check if this is a cancelled task by looking at the checkbox class
-      const isCancelled = checkboxAttrs.includes('task-cancelled');
-      const liClass = isCancelled ? ` class="task-cancelled"` : '';
-      return `<li data-file="${file}" data-line="${line}"${liClass}>${before}<input${checkboxAttrs}>`;
-    }
-  );
+  htmlContent = markTaskListItems(htmlContent);
 
   // Clean up any remaining metadata markers that weren't processed (handle both " and &quot;)
   htmlContent = htmlContent.replace(/\{data-file=(&quot;|")[^"&]+(&quot;|")\s+data-line=(&quot;|")\d+(&quot;|")(?:\s+data-cancelled=(&quot;|")true(&quot;|"))?\}/g, '');
 
-  // Enable any remaining checkboxes (from ```tasks blocks that already have data attributes)
-  htmlContent = htmlContent.replace(
-    /<input[^>]*type="checkbox"[^>]*>/gi,
-    (match) => {
-      // Just enable all checkboxes
-      return match.replace(/\s*disabled="?"?/gi, '');
-    }
-  );
+  // Enable the remaining checkboxes (from ```tasks blocks that already have
+  // data attributes); canceled ones stay disabled
+  htmlContent = enableTaskCheckboxes(htmlContent);
   
   // Make tasks with IDs clickable - wrap the task text in a link
   htmlContent = htmlContent.replace(
@@ -7822,6 +7810,10 @@ app.post('/task/toggle', authMiddleware, async (req, res) => {
 
     // Validate that this is actually a task line
     // Updated regex to match tasks in blockquotes too
+    if (isCancelledTaskLine(taskLine)) {
+      debug(`[TASK] Line ${line} is a cancelled task: "${taskLine}"`);
+      return res.status(409).json({ error: 'This task is cancelled; reopen it before checking it off' });
+    }
     if (!taskLine.match(/^(?:\s*>)*\s*- \[[ xX]\]/)) {
       debug(`[TASK] Line ${line} is not a task: "${taskLine}"`);
       return res.status(400).json({ error: 'Not a task line' });
