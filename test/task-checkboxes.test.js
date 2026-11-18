@@ -1,4 +1,4 @@
-import { enableTaskCheckboxes, isCancelledTaskLine, markTaskListItems } from '../src/task-checkboxes.js';
+import { CANCELLED_CHECKBOX_ATTRS, enableTaskCheckboxes, isCancelledTaskLine, markTaskListItems } from '../src/task-checkboxes.js';
 
 describe('markTaskListItems', () => {
   test('marks the canceled task\'s own list item, not a plain bullet above it (issue #735)', () => {
@@ -46,6 +46,13 @@ describe('enableTaskCheckboxes', () => {
   test('does not add a second disabled to a canceled checkbox marked already rendered disabled', () => {
     const out = enableTaskCheckboxes('<input disabled="" type="checkbox" class="task-checkbox task-cancelled">');
     expect(out.match(/disabled/g)).toHaveLength(1);
+  });
+
+  test('gives a query result\'s canceled checkbox its attributes only once', () => {
+    const queryInput = `<input type="checkbox"  ${CANCELLED_CHECKBOX_ATTRS} class="task-checkbox task-cancelled" data-file="a.md" data-line="4">`;
+    const out = enableTaskCheckboxes(queryInput);
+    expect(out.match(/disabled/g)).toHaveLength(1);
+    expect(out.match(/title=/g)).toHaveLength(1);
   });
 
   test('leaves data attributes that contain the word disabled alone', () => {

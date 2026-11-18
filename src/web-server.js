@@ -98,7 +98,7 @@ import { readTasks, withLazyTasks } from './dataview-tasks.js';
 import { isPostponable, postponeTaskLine } from './task-postpone.js';
 import { injectRoleReplyForms, saveRoleReply, ROLE_REPLY_ENDPOINT } from '../plugins/roles/web-reply.js';
 import { roleBlocksToCards } from '../plugins/roles/web-cards.js';
-import { enableTaskCheckboxes, isCancelledTaskLine, markTaskListItems } from './task-checkboxes.js';
+import { CANCELLED_CHECKBOX_ATTRS, enableTaskCheckboxes, isCancelledTaskLine, markTaskListItems } from './task-checkboxes.js';
 import { getProjectsDueForReview } from './projects.js';
 import {
   formatInlineDataviewValue,
@@ -4661,7 +4661,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           const taskLink = task.id ? `/task/${task.id}` : '';
 
           replacement += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
-          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox${task.isCancelled ? ' task-cancelled' : ''}" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
+          replacement += `<input type="checkbox" ${checkbox}${task.isCancelled ? ` ${CANCELLED_CHECKBOX_ATTRS}` : ''} class="task-checkbox${task.isCancelled ? ' task-cancelled' : ''}" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
           if (taskLink) {
             replacement += `<a href="${taskLink}" style="text-decoration: none; color: inherit;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${priorityIcon}${displayText}</a>`;
           } else {
@@ -4694,7 +4694,7 @@ async function processTasksCodeBlocks(content, skipBlockquotes = false) {
           const taskLink = task.id ? `/task/${task.id}` : '';
 
           replacement += `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
-          replacement += `<input type="checkbox" ${checkbox} class="task-checkbox${task.isCancelled ? ' task-cancelled' : ''}" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
+          replacement += `<input type="checkbox" ${checkbox}${task.isCancelled ? ` ${CANCELLED_CHECKBOX_ATTRS}` : ''} class="task-checkbox${task.isCancelled ? ' task-cancelled' : ''}" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
           if (taskLink) {
             replacement += `<a href="${taskLink}" style="text-decoration: none; color: inherit;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${priorityIcon}${displayText}</a>`;
           } else {
@@ -4756,7 +4756,7 @@ function renderQueryTaskItem(task, { embed = false } = {}) {
 
   const taskLink = task.id ? `/task/${task.id}` : '';
   let html = `<li data-task-id="${task.id || ''}" class="${taskClass}">`;
-  html += `<input type="checkbox" ${checkbox} class="task-checkbox${task.isCancelled ? ' task-cancelled' : ''}" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
+  html += `<input type="checkbox" ${checkbox}${task.isCancelled ? ` ${CANCELLED_CHECKBOX_ATTRS}` : ''} class="task-checkbox${task.isCancelled ? ' task-cancelled' : ''}" data-task-id="${task.id || ''}" data-file="${task.filePath || ''}" data-line="${task.lineNumber || ''}"> `;
   if (taskLink) {
     html += `<a href="${taskLink}" style="text-decoration: none; color: inherit;">${priorityIcon}${displayText}</a>`;
   } else {

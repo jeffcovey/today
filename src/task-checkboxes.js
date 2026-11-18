@@ -10,6 +10,13 @@
 const CANCELLED_TASK_LINE = /^(?:\s*>)*\s*- \[-\]/;
 
 /**
+ * Attributes for a canceled task's checkbox. Pages rendered in one go get them
+ * from enableTaskCheckboxes(); tasks query results add them directly, because
+ * a deferred block's results are sent without that pass.
+ */
+export const CANCELLED_CHECKBOX_ATTRS = 'disabled title="Cancelled"';
+
+/**
  * True when a Markdown line is a canceled task ("- [-] ..."), including one
  * inside a blockquote or callout.
  */
@@ -48,6 +55,8 @@ export function enableTaskCheckboxes(html) {
     if (!/class="[^"]*\btask-cancelled\b/.test(enabled)) {
       return enabled;
     }
-    return enabled.replace(/^<input/i, '<input disabled title="Cancelled"');
+    // A query result's checkbox already carries the attributes; add them once
+    const plain = enabled.replace(/\s+title="Cancelled"/g, '');
+    return plain.replace(/^<input/i, `<input ${CANCELLED_CHECKBOX_ATTRS}`);
   });
 }
