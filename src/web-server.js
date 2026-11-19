@@ -6291,6 +6291,8 @@ app.get('/_git', authMiddleware, async (req, res) => {
     .d2h-file-stats { font-size: 0.82rem; }
     .d2h-file-collapse { font-size: 0.7rem; }
     .d2h-tag, .d2h-file-switch { font-size: 0.6rem; }
+    /* diff2html fixes the file header at 35px; let it grow with larger text. */
+    .d2h-file-header { height: auto; min-height: 35px; }
     .action-bar { position: sticky; top: 0; z-index: 100; }
   </style>
 </head>
