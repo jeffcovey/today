@@ -6282,6 +6282,15 @@ app.get('/_git', authMiddleware, async (req, res) => {
     .diff-container { min-height: 200px; }
     .commit-list { max-height: 300px; overflow-y: auto; }
     .d2h-wrapper { font-size: 0.82rem; }
+    /* diff2html sizes its text in fixed px, so it ignored Today's text size
+       (Dynamic Type, the display menu, zoom) and stayed 13px while the rest of
+       the page shrank around it (#740). These are its sizes in rem, scaled
+       from the 17px default root, with the code a step under the file list. */
+    .d2h-diff-table { font-size: 0.75rem; }
+    .d2h-file-name-wrapper { font-size: 0.88rem; }
+    .d2h-file-stats { font-size: 0.82rem; }
+    .d2h-file-collapse { font-size: 0.7rem; }
+    .d2h-tag, .d2h-file-switch { font-size: 0.6rem; }
     .action-bar { position: sticky; top: 0; z-index: 100; }
   </style>
 </head>
