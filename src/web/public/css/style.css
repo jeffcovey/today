@@ -199,9 +199,15 @@ html[data-theme="dark"] {
   color: var(--today-link);
 }
 
-/* Default to iOS 'Large'; the head bootstrap applies Dynamic Type on iOS. */
+/* Default to iOS 'Large'; the head bootstrap applies Dynamic Type on iOS.
+ * text-size-adjust stops iOS/iPadOS Safari's text autosizing, which otherwise
+ * inflates wide, non-wrapping text such as diff2html's code lines (#738).
+ * Text size is already handled by Dynamic Type and the display menu, and
+ * this doesn't affect pinch zoom. */
 html {
   font-size: 17px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 /* Display settings menu (gear button in the navbar) */
