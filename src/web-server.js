@@ -10,6 +10,9 @@ import {
 import { loadTimerState, writeTimerState } from './timer-state-store.js';
 import { getRecentTimerDescriptions, renderRecentTimers } from './recent-timers.js';
 import { INBOX_SESSION_MAX_HOURS, readInboxSession } from './inbox-session.js';
+import {
+  getCurrentFast, startFast, stopFast, getLastFastEnd, DEFAULT_GOAL_HOURS
+} from './fasting.js';
 import express from 'express';
 import session from 'express-session';
 import Database from 'better-sqlite3';
@@ -1721,16 +1724,81 @@ function getPomodoroWidget() {
 // This used to be built inline at three call sites, identically, which is why
 // it lives in one function now.
 
-async function getActivityBar({ timer }) {
+const EMOJI_FASTING = '\u{1F374}'; // 🍴
+
+async function getFastingWidget() {
+  const tz = getConfiguredTimezone();
+  let fast;
+  try {
+    fast = await getCurrentFast();
+  } catch {
+    return '';
+  }
+
+  if (fast) {
+    const goalMs = DEFAULT_GOAL_HOURS * 3600 * 1000;
+    const startISO = fast.startTime;
+    const expiryISO = new Date(new Date(startISO).getTime() + goalMs).toISOString();
+    const startFormatted = new Date(startISO).toLocaleTimeString('en-US', {
+      hour: 'numeric', minute: '2-digit', hour12: true, timeZone: tz
+    });
+    return timerCard({
+      key: 'fasting',
+      extraClass: 'timer-card-grow',
+      attrs: ` data-timer-start="${startISO}" data-fast-goal-hours="${DEFAULT_GOAL_HOURS}"`,
+      emoji: EMOJI_FASTING,
+      title: `Fasting since ${startFormatted}`,
+      clock: `<span class="timer-duration"></span>`,
+      detail: `
+        <div class="fast-progress mb-2">
+          <div class="progress" style="height:6px">
+            <div class="progress-bar fast-progress-bar" role="progressbar" style="width:0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+          </div>
+          <small class="text-muted fast-progress-label">— / ${DEFAULT_GOAL_HOURS}h goal</small>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary" onclick="
+          if(!confirm('End your fast now?')) return;
+          fetch('/api/fast/stop', {method:'POST'}).then(() => location.reload());
+        ">End fast</button>`
+    });
+  }
+
+  // No fast running — show time since last fast and a start button.
+  let sinceText = '';
+  try {
+    const lastEnd = await getLastFastEnd();
+    if (lastEnd) {
+      const sinceMs = Date.now() - new Date(lastEnd).getTime();
+      const sinceH = Math.floor(sinceMs / 3600000);
+      const sinceM = Math.floor((sinceMs % 3600000) / 60000);
+      sinceText = sinceH > 0 ? `${sinceH}h ${sinceM}m ago` : `${sinceM}m ago`;
+    }
+  } catch { /* ignore */ }
+
+  return timerCard({
+    key: 'fasting',
+    extraClass: 'timer-card-tight',
+    emoji: EMOJI_FASTING,
+    title: 'Start fast',
+    clock: sinceText ? `<span class="text-muted" style="font-size:.8em">last ended ${sinceText}</span>` : '',
+    detail: `
+      <button class="btn btn-sm btn-primary" onclick="
+        fetch('/api/fast/start', {method:'POST'}).then(() => location.reload());
+      ">Start fast now</button>`
+  });
+}
+
+async function getActivityBar({ timer, showFasting = false }) {
   const taskTimerHtml = await getTaskTimerWidget();
   const pomodoroHtml = getPomodoroWidget();
   const inboxSessionHtml = await getInboxSessionWidget();
+  const fastingHtml = showFasting ? await getFastingWidget() : '';
 
   // All of them on one row, each a card that is one line until you tap it and
   // looks the same whether it is running or not. There is no banner/pill split
   // to decide any more: the state is in the text and the clock, not in two
   // different shapes.
-  const rowed = [inboxSessionHtml, getTimerWidget(timer, getRecentTimersFor(timer)), taskTimerHtml, pomodoroHtml].filter(Boolean);
+  const rowed = [inboxSessionHtml, getTimerWidget(timer, getRecentTimersFor(timer)), taskTimerHtml, pomodoroHtml, fastingHtml].filter(Boolean);
 
   return `
     <div class="activity-bar mb-3">
@@ -5920,8 +5988,8 @@ async function renderMarkdown(filePath, urlPath) {
   const html = await getCachedRender(filePath, urlPath);
   // Inject live timer widgets on every request (not cached)
   const currentTimer = await getCurrentTimer();
-
-  const widgetsHtml = await getActivityBar({ timer: currentTimer });
+  const showFasting = /^\/?diary\//.test(urlPath);
+  const widgetsHtml = await getActivityBar({ timer: currentTimer, showFasting });
 
   return html.replace('<!--TIMER_WIDGETS_PLACEHOLDER-->', widgetsHtml);
 }
@@ -8124,6 +8192,59 @@ app.post('/api/track/stop', authMiddleware, async (req, res) => {
   }
 });
 
+// ── Fasting timer API ────────────────────────────────────────────────────────
+
+app.post('/api/fast/start', authMiddleware, express.json(), async (req, res) => {
+  const startTime = req.body?.startTime;
+  if (startTime !== undefined && (typeof startTime !== 'string' || !Number.isFinite(Date.parse(startTime)))) {
+    return res.status(400).json({ success: false, message: 'startTime must be a valid timestamp' });
+  }
+
+  try {
+    const ts = await startFast(startTime ?? null);
+    res.json({ success: true, startTime: ts });
+  } catch (error) {
+    if (error.code === 'EEXIST') {
+      return res.status(409).json({ success: false, message: 'A fast is already in progress' });
+    }
+    console.error('Error starting fast:', error);
+    res.status(500).json({ success: false, message: 'Failed to start fast' });
+  }
+});
+
+app.post('/api/fast/stop', authMiddleware, express.json(), async (req, res) => {
+  const goalHours = req.body?.goalHours ?? DEFAULT_GOAL_HOURS;
+  if (typeof goalHours !== 'number' || !Number.isFinite(goalHours) || goalHours <= 0) {
+    return res.status(400).json({ success: false, message: 'goalHours must be a positive finite number' });
+  }
+
+  try {
+    const result = await stopFast(goalHours);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    if (error.message === 'No fast in progress') {
+      return res.status(409).json({ success: false, message: error.message });
+    }
+    console.error('Error stopping fast:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to stop fast' });
+  }
+});
+
+app.get('/api/fast/status', authMiddleware, async (req, res) => {
+  try {
+    const fast = await getCurrentFast();
+    if (!fast) {
+      const lastEnd = await getLastFastEnd();
+      return res.json({ running: false, lastEnd });
+    }
+    const elapsedMs = Date.now() - new Date(fast.startTime).getTime();
+    res.json({ running: true, startTime: fast.startTime, elapsedMs, goalHours: DEFAULT_GOAL_HOURS });
+  } catch (error) {
+    console.error('Error getting fast status:', error);
+    res.status(500).json({ success: false, message: 'Failed to get fast status' });
+  }
+});
+
 // Task Timer API endpoints
 app.post('/api/task-timer/start', authMiddleware, express.json(), async (req, res) => {
   try {
@@ -8657,8 +8778,8 @@ app.get('/*path', authMiddleware, async (req, res) => {
           : await getCachedRender(fullPath, urlPath);
         // Inject live timer widgets (not cached)
         const currentTimer = await getCurrentTimer();
-
-        const widgetsHtml = await getActivityBar({ timer: currentTimer });
+        const showFasting = /^\/?diary\//.test(urlPath);
+        const widgetsHtml = await getActivityBar({ timer: currentTimer, showFasting });
 
         const html = injectRoleReplyForms(
           cachedHtml.replace('<!--TIMER_WIDGETS_PLACEHOLDER-->', widgetsHtml),

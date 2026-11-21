@@ -486,6 +486,30 @@ function updateTimerDuration() {
   }
 }
 
+// Fasting timer progress bar
+function updateFastingProgress() {
+  const card = document.querySelector('[data-fast-goal-hours]');
+  if (!card) return;
+  const startTime = card.dataset.timerStart;
+  if (!startTime) return;
+  const goalHours = parseFloat(card.dataset.fastGoalHours) || 16;
+  const goalMs = goalHours * 3600 * 1000;
+  const elapsedMs = Date.now() - new Date(startTime).getTime();
+  const pct = Math.min(100, (elapsedMs / goalMs) * 100);
+  const bar = card.querySelector('.fast-progress-bar');
+  if (bar) {
+    bar.style.width = pct.toFixed(1) + '%';
+    bar.setAttribute('aria-valuenow', pct.toFixed(0));
+  }
+  const label = card.querySelector('.fast-progress-label');
+  if (label) {
+    const elapsedH = Math.floor(elapsedMs / 3600000);
+    const elapsedM = Math.floor((elapsedMs % 3600000) / 60000);
+    const display = elapsedH > 0 ? `${elapsedH}h ${elapsedM}m` : `${elapsedM}m`;
+    label.textContent = `${display} / ${goalHours}h goal${pct >= 100 ? ' ✓' : ''}`;
+  }
+}
+
 // Task Timer countdown functionality
 function updateTaskTimerCountdown() {
   const taskTimerAlert = document.querySelector('[data-timer-total-seconds]');
@@ -1046,6 +1070,12 @@ document.addEventListener('DOMContentLoaded', () => {
   if (document.querySelector('[data-timer-start]')) {
     updateTimerDuration();
     setInterval(updateTimerDuration, 1000);
+  }
+
+  // Start fasting progress bar if a fast is running
+  if (document.querySelector('[data-fast-goal-hours]')) {
+    updateFastingProgress();
+    setInterval(updateFastingProgress, 1000);
   }
 
   // Start task timer countdown if there's an active task timer
