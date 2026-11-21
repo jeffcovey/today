@@ -6,12 +6,24 @@
 
 import fs from 'fs/promises';
 import path from 'path';
+import { TZDate } from '@date-fns/tz';
 import { getAbsoluteVaultPath } from './config.js';
 import { getCurrentTimeISO, getConfiguredTimezone } from './date-utils.js';
 
 export const DEFAULT_GOAL_HOURS = 16;
 const FASTING_LOG_DIR = path.join('logs', 'fasting');
 const CURRENT_FAST_FILE = 'current-fast.md';
+let transitionQueue = Promise.resolve();
+
+function serializeTransition(operation) {
+  const result = transitionQueue.then(operation);
+  transitionQueue = result.catch(() => {});
+  return result;
+}
+
+function isValidTimestamp(timestamp) {
+  return typeof timestamp === 'string' && Number.isFinite(Date.parse(timestamp));
+}
 
 function fastingDir() {
   return path.join(getAbsoluteVaultPath(), FASTING_LOG_DIR);
@@ -23,7 +35,7 @@ function currentFastPath() {
 
 function monthlyLogPath(isoTimestamp) {
   // Returns the path for the monthly log that owns this timestamp's start date.
-  const d = new Date(isoTimestamp);
+  const d = new TZDate(new Date(isoTimestamp).getTime(), getConfiguredTimezone());
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   return path.join(fastingDir(), `${year}-${month}.md`);
@@ -46,9 +58,16 @@ export async function getCurrentFast() {
 // Starts a fast. startTime defaults to now.
 // Returns the ISO 8601 timestamp written to current-fast.md.
 export async function startFast(startTime = null) {
-  const ts = startTime || getCurrentTimeISO(getConfiguredTimezone());
-  await fs.writeFile(currentFastPath(), ts + '\n', 'utf8');
-  return ts;
+  if (startTime !== null && !isValidTimestamp(startTime)) {
+    throw new TypeError('startTime must be a valid timestamp');
+  }
+
+  return serializeTransition(async () => {
+    const ts = startTime ?? getCurrentTimeISO(getConfiguredTimezone());
+    await fs.mkdir(fastingDir(), { recursive: true });
+    await fs.writeFile(currentFastPath(), ts + '\n', { encoding: 'utf8', flag: 'wx' });
+    return ts;
+  });
 }
 
 // Ends the running fast.
@@ -57,42 +76,53 @@ export async function startFast(startTime = null) {
 // it at start time, so the caller supplies it).
 // Returns { startTime, endTime, goalHours, durationMs }.
 export async function stopFast(goalHours = DEFAULT_GOAL_HOURS) {
-  const fast = await getCurrentFast();
-  if (!fast) throw new Error('No fast in progress');
-
-  const endTime = getCurrentTimeISO(getConfiguredTimezone());
-  const durationMs = new Date(endTime).getTime() - new Date(fast.startTime).getTime();
-
-  const line = `${fast.startTime}|${endTime}|${goalHours}\n`;
-  const logFile = monthlyLogPath(fast.startTime);
-
-  // Append to the month file, creating it if it doesn't exist yet.
-  try {
-    await fs.appendFile(logFile, line, 'utf8');
-  } catch (err) {
-    if (err.code !== 'ENOENT') throw err;
-    await fs.writeFile(logFile, line, 'utf8');
+  if (typeof goalHours !== 'number' || !Number.isFinite(goalHours) || goalHours <= 0) {
+    throw new TypeError('goalHours must be a positive finite number');
   }
 
-  await fs.unlink(currentFastPath());
+  return serializeTransition(async () => {
+    const fast = await getCurrentFast();
+    if (!fast) throw new Error('No fast in progress');
 
-  return { startTime: fast.startTime, endTime, goalHours, durationMs };
+    const endTime = getCurrentTimeISO(getConfiguredTimezone());
+    const durationMs = new Date(endTime).getTime() - new Date(fast.startTime).getTime();
+
+    const line = `${fast.startTime}|${endTime}|${goalHours}\n`;
+    const logFile = monthlyLogPath(fast.startTime);
+    await fs.mkdir(fastingDir(), { recursive: true });
+
+    // Keep the active state until the completed fast has been persisted.
+    await fs.appendFile(logFile, line, 'utf8');
+    await fs.unlink(currentFastPath());
+
+    return { startTime: fast.startTime, endTime, goalHours, durationMs };
+  });
 }
 
 // Returns the ISO 8601 end timestamp of the most recent completed fast,
-// or null if none found in the current month's log.
+// or null if no valid completed fast is found.
 export async function getLastFastEnd() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const logFile = path.join(fastingDir(), `${year}-${month}.md`);
+  let latestEnd = null;
+  let latestEndTime = -Infinity;
+
   try {
-    const content = await fs.readFile(logFile, 'utf8');
-    const lines = content.trim().split('\n').filter(Boolean);
-    if (lines.length === 0) return null;
-    const parts = lines[lines.length - 1].split('|');
-    return parts[1] || null;
+    const files = await fs.readdir(fastingDir());
+    for (const file of files) {
+      if (!/^\d{4}-\d{2}\.md$/.test(file)) continue;
+      const content = await fs.readFile(path.join(fastingDir(), file), 'utf8');
+      for (const line of content.split(/\r?\n/)) {
+        const endTime = line.split('|')[1];
+        if (!isValidTimestamp(endTime)) continue;
+        const parsedEndTime = Date.parse(endTime);
+        if (parsedEndTime > latestEndTime) {
+          latestEnd = endTime;
+          latestEndTime = parsedEndTime;
+        }
+      }
+    }
   } catch {
-    return null;
+    return latestEnd;
   }
+
+  return latestEnd;
 }

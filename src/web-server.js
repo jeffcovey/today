@@ -5988,7 +5988,7 @@ async function renderMarkdown(filePath, urlPath) {
   const html = await getCachedRender(filePath, urlPath);
   // Inject live timer widgets on every request (not cached)
   const currentTimer = await getCurrentTimer();
-  const showFasting = /^\/diary\//.test(urlPath);
+  const showFasting = /^\/?diary\//.test(urlPath);
   const widgetsHtml = await getActivityBar({ timer: currentTimer, showFasting });
 
   return html.replace('<!--TIMER_WIDGETS_PLACEHOLDER-->', widgetsHtml);
@@ -8195,22 +8195,36 @@ app.post('/api/track/stop', authMiddleware, async (req, res) => {
 // ── Fasting timer API ────────────────────────────────────────────────────────
 
 app.post('/api/fast/start', authMiddleware, express.json(), async (req, res) => {
+  const startTime = req.body?.startTime;
+  if (startTime !== undefined && (typeof startTime !== 'string' || !Number.isFinite(Date.parse(startTime)))) {
+    return res.status(400).json({ success: false, message: 'startTime must be a valid timestamp' });
+  }
+
   try {
-    const startTime = req.body?.startTime || null;
-    const ts = await startFast(startTime);
+    const ts = await startFast(startTime ?? null);
     res.json({ success: true, startTime: ts });
   } catch (error) {
+    if (error.code === 'EEXIST') {
+      return res.status(409).json({ success: false, message: 'A fast is already in progress' });
+    }
     console.error('Error starting fast:', error);
     res.status(500).json({ success: false, message: 'Failed to start fast' });
   }
 });
 
 app.post('/api/fast/stop', authMiddleware, express.json(), async (req, res) => {
+  const goalHours = req.body?.goalHours ?? DEFAULT_GOAL_HOURS;
+  if (typeof goalHours !== 'number' || !Number.isFinite(goalHours) || goalHours <= 0) {
+    return res.status(400).json({ success: false, message: 'goalHours must be a positive finite number' });
+  }
+
   try {
-    const goalHours = req.body?.goalHours ?? DEFAULT_GOAL_HOURS;
     const result = await stopFast(goalHours);
     res.json({ success: true, ...result });
   } catch (error) {
+    if (error.message === 'No fast in progress') {
+      return res.status(409).json({ success: false, message: error.message });
+    }
     console.error('Error stopping fast:', error);
     res.status(500).json({ success: false, message: error.message || 'Failed to stop fast' });
   }
@@ -8764,7 +8778,7 @@ app.get('/*path', authMiddleware, async (req, res) => {
           : await getCachedRender(fullPath, urlPath);
         // Inject live timer widgets (not cached)
         const currentTimer = await getCurrentTimer();
-        const showFasting = /^\/diary\//.test(urlPath);
+        const showFasting = /^\/?diary\//.test(urlPath);
         const widgetsHtml = await getActivityBar({ timer: currentTimer, showFasting });
 
         const html = injectRoleReplyForms(
