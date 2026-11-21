@@ -1788,11 +1788,11 @@ async function getFastingWidget() {
   });
 }
 
-async function getActivityBar({ timer }) {
+async function getActivityBar({ timer, showFasting = false }) {
   const taskTimerHtml = await getTaskTimerWidget();
   const pomodoroHtml = getPomodoroWidget();
   const inboxSessionHtml = await getInboxSessionWidget();
-  const fastingHtml = await getFastingWidget();
+  const fastingHtml = showFasting ? await getFastingWidget() : '';
 
   // All of them on one row, each a card that is one line until you tap it and
   // looks the same whether it is running or not. There is no banner/pill split
@@ -5988,8 +5988,8 @@ async function renderMarkdown(filePath, urlPath) {
   const html = await getCachedRender(filePath, urlPath);
   // Inject live timer widgets on every request (not cached)
   const currentTimer = await getCurrentTimer();
-
-  const widgetsHtml = await getActivityBar({ timer: currentTimer });
+  const showFasting = /^\/diary\//.test(urlPath);
+  const widgetsHtml = await getActivityBar({ timer: currentTimer, showFasting });
 
   return html.replace('<!--TIMER_WIDGETS_PLACEHOLDER-->', widgetsHtml);
 }
@@ -8764,8 +8764,8 @@ app.get('/*path', authMiddleware, async (req, res) => {
           : await getCachedRender(fullPath, urlPath);
         // Inject live timer widgets (not cached)
         const currentTimer = await getCurrentTimer();
-
-        const widgetsHtml = await getActivityBar({ timer: currentTimer });
+        const showFasting = /^\/diary\//.test(urlPath);
+        const widgetsHtml = await getActivityBar({ timer: currentTimer, showFasting });
 
         const html = injectRoleReplyForms(
           cachedHtml.replace('<!--TIMER_WIDGETS_PLACEHOLDER-->', widgetsHtml),
