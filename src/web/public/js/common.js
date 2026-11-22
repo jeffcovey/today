@@ -486,28 +486,111 @@ function updateTimerDuration() {
   }
 }
 
-// Fasting timer progress bar
-function updateFastingProgress() {
-  const card = document.querySelector('[data-fast-goal-hours]');
+// Fasting timer: the card's clock and progress bar. The clock shows time
+// elapsed or time remaining to the goal; the choice is remembered per browser.
+const FAST_CLOCK_MODE_KEY = 'fast-clock-mode';
+
+function getFastClockMode() {
+  try {
+    return localStorage.getItem(FAST_CLOCK_MODE_KEY) === 'remaining' ? 'remaining' : 'elapsed';
+  } catch {
+    return 'elapsed';
+  }
+}
+
+function fastToggleClockMode() {
+  const next = getFastClockMode() === 'remaining' ? 'elapsed' : 'remaining';
+  try { localStorage.setItem(FAST_CLOCK_MODE_KEY, next); } catch { /* per-viewer only */ }
+  updateFastingProgress(next);
+}
+
+function formatFastDuration(ms, { seconds = false } = {}) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (!seconds) return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+function updateFastingProgress(mode = getFastClockMode()) {
+  const card = document.querySelector('[data-fast-goal-hours][data-fast-start]');
   if (!card) return;
-  const startTime = card.dataset.timerStart;
-  if (!startTime) return;
   const goalHours = parseFloat(card.dataset.fastGoalHours) || 16;
   const goalMs = goalHours * 3600 * 1000;
-  const elapsedMs = Date.now() - new Date(startTime).getTime();
+  const elapsedMs = Date.now() - new Date(card.dataset.fastStart).getTime();
+  const remainingMs = goalMs - elapsedMs;
+  const reached = remainingMs <= 0;
   const pct = Math.min(100, (elapsedMs / goalMs) * 100);
+
   const bar = card.querySelector('.fast-progress-bar');
   if (bar) {
     bar.style.width = pct.toFixed(1) + '%';
     bar.setAttribute('aria-valuenow', pct.toFixed(0));
   }
+
+  const clock = card.querySelector('.fast-clock');
   const label = card.querySelector('.fast-progress-label');
-  if (label) {
-    const elapsedH = Math.floor(elapsedMs / 3600000);
-    const elapsedM = Math.floor((elapsedMs % 3600000) / 60000);
-    const display = elapsedH > 0 ? `${elapsedH}h ${elapsedM}m` : `${elapsedM}m`;
-    label.textContent = `${display} / ${goalHours}h goal${pct >= 100 ? ' ✓' : ''}`;
+  if (mode === 'remaining') {
+    if (clock) {
+      clock.textContent = reached
+        ? `+${formatFastDuration(-remainingMs, { seconds: true })} past goal`
+        : `${formatFastDuration(remainingMs, { seconds: true })} left`;
+    }
+    if (label) {
+      label.textContent = reached
+        ? `${goalHours}h goal reached ✓`
+        : `${formatFastDuration(remainingMs)} left of ${goalHours}h goal`;
+    }
+  } else {
+    if (clock) clock.textContent = formatFastDuration(elapsedMs, { seconds: true });
+    if (label) label.textContent = `${formatFastDuration(elapsedMs)} / ${goalHours}h goal${reached ? ' ✓' : ''}`;
   }
+
+  const toggle = card.querySelector('.fast-mode-toggle');
+  if (toggle) toggle.textContent = mode === 'remaining' ? 'Show elapsed' : 'Show remaining';
+}
+
+// Fasting card actions. The start input is sent only when it was changed, so a
+// card left open for an hour still starts "now" rather than when it rendered.
+function fastFormValues(button, { alwaysSendStart = false } = {}) {
+  const card = button.closest('[data-timer-key="fasting"]');
+  const startInput = card.querySelector('.fast-start-input');
+  const goalInput = card.querySelector('.fast-goal-input');
+  const body = { goalHours: Number(goalInput.value) };
+  if (startInput.value && (alwaysSendStart || startInput.value !== startInput.dataset.initial)) {
+    body.startTime = startInput.value;
+  }
+  return body;
+}
+
+async function fastRequest(action, body) {
+  const res = await fetch(`/api/fast/${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.success === false) {
+    alert(data.message || `Could not ${action} the fast`);
+    return false;
+  }
+  location.reload();
+  return true;
+}
+
+function fastStart(button) {
+  return fastRequest('start', fastFormValues(button));
+}
+
+function fastSave(button) {
+  return fastRequest('update', fastFormValues(button));
+}
+
+function fastEnd() {
+  if (!confirm('End your fast now?')) return;
+  return fastRequest('stop', {});
 }
 
 // Task Timer countdown functionality
@@ -1073,9 +1156,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Start fasting progress bar if a fast is running
-  if (document.querySelector('[data-fast-goal-hours]')) {
+  if (document.querySelector('[data-fast-goal-hours][data-fast-start]')) {
     updateFastingProgress();
-    setInterval(updateFastingProgress, 1000);
+    setInterval(() => updateFastingProgress(), 1000);
   }
 
   // Start task timer countdown if there's an active task timer

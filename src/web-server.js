@@ -11,7 +11,8 @@ import { loadTimerState, writeTimerState } from './timer-state-store.js';
 import { getRecentTimerDescriptions, renderRecentTimers } from './recent-timers.js';
 import { INBOX_SESSION_MAX_HOURS, readInboxSession } from './inbox-session.js';
 import {
-  getCurrentFast, startFast, stopFast, getLastFastEnd, DEFAULT_GOAL_HOURS
+  getCurrentFast, startFast, stopFast, updateFast, getLastFastEnd,
+  getDefaultGoalHours, isValidGoalHours, toLocalInputValue
 } from './fasting.js';
 import express from 'express';
 import session from 'express-session';
@@ -312,6 +313,9 @@ async function readFromDiskCache(urlPath, sourceMtime, consoleEnabled = false) {
     const meta = JSON.parse(metaRaw);
     if (meta.mtime !== sourceMtime ||
         meta.renderVersion !== HTML_CACHE_RENDER_VERSION ||
+        // The page bakes in ?v=STATIC_VERSION; a page cached before a deploy
+        // would keep loading the old common.js and style.css.
+        meta.staticVersion !== STATIC_VERSION ||
         meta.consoleEnabled !== consoleEnabled) return null;
     const html = await fs.readFile(htmlPath, 'utf-8');
     return html;
@@ -330,6 +334,7 @@ async function writeToDiskCache(urlPath, html, sourceMtime, consoleEnabled = fal
     await fs.writeFile(metaPath, JSON.stringify({
       mtime: sourceMtime,
       renderVersion: HTML_CACHE_RENDER_VERSION,
+      staticVersion: STATIC_VERSION,
       consoleEnabled,
       timestamp: Date.now()
     }), 'utf-8');
@@ -1726,6 +1731,31 @@ function getPomodoroWidget() {
 
 const EMOJI_FASTING = '\u{1F374}'; // 🍴
 
+const FAST_GOAL_CHOICES = [12, 13, 14, 15, 16, 17, 18, 20, 24, 36, 48];
+
+function fastGoalSelect(selected) {
+  const choices = FAST_GOAL_CHOICES.includes(selected)
+    ? FAST_GOAL_CHOICES
+    : [...FAST_GOAL_CHOICES, selected].sort((a, b) => a - b);
+  return `<select class="form-select form-select-sm fast-goal-input" aria-label="Goal hours">
+            ${choices.map(h => `<option value="${h}"${h === selected ? ' selected' : ''}>${h}h</option>`).join('')}
+          </select>`;
+}
+
+// The start-time and goal inputs, shared by the idle and running cards.
+function fastFields({ startValue, maxValue, goalHours }) {
+  return `
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+          <label class="d-flex align-items-center gap-1 mb-0"><small>Started</small>
+            <input type="datetime-local" class="form-control form-control-sm fast-start-input"
+              value="${startValue}" data-initial="${startValue}" max="${maxValue}" style="width:auto">
+          </label>
+          <label class="d-flex align-items-center gap-1 mb-0"><small>Goal</small>
+            ${fastGoalSelect(goalHours)}
+          </label>
+        </div>`;
+}
+
 async function getFastingWidget() {
   const tz = getConfiguredTimezone();
   let fast;
@@ -1734,36 +1764,45 @@ async function getFastingWidget() {
   } catch {
     return '';
   }
+  const nowValue = toLocalInputValue(new Date().toISOString());
 
   if (fast) {
-    const goalMs = DEFAULT_GOAL_HOURS * 3600 * 1000;
-    const startISO = fast.startTime;
-    const expiryISO = new Date(new Date(startISO).getTime() + goalMs).toISOString();
-    const startFormatted = new Date(startISO).toLocaleTimeString('en-US', {
+    const { startTime: startISO, goalHours } = fast;
+    const todayLabel = new Date().toLocaleDateString('en-US', { timeZone: tz });
+    // Time of day, with the weekday when it isn't today.
+    const formatWhen = (date) => date.toLocaleString('en-US', {
+      ...(date.toLocaleDateString('en-US', { timeZone: tz }) === todayLabel ? {} : { weekday: 'short' }),
       hour: 'numeric', minute: '2-digit', hour12: true, timeZone: tz
     });
+    const startDate = new Date(startISO);
+    const goalEnd = new Date(startDate.getTime() + goalHours * 3600 * 1000);
     return timerCard({
       key: 'fasting',
       extraClass: 'timer-card-grow',
-      attrs: ` data-timer-start="${startISO}" data-fast-goal-hours="${DEFAULT_GOAL_HOURS}"`,
+      attrs: ` data-fast-start="${startISO}" data-fast-goal-hours="${goalHours}"`,
       emoji: EMOJI_FASTING,
-      title: `Fasting since ${startFormatted}`,
-      clock: `<span class="timer-duration"></span>`,
+      title: `Fasting since ${formatWhen(startDate)}`,
+      clock: `<span class="fast-clock"></span>`,
       detail: `
         <div class="fast-progress mb-2">
           <div class="progress" style="height:6px">
             <div class="progress-bar fast-progress-bar" role="progressbar" style="width:0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
           </div>
-          <small class="text-muted fast-progress-label">— / ${DEFAULT_GOAL_HOURS}h goal</small>
+          <div class="d-flex justify-content-between align-items-baseline gap-2">
+            <small class="text-muted fast-progress-label">— / ${goalHours}h goal</small>
+            <small class="text-muted fast-goal-end">ends ${formatWhen(goalEnd)}</small>
+          </div>
         </div>
-        <button class="btn btn-sm btn-outline-secondary" onclick="
-          if(!confirm('End your fast now?')) return;
-          fetch('/api/fast/stop', {method:'POST'}).then(() => location.reload());
-        ">End fast</button>`
+        ${fastFields({ startValue: toLocalInputValue(startISO), maxValue: nowValue, goalHours })}
+        <div class="d-flex flex-wrap gap-1">
+          <button class="btn btn-sm btn-outline-secondary fast-mode-toggle" onclick="fastToggleClockMode()">Show remaining</button>
+          <button class="btn btn-sm btn-outline-primary" onclick="fastSave(this)">Save changes</button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="fastEnd()">End fast</button>
+        </div>`
     });
   }
 
-  // No fast running — show time since last fast and a start button.
+  // No fast running — show time since last fast and a start form.
   let sinceText = '';
   try {
     const lastEnd = await getLastFastEnd();
@@ -1782,9 +1821,8 @@ async function getFastingWidget() {
     title: 'Start fast',
     clock: sinceText ? `<span class="text-muted" style="font-size:.8em">last ended ${sinceText}</span>` : '',
     detail: `
-      <button class="btn btn-sm btn-primary" onclick="
-        fetch('/api/fast/start', {method:'POST'}).then(() => location.reload());
-      ">Start fast now</button>`
+        ${fastFields({ startValue: nowValue, maxValue: nowValue, goalHours: getDefaultGoalHours() })}
+        <button class="btn btn-sm btn-primary" onclick="fastStart(this)">Start fast</button>`
   });
 }
 
@@ -8194,39 +8232,60 @@ app.post('/api/track/stop', authMiddleware, async (req, res) => {
 
 // ── Fasting timer API ────────────────────────────────────────────────────────
 
-app.post('/api/fast/start', authMiddleware, express.json(), async (req, res) => {
-  const startTime = req.body?.startTime;
-  if (startTime !== undefined && (typeof startTime !== 'string' || !Number.isFinite(Date.parse(startTime)))) {
-    return res.status(400).json({ success: false, message: 'startTime must be a valid timestamp' });
+// RangeError from fasting.js = a start time that is in the future or overlaps
+// the last fast; TypeError = malformed input.
+function fastErrorResponse(res, error, fallback) {
+  if (error.code === 'EEXIST') {
+    return res.status(409).json({ success: false, message: 'A fast is already in progress' });
   }
+  if (error.message === 'No fast in progress') {
+    return res.status(409).json({ success: false, message: error.message });
+  }
+  if (error instanceof RangeError || error instanceof TypeError) {
+    return res.status(400).json({ success: false, message: error.message });
+  }
+  console.error(`${fallback}:`, error);
+  return res.status(500).json({ success: false, message: fallback });
+}
 
+function readFastBody(body) {
+  const { startTime, goalHours } = body ?? {};
+  if (startTime !== undefined && typeof startTime !== 'string') {
+    throw new TypeError('startTime must be a valid timestamp');
+  }
+  if (goalHours !== undefined && !isValidGoalHours(goalHours)) {
+    throw new TypeError('goalHours must be a positive number of hours');
+  }
+  return { startTime, goalHours };
+}
+
+app.post('/api/fast/start', authMiddleware, express.json(), async (req, res) => {
   try {
-    const ts = await startFast(startTime ?? null);
-    res.json({ success: true, startTime: ts });
+    const { startTime, goalHours } = readFastBody(req.body);
+    const fast = await startFast(startTime ?? null, goalHours ?? null);
+    res.json({ success: true, ...fast });
   } catch (error) {
-    if (error.code === 'EEXIST') {
-      return res.status(409).json({ success: false, message: 'A fast is already in progress' });
-    }
-    console.error('Error starting fast:', error);
-    res.status(500).json({ success: false, message: 'Failed to start fast' });
+    fastErrorResponse(res, error, 'Failed to start fast');
+  }
+});
+
+app.post('/api/fast/update', authMiddleware, express.json(), async (req, res) => {
+  try {
+    const { startTime, goalHours } = readFastBody(req.body);
+    const fast = await updateFast({ startTime, goalHours });
+    res.json({ success: true, ...fast });
+  } catch (error) {
+    fastErrorResponse(res, error, 'Failed to update fast');
   }
 });
 
 app.post('/api/fast/stop', authMiddleware, express.json(), async (req, res) => {
-  const goalHours = req.body?.goalHours ?? DEFAULT_GOAL_HOURS;
-  if (typeof goalHours !== 'number' || !Number.isFinite(goalHours) || goalHours <= 0) {
-    return res.status(400).json({ success: false, message: 'goalHours must be a positive finite number' });
-  }
-
   try {
-    const result = await stopFast(goalHours);
+    const { goalHours } = readFastBody({ goalHours: req.body?.goalHours });
+    const result = await stopFast(goalHours ?? null);
     res.json({ success: true, ...result });
   } catch (error) {
-    if (error.message === 'No fast in progress') {
-      return res.status(409).json({ success: false, message: error.message });
-    }
-    console.error('Error stopping fast:', error);
-    res.status(500).json({ success: false, message: error.message || 'Failed to stop fast' });
+    fastErrorResponse(res, error, 'Failed to stop fast');
   }
 });
 
@@ -8238,7 +8297,7 @@ app.get('/api/fast/status', authMiddleware, async (req, res) => {
       return res.json({ running: false, lastEnd });
     }
     const elapsedMs = Date.now() - new Date(fast.startTime).getTime();
-    res.json({ running: true, startTime: fast.startTime, elapsedMs, goalHours: DEFAULT_GOAL_HOURS });
+    res.json({ running: true, startTime: fast.startTime, elapsedMs, goalHours: fast.goalHours });
   } catch (error) {
     console.error('Error getting fast status:', error);
     res.status(500).json({ success: false, message: 'Failed to get fast status' });
