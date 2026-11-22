@@ -44,8 +44,30 @@ const HEALTH_READINGS = new Set([
   'Env Audio', 'Headphone'
 ]);
 
-// Short units worth repeating on every tick label.
-const TICK_SUFFIX = { min: ' min', lb: ' lb', lbs: ' lb', kg: ' kg', bpm: ' bpm', '%': '%', hr: ' h', hrs: ' h' };
+// Short units worth repeating on every tick label, keyed by the stored unit
+// in lower case.
+const TICK_SUFFIX = {
+  min: ' min', hr: ' h', hrs: ' h', ms: ' ms',
+  lb: ' lb', lbs: ' lb', kg: ' kg', g: ' g', mg: ' mg', mcg: ' mcg',
+  mi: ' mi', km: ' km', m: ' m', in: ' in', ft: ' ft',
+  kcal: ' kcal', kj: ' kJ', ml: ' mL', l: ' L', fl_oz_us: ' fl oz',
+  bpm: ' bpm', 'count/min': '/min', 'mi/hr': ' mph',
+  '%': '%', dbaspl: ' dB', db: ' dB', degf: '°F', degc: '°C'
+};
+
+/** The tick-label suffix for a unit, or null when it has none. */
+function unitSuffix(units) {
+  return TICK_SUFFIX[String(units || '').toLowerCase()] ?? null;
+}
+
+/**
+ * A unit the tick labels can't carry (ml/(kg·min), kcal/hr·kg) goes in the
+ * axis title instead, so no chart is left with bare numbers.
+ */
+export function unitTitle(units) {
+  if (!units || units === '$' || units === 'count' || unitSuffix(units) !== null) return null;
+  return units;
+}
 
 // ---------------------------------------------------------------- dates
 
@@ -79,6 +101,54 @@ export function windowStart(today, timePeriod) {
 
 // ---------------------------------------------------------------- data
 
+// Units that can be converted into one another, as a factor to a base unit
+// of their kind.
+const CONVERSIONS = {
+  mass: { kg: 1, lb: 0.45359237, lbs: 0.45359237, g: 0.001 },
+  distance: { m: 1, km: 1000, mi: 1609.344, ft: 0.3048 },
+  energy: { kj: 1, kcal: 4.184 },
+  volume: { l: 1, ml: 0.001, fl_oz_us: 0.0295735295625 }
+};
+
+function conversionFactor(from, to) {
+  const f = String(from || '').toLowerCase();
+  const t = String(to || '').toLowerCase();
+  if (f === t) return 1;
+  for (const table of Object.values(CONVERSIONS)) {
+    if (f in table && t in table) return table[f] / table[t];
+  }
+  return null;
+}
+
+/**
+ * Put a series' rows in one unit: the unit of its latest row. A Weight
+ * history kept partly in kg and partly in lb is converted, never averaged
+ * as raw numbers; a row whose unit can't be converted is left out.
+ *
+ * @returns {{rows: object[], units: string, dropped: number}}
+ */
+export function normalizeUnits(rows) {
+  if (rows.length === 0) return { rows, units: '', dropped: 0 };
+  const latest = rows.reduce((m, r) => (r.date >= m.date ? r : m), rows[0]);
+  const units = latest.units || '';
+  let dropped = 0;
+  const out = [];
+  for (const r of rows) {
+    const factor = conversionFactor(r.units || '', units);
+    if (factor === null) { dropped++; continue; }
+    out.push(factor === 1 ? r : { ...r, value: r.value * factor, units });
+  }
+  return { rows: out, units, dropped };
+}
+
+// Sources whose query has no row for a day or month with nothing in it, so
+// a missing period means zero. A missing health reading means unknown.
+const ZERO_WHEN_MISSING = new Set(['finance', 'tasks', 'time-logs']);
+
+export function zeroWhenMissing(source) {
+  return ZERO_WHEN_MISSING.has(source);
+}
+
 /** Graphs are lines; `chart_type = "bar"` asks for bars instead. */
 export function chartKind({ chartType }) {
   return chartType === 'bar' ? 'bar' : 'line';
@@ -97,10 +167,10 @@ export function isAdditive({ source, metric }) {
  * Turn query rows into plot rows on one calendar.
  *
  * @param {Array<{metric: string, rows: Array<{date: string, value: number}>}>} datasets
- * @param {{today: string, timePeriod: string, additive: boolean, averageDays: number}} opts
+ * @param {{today: string, timePeriod: string, additive: boolean, averageDays: number, zeroFill: boolean}} opts
  * @returns {{monthly: boolean, start: string, end: string, points: object[], skippedPartial: boolean}}
  */
-export function prepareData(datasets, { today, timePeriod, additive, averageDays = 0 }) {
+export function prepareData(datasets, { today, timePeriod, additive, averageDays = 0, zeroFill = false }) {
   const monthly = datasets.some(ds => ds.rows.some(r => /^\d{4}-\d{2}$/.test(r.date)));
   let start = windowStart(today, timePeriod);
   let skippedPartial = false;
@@ -118,14 +188,30 @@ export function prepareData(datasets, { today, timePeriod, additive, averageDays
   }
 
   const currentPeriod = monthly ? today.slice(0, 7) : today;
+  const last = monthly ? `${currentPeriod}-01` : today;
   const points = [];
 
+  // Every day or month in the window, for sources where a missing one is zero.
+  const periods = [];
+  if (zeroFill) {
+    const d = new Date(toUtc(start));
+    for (; toIso(d.getTime()) <= last; monthly ? d.setUTCMonth(d.getUTCMonth() + 1) : d.setUTCDate(d.getUTCDate() + 1)) {
+      periods.push(toIso(d.getTime()));
+    }
+  }
+
   for (const ds of datasets) {
-    const rows = ds.rows
+    let rows = ds.rows
       .filter(r => Number.isFinite(r.value))
       .map(r => ({ ...r, date: monthly && r.date.length === 7 ? `${r.date}-01` : r.date }))
-      .filter(r => r.date >= start && r.date <= (monthly ? `${currentPeriod}-01` : today))
+      .filter(r => r.date >= start && r.date <= last)
       .sort((a, b) => a.date.localeCompare(b.date));
+
+    if (zeroFill) {
+      const have = new Set(rows.map(r => r.date));
+      rows = [...rows, ...periods.filter(d => !have.has(d)).map(date => ({ date, value: 0 }))]
+        .sort((a, b) => a.date.localeCompare(b.date));
+    }
 
     for (const r of rows) {
       const point = {
@@ -155,13 +241,12 @@ export function prepareData(datasets, { today, timePeriod, additive, averageDays
   // Daily data that only begins partway into the window (a source connected
   // recently) starts the axis at its first day rather than leaving most of
   // the chart empty. The end always stays at today, so stale data shows.
-  if (!monthly && points.length) {
+  if (!monthly && !zeroFill && points.length) {
     const first = points.reduce((m, p) => (p.date < m ? p.date : m), points[0].date);
     if (first > start) start = first;
   }
 
-  const end = monthly ? `${currentPeriod}-01` : today;
-  return { monthly, start, end, points, skippedPartial };
+  return { monthly, start, end: last, points, skippedPartial };
 }
 
 // ---------------------------------------------------------------- formatting
@@ -187,7 +272,7 @@ export function displayNames(metrics) {
  */
 export function tickLabelExpr(units, maxValue, fmt) {
   const prefix = units === '$' ? '$' : '';
-  const suffix = TICK_SUFFIX[String(units).toLowerCase()] || '';
+  const suffix = unitSuffix(units) || '';
   const plain = `format(datum.value, '${fmt === ',.1f' ? ',~f' : ',.0f'}')`;
   const body = maxValue >= 10000
     ? `(abs(datum.value) >= 1000 ? format(datum.value / 1000, ',~f') + 'K' : ${plain})`
@@ -223,8 +308,9 @@ function formatNumber(value, units, fmt) {
   const decimals = fmt.includes('.1f') ? 1 : 0;
   const n = value.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   if (units === '$') return `$${n}`;
-  const suffix = TICK_SUFFIX[String(units).toLowerCase()];
-  return suffix ? `${n}${suffix}` : n;
+  const suffix = unitSuffix(units);
+  if (suffix) return `${n}${suffix}`;
+  return unitTitle(units) ? `${n} ${units}` : n;
 }
 
 /**
@@ -385,13 +471,19 @@ function lineLayers({ points, x, y, color, multi, fmt, averageDays }) {
  * @param {object} p.settings - plugin settings (see read.js)
  * @param {string} p.today - YYYY-MM-DD in the user's time zone
  */
-export function buildSpec({ datasets, settings, today }) {
+export function buildSpec({ datasets: raw, settings, today }) {
+  // Each series in one unit before anything is averaged or totalled.
+  const datasets = raw.map(ds => ({ ...ds, ...normalizeUnits(ds.rows) }));
+  const dropped = datasets.reduce((n, ds) => n + ds.dropped, 0);
   const metrics = datasets.map(ds => ds.metric);
   const units = datasets[0]?.units || '';
   const kind = chartKind({ chartType: settings.chartType });
   const additive = metrics.every(metric => isAdditive({ source: settings.source, metric }));
   const averageDays = Number.isFinite(settings.averageDays) ? settings.averageDays : 0;
-  const data = prepareData(datasets, { today, timePeriod: settings.timePeriod, additive, averageDays });
+  const data = prepareData(datasets, {
+    today, timePeriod: settings.timePeriod, additive, averageDays,
+    zeroFill: additive && zeroWhenMissing(settings.source)
+  });
   const { monthly } = data;
   const names = displayNames(metrics);
   const points = data.points.map(p => ({ ...p, series: names.get(p.series) }));
@@ -414,6 +506,7 @@ export function buildSpec({ datasets, settings, today }) {
     (multi ? metrics.join(' vs ') : metrics[0] || 'Graph');
   let subtitle = buildSubtitle({ additive, monthly, points, units, metrics: seriesNames, today, fmt, averageDays });
   if (kind === 'bar') subtitle = subtitle.replace('so far is dashed', 'so far is faded');
+  if (dropped) subtitle += ` · ${dropped} reading${dropped === 1 ? '' : 's'} in other units left out`;
 
   // autosize "fit" makes this the size of the whole image; the plot area is
   // what remains after title, axes and legend. Bar widths use the estimate.
@@ -423,7 +516,7 @@ export function buildSpec({ datasets, settings, today }) {
   // Tick labels carry the unit where it is short, so no axis title is needed.
   const maxValue = Math.max(0, ...points.map(p => p.value), Number.isFinite(settings.goal) ? settings.goal : 0);
   const yAxis = {
-    title: settings.yAxisLabel || null,
+    title: settings.yAxisLabel || unitTitle(units),
     tickCount: 5,
     labelExpr: tickLabelExpr(units, maxValue, fmt)
   };

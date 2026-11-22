@@ -9,7 +9,7 @@
 import * as vega from 'vega';
 import { compile } from 'vega-lite';
 import {
-  chartKind, isAdditive, windowStart, prepareData, displayNames, tickLabelExpr,
+  chartKind, isAdditive, normalizeUnits, unitTitle, zeroWhenMissing, windowStart, prepareData, displayNames, tickLabelExpr,
   dayTicks, buildSubtitle, buildSpec, addDarkMode, SERIES, CHROME
 } from '../plugins/data-graphing/chart-spec.js';
 
@@ -44,6 +44,100 @@ describe('chart kind and metric meaning', () => {
     expect(isAdditive({ source: 'health', metric: 'Weight' })).toBe(false);
     expect(isAdditive({ source: 'health', metric: 'BMI' })).toBe(false);
     expect(isAdditive({ source: 'finance', metric: 'Income' })).toBe(true);
+  });
+});
+
+describe('units', () => {
+  test('a history kept partly in kg and partly in lb is put in the latest unit', () => {
+    const { rows, units, dropped } = normalizeUnits([
+      { date: '2026-11-01', value: 70, units: 'kg' },
+      { date: '2026-11-02', value: 154.3, units: 'lb' },
+      { date: '2026-11-03', value: 71, units: 'kg' }
+    ]);
+    expect(units).toBe('kg');
+    expect(dropped).toBe(0);
+    expect(rows.map(r => Number(r.value.toFixed(2)))).toEqual([70, 69.99, 71]);
+  });
+
+  test("a row whose unit can't be converted is left out and counted", () => {
+    const { rows, dropped } = normalizeUnits([
+      { date: '2026-11-01', value: 3, units: 'count' },
+      { date: '2026-11-02', value: 1.2, units: 'mi' }
+    ]);
+    expect(rows.map(r => r.value)).toEqual([1.2]);
+    expect(dropped).toBe(1);
+  });
+
+  test('a mixed history is averaged after conversion, and the subtitle says what was left out', () => {
+    const rows = [
+      ...days('2026-11-01', 6, () => 70).map(r => ({ ...r, units: 'kg' })),
+      ...days('2026-11-07', 6, () => 154.32).map(r => ({ ...r, units: 'lb' })),
+      { date: '2026-10-31', value: 1, units: 'count' }
+    ];
+    const spec = buildSpec({
+      datasets: [{ metric: 'Weight', units: 'kg', rows }],
+      settings: { ...baseSettings, metrics: ['Weight'], averageDays: 7 },
+      today: '2026-11-13'
+    });
+    const values = spec.layer[0].data.values.map(v => Number(v.value.toFixed(1)));
+    expect(new Set(values)).toEqual(new Set([154.3]));
+    expect(spec.title.subtitle).toContain('Latest 154.3 lb');
+    expect(spec.title.subtitle).toContain('1 reading in other units left out');
+  });
+
+  test('units the ticks cannot carry title the axis instead', () => {
+    expect(unitTitle('ml/(kg·min)')).toBe('ml/(kg·min)');
+    expect(unitTitle('kcal')).toBeNull();
+    expect(unitTitle('mi')).toBeNull();
+    expect(unitTitle('count')).toBeNull();
+    expect(unitTitle('$')).toBeNull();
+    const spec = buildSpec({
+      datasets: [{ metric: 'VO2 Max', units: 'ml/(kg·min)', rows: days('2026-11-01', 5, () => 35).map(r => ({ ...r, units: 'ml/(kg·min)' })) }],
+      settings: { ...baseSettings, metrics: ['VO2 Max'] },
+      today: '2026-11-05'
+    });
+    expect(spec.layer[0].encoding.y.axis.title).toBe('ml/(kg·min)');
+  });
+});
+
+describe('periods with nothing in them', () => {
+  test('finance, tasks and time logs count a missing period as zero; health does not', () => {
+    expect(zeroWhenMissing('finance')).toBe(true);
+    expect(zeroWhenMissing('tasks')).toBe(true);
+    expect(zeroWhenMissing('time-logs')).toBe(true);
+    expect(zeroWhenMissing('health')).toBe(false);
+  });
+
+  test('two active days among three empty ones average over all five', () => {
+    const rows = [day('2026-11-17', 10), day('2026-11-21', 10)];
+    const spec = buildSpec({
+      datasets: [{ metric: 'Completed', units: '', rows }],
+      settings: { ...baseSettings, source: 'tasks', metrics: ['Completed'], timePeriod: '5 days' },
+      today: '2026-11-22'
+    });
+    const values = spec.layer[0].data.values.filter(v => v.seg === 'whole').map(v => [v.date, v.value]);
+    expect(values).toEqual([
+      ['2026-11-17', 10], ['2026-11-18', 0], ['2026-11-19', 0], ['2026-11-20', 0], ['2026-11-21', 10]
+    ]);
+    expect(spec.title.subtitle).toContain('Average 4 a day');
+  });
+
+  test('a month with no transactions is a zero month', () => {
+    const data = prepareData(
+      [{ metric: 'Expenses', rows: [day('2026-09', 100), day('2026-11', 50)] }],
+      { today: '2026-11-22', timePeriod: '3 months', additive: true, zeroFill: true }
+    );
+    expect(data.points.map(p => [p.date, p.value])).toEqual([
+      ['2026-09-01', 100], ['2026-10-01', 0], ['2026-11-01', 50]
+    ]);
+  });
+
+  test('a missing health day stays missing', () => {
+    const data = prepareData(
+      [{ metric: 'Steps', rows: [day('2026-11-17', 10), day('2026-11-21', 10)] }],
+      { today: '2026-11-22', timePeriod: '5 days', additive: true }
+    );
+    expect(data.points).toHaveLength(2);
   });
 });
 

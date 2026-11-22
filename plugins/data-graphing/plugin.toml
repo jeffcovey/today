@@ -23,6 +23,12 @@ sharp at any size. Set `image_format = "png"` for a raster image (drawn at 2x).
   month's spending) is reached by a dashed segment and a hollow point.
 - The subtitle gives the latest value, the average or the totals, and says
   when data has stopped arriving.
+- A series is drawn in one unit, the unit of its latest row: kg and lb
+  (and other convertible units) are converted; a row that can't be is left
+  out, and the subtitle says how many. Units the tick labels can't carry
+  title the y axis.
+- For finance, tasks and time logs a day or month with nothing in it counts
+  as zero; a missing health reading stays missing.
 - `average_days = 7` adds a rolling average over daily data; the daily line
   then goes quiet behind it.
 - `chart_type = "bar"` draws bars instead of a line.
