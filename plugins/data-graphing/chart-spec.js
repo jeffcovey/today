@@ -101,6 +101,14 @@ export function windowStart(today, timePeriod) {
 
 // ---------------------------------------------------------------- data
 
+/** The day or month before the one starting on `iso`. */
+function previousPeriod(iso, monthly) {
+  const d = new Date(toUtc(iso));
+  if (monthly) d.setUTCMonth(d.getUTCMonth() - 1);
+  else d.setUTCDate(d.getUTCDate() - 1);
+  return toIso(d.getTime());
+}
+
 // Units that can be converted into one another, as a factor to a base unit
 // of their kind.
 const CONVERSIONS = {
@@ -167,10 +175,10 @@ export function isAdditive({ source, metric }) {
  * Turn query rows into plot rows on one calendar.
  *
  * @param {Array<{metric: string, rows: Array<{date: string, value: number}>}>} datasets
- * @param {{today: string, timePeriod: string, additive: boolean, averageDays: number, zeroFill: boolean}} opts
+ * @param {{today: string, timePeriod: string, additive: boolean, averageDays: number, zeroFill: boolean, includeCurrent: boolean}} opts
  * @returns {{monthly: boolean, start: string, end: string, points: object[], skippedPartial: boolean}}
  */
-export function prepareData(datasets, { today, timePeriod, additive, averageDays = 0, zeroFill = false }) {
+export function prepareData(datasets, { today, timePeriod, additive, averageDays = 0, zeroFill = false, includeCurrent = false }) {
   const monthly = datasets.some(ds => ds.rows.some(r => /^\d{4}-\d{2}$/.test(r.date)));
   let start = windowStart(today, timePeriod);
   let skippedPartial = false;
@@ -188,7 +196,12 @@ export function prepareData(datasets, { today, timePeriod, additive, averageDays
   }
 
   const currentPeriod = monthly ? today.slice(0, 7) : today;
-  const last = monthly ? `${currentPeriod}-01` : today;
+  const currentStart = monthly ? `${currentPeriod}-01` : today;
+  // An amount for the day or month still under way isn't finished, so the
+  // graph ends at the last finished one unless include_current asks for it.
+  // A reading taken today is complete, so readings run through today.
+  const dropCurrent = additive && !includeCurrent;
+  const last = dropCurrent ? previousPeriod(currentStart, monthly) : currentStart;
   const points = [];
 
   // Every day or month in the window, for sources where a missing one is zero.
@@ -482,7 +495,8 @@ export function buildSpec({ datasets: raw, settings, today }) {
   const averageDays = Number.isFinite(settings.averageDays) ? settings.averageDays : 0;
   const data = prepareData(datasets, {
     today, timePeriod: settings.timePeriod, additive, averageDays,
-    zeroFill: additive && zeroWhenMissing(settings.source)
+    zeroFill: additive && zeroWhenMissing(settings.source),
+    includeCurrent: settings.includeCurrent === true
   });
   const { monthly } = data;
   const names = displayNames(metrics);

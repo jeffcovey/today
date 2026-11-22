@@ -18,9 +18,12 @@ sharp at any size. Set `image_format = "png"` for a raster image (drawn at 2x).
 - Lines with straight segments between the real data points, so nothing is
   invented between days. Points are marked while there is room for them, and
   a single series has its latest value written at its end.
-- A monthly window starting mid-month leaves out that partial first month.
-  An amount for the day or month still under way (today's steps, this
-  month's spending) is reached by a dashed segment and a hollow point.
+- Only finished periods are drawn: a monthly window starting mid-month
+  leaves out that partial first month, and an amount for the day or month
+  still under way (today's steps, this month's spending) is left off, so the
+  graph ends yesterday or last month. Readings such as weight run through
+  today. `include_current = true` draws the period under way too, as a
+  dashed segment to a hollow point.
 - The subtitle gives the latest value, the average or the totals, and says
   when data has stopped arriving.
 - A series is drawn in one unit, the unit of its latest row: kg and lb
@@ -94,6 +97,7 @@ x_axis_label = { type = "string", default = "", description = "X-axis label (dat
 y_axis_label = { type = "string", default = "", description = "Y-axis label (tick labels already carry $, lb, min)" }
 chart_type = { type = "string", default = "line", description = "line or bar" }
 goal = { type = "number", default = "", description = "Draw a target line at this value" }
+include_current = { type = "boolean", default = false, description = "Also draw the day or month still under way (dashed)" }
 average_days = { type = "number", default = 0, description = "Days in a rolling average over daily data (0 for none)" }
 data_color = { type = "string", default = "", description = "Single-curve color (hex); defaults to the palette, which has a dark-mode step" }
 colors = { type = "string", default = "", description = "JSON array of colors for multi-curve charts" }
