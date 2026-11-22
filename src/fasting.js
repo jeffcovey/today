@@ -89,8 +89,11 @@ function serializeCurrentFast({ startTime, goalHours }) {
 
 // A start time must not be in the future, and (when known) must come after the
 // last completed fast ended, or the log would hold overlapping fasts.
-async function validateStartTime(startTime) {
-  if (Date.parse(startTime) > Date.now() + 60 * 1000) {
+async function validateStartTime(startTime, originalStartTime) {
+  const startMs = NAIVE_LOCAL.test(originalStartTime.trim())
+    ? Date.parse(startTime)
+    : Date.parse(originalStartTime);
+  if (startMs > Date.now()) {
     throw new RangeError('Start time is in the future');
   }
   const lastEnd = await getLastFastEnd();
@@ -132,7 +135,7 @@ export async function startFast(startTime = null, goalHours = null) {
       startTime: ts ?? getCurrentTimeISO(getConfiguredTimezone()),
       goalHours: goalHours ?? getDefaultGoalHours()
     };
-    if (ts) await validateStartTime(fast.startTime);
+    if (ts) await validateStartTime(fast.startTime, startTime);
     await fs.mkdir(fastingDir(), { recursive: true });
     await fs.writeFile(currentFastPath(), serializeCurrentFast(fast), { encoding: 'utf8', flag: 'wx' });
     return fast;
@@ -152,7 +155,7 @@ export async function updateFast({ startTime, goalHours } = {}) {
     const fast = await getCurrentFast();
     if (!fast) throw new Error('No fast in progress');
     if (ts !== undefined) {
-      await validateStartTime(ts);
+      await validateStartTime(ts, startTime);
       fast.startTime = ts;
     }
     if (goalHours !== undefined) fast.goalHours = goalHours;

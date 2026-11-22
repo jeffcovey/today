@@ -489,8 +489,10 @@ function updateTimerDuration() {
 // Fasting timer: the card's clock and progress bar. The clock shows time
 // elapsed or time remaining to the goal; the choice is remembered per browser.
 const FAST_CLOCK_MODE_KEY = 'fast-clock-mode';
+let fastClockMode = null;
 
 function getFastClockMode() {
+  if (fastClockMode !== null) return fastClockMode;
   try {
     return localStorage.getItem(FAST_CLOCK_MODE_KEY) === 'remaining' ? 'remaining' : 'elapsed';
   } catch {
@@ -499,9 +501,9 @@ function getFastClockMode() {
 }
 
 function fastToggleClockMode() {
-  const next = getFastClockMode() === 'remaining' ? 'elapsed' : 'remaining';
-  try { localStorage.setItem(FAST_CLOCK_MODE_KEY, next); } catch { /* per-viewer only */ }
-  updateFastingProgress(next);
+  fastClockMode = getFastClockMode() === 'remaining' ? 'elapsed' : 'remaining';
+  try { localStorage.setItem(FAST_CLOCK_MODE_KEY, fastClockMode); } catch { /* per-viewer only */ }
+  updateFastingProgress();
 }
 
 function formatFastDuration(ms, { seconds = false } = {}) {

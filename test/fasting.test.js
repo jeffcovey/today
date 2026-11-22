@@ -146,6 +146,25 @@ describe('fasting storage', () => {
     await expect(updateFast({ startTime: '2099-01-01T00:00:00Z' })).rejects.toThrow('future');
   });
 
+  test('rejects future starts even within a minute or the current second', async () => {
+    const now = Date.parse('2026-11-22T12:00:00.500Z');
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
+    try {
+      const fewSecondsAhead = new Date(now + 5000).toISOString();
+      const fractionAhead = new Date(now + 100).toISOString();
+      await expect(startFast(fewSecondsAhead)).rejects.toThrow('future');
+      await expect(startFast(fractionAhead)).rejects.toThrow('future');
+      await expect(startFast('2026-11-22T07:00:05')).rejects.toThrow('future');
+      await startFast(new Date(now).toISOString());
+      await expect(updateFast({ startTime: fewSecondsAhead })).rejects.toThrow('future');
+      await expect(updateFast({ startTime: fractionAhead })).rejects.toThrow('future');
+      await expect(updateFast({ startTime: '2026-11-22T07:00:05' })).rejects.toThrow('future');
+      await expect(getCurrentFast()).resolves.toMatchObject({ startTime: '2026-11-22T07:00:00-05:00' });
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
   test('refuses to update when no fast is running', async () => {
     await expect(updateFast({ goalHours: 18 })).rejects.toThrow('No fast in progress');
   });
