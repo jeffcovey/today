@@ -34,9 +34,15 @@ const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sa
 const DAY_MS = 86400000;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-// Units of a reading taken at a moment (a line), as opposed to an amount that
-// adds up over the day (a bar).
-const MEASUREMENT_UNITS = /^(lb|lbs|kg|g|%|bpm|ms|mph|in|cm|db|dbaspl|degf|degc|°f|°c)$/i;
+// Health metrics that are a reading taken at a moment rather than an amount
+// that adds up over the day. A day's reading is complete once taken; a day's
+// steps are not complete until the day ends. Labels as in METRIC_DISPLAY.
+const HEALTH_READINGS = new Set([
+  'Walk Speed', 'Step Length', 'Walk Asymmetry', 'Double Support', 'Walk HR', 'Effort',
+  'Weight', 'Body Fat', 'BMI', 'Lean Mass',
+  'Heart Rate', 'Resting HR', 'HRV', 'Resp Rate', 'SpO2',
+  'Env Audio', 'Headphone'
+]);
 
 // Short units worth repeating on every tick label.
 const TICK_SUFFIX = { min: ' min', lb: ' lb', lbs: ' lb', kg: ' kg', bpm: ' bpm', '%': '%', hr: ' h', hrs: ' h' };
@@ -73,25 +79,28 @@ export function windowStart(today, timePeriod) {
 
 // ---------------------------------------------------------------- data
 
+/** Graphs are lines; `chart_type = "bar"` asks for bars instead. */
+export function chartKind({ chartType }) {
+  return chartType === 'bar' ? 'bar' : 'line';
+}
+
 /**
- * Bar for amounts that add up (steps, minutes, dollars, counts); line for
- * readings (weight, heart rate). `chart_type` overrides.
+ * Whether a metric is an amount that adds up over its day or month (steps,
+ * dollars, tasks done) rather than a reading (weight). An amount for the
+ * period still under way is incomplete; amounts can be totalled.
  */
-export function chartKind({ chartType, source, units }) {
-  if (chartType === 'bar' || chartType === 'line') return chartType;
-  if (source !== 'health') return 'bar';
-  if (!units) return 'bar';
-  return MEASUREMENT_UNITS.test(units) || units.includes('/') ? 'line' : 'bar';
+export function isAdditive({ source, metric }) {
+  return source !== 'health' || !HEALTH_READINGS.has(metric);
 }
 
 /**
  * Turn query rows into plot rows on one calendar.
  *
  * @param {Array<{metric: string, rows: Array<{date: string, value: number}>}>} datasets
- * @param {{today: string, timePeriod: string, kind: 'bar'|'line', averageDays: number}} opts
+ * @param {{today: string, timePeriod: string, additive: boolean, averageDays: number}} opts
  * @returns {{monthly: boolean, start: string, end: string, points: object[], skippedPartial: boolean}}
  */
-export function prepareData(datasets, { today, timePeriod, kind, averageDays = 7 }) {
+export function prepareData(datasets, { today, timePeriod, additive, averageDays = 0 }) {
   const monthly = datasets.some(ds => ds.rows.some(r => /^\d{4}-\d{2}$/.test(r.date)));
   let start = windowStart(today, timePeriod);
   let skippedPartial = false;
@@ -125,18 +134,19 @@ export function prepareData(datasets, { today, timePeriod, kind, averageDays = 7
         label: monthly ? shortMonth(r.date) : shortDate(r.date),
         value: r.value,
         // The period still under way: an amount that is still adding up.
-        partial: kind === 'bar' && (monthly ? r.date.slice(0, 7) === currentPeriod : r.date === today)
+        partial: additive && (monthly ? r.date.slice(0, 7) === currentPeriod : r.date === today)
       };
       points.push(point);
     }
 
-    if (kind === 'line' && !monthly && averageDays > 1 && rows.length >= averageDays + 3) {
+    if (!monthly && averageDays > 1 && rows.length >= averageDays + 3) {
       // Trailing mean over calendar days, not rows, so a gap in the data
-      // doesn't stretch the window.
-      const byPoint = points.filter(p => p.series === ds.metric);
+      // doesn't stretch the window. A partial day stays out of it.
+      const whole = rows.filter(r => !(additive && r.date === today));
+      const byPoint = points.filter(p => p.series === ds.metric && !p.partial);
       for (const p of byPoint) {
         const from = toIso(toUtc(p.date) - (averageDays - 1) * DAY_MS);
-        const win = rows.filter(r => r.date >= from && r.date <= p.date);
+        const win = whole.filter(r => r.date >= from && r.date <= p.date);
         p.average = win.reduce((s, r) => s + r.value, 0) / win.length;
       }
     }
@@ -221,20 +231,32 @@ function formatNumber(value, units, fmt) {
  * One line under the title saying what the chart is for: where it ended up,
  * the typical value, and how fresh the data is.
  */
-export function buildSubtitle({ kind, monthly, points, units, metrics, today, fmt, averageDays }) {
+export function buildSubtitle({ additive, monthly, points, units, metrics, today, fmt, averageDays }) {
   if (points.length === 0) return 'No data in this period';
   const parts = [];
   const fmtN = (v) => formatNumber(v, units, fmt);
   const lastDate = points.reduce((m, p) => (p.date > m ? p.date : m), points[0].date);
 
-  if (metrics.length > 1) {
+  const latest = (metric) => {
+    const own = points.filter(p => p.series === metric && !p.partial);
+    return own[own.length - 1];
+  };
+
+  if (metrics.length > 1 && additive) {
     for (const metric of metrics) {
       const total = points.filter(p => p.series === metric).reduce((s, p) => s + p.value, 0);
       parts.push(`${metric} ${fmtN(total)}`);
     }
     parts[0] = `${monthly ? 'Totals' : 'Total'}: ${parts[0]}`;
-  } else if (kind === 'line') {
-    const last = points[points.length - 1];
+  } else if (metrics.length > 1) {
+    // Readings don't add up; each series' latest is what to compare.
+    for (const metric of metrics) {
+      const last = latest(metric);
+      if (last) parts.push(`${metric} ${fmtN(last.value)}`);
+    }
+    if (parts.length) parts[0] = `Latest: ${parts[0]}`;
+  } else if (!additive) {
+    const last = latest(metrics[0]);
     parts.push(`Latest ${fmtN(last.value)}`);
     if (last.average !== undefined) parts.push(`${averageDays}-day average ${fmtN(last.average)}`);
   } else {
@@ -250,12 +272,110 @@ export function buildSubtitle({ kind, monthly, points, units, metrics, today, fm
   // Stale data should be visible at a glance, not only from the axis.
   const staleDays = Math.round((toUtc(today) - toUtc(lastDate)) / DAY_MS);
   if (!monthly && staleDays > 1) parts.push(`no data since ${shortDate(lastDate)}`);
-  if (points.some(p => p.partial)) parts.push(`${monthly ? 'this month' : 'today'} so far is faded`);
+  if (points.some(p => p.partial)) parts.push(`${monthly ? 'this month' : 'today'} so far is dashed`);
 
   return parts.join(' · ');
 }
 
 // ---------------------------------------------------------------- spec
+
+/**
+ * The layers of a line graph.
+ *
+ * Straight segments between real points (no smoothing that invents values
+ * between days). A period still under way is reached by a dashed segment
+ * and drawn as a hollow point. Points are marked while there is room for
+ * them, and a single series has its latest value written at its end.
+ * With a rolling average the daily line goes quiet and the average leads.
+ */
+function lineLayers({ points, x, y, color, multi, fmt, averageDays }) {
+  const series = [...new Set(points.map(p => p.series))];
+  const segments = [];
+  for (const name of series) {
+    const own = points.filter(p => p.series === name);
+    const whole = own.filter(p => !p.partial);
+    for (const p of whole) segments.push({ ...p, seg: 'whole' });
+    const partial = own.find(p => p.partial);
+    if (partial && whole.length) {
+      segments.push({ ...whole[whole.length - 1], seg: 'partial' }, { ...partial, seg: 'partial' });
+    }
+  }
+
+  const averaged = points.some(p => p.average !== undefined);
+  const perSeries = Math.max(...series.map(n => points.filter(p => p.series === n).length), 0);
+  const markers = !averaged && perSeries <= 45;
+  const surface = CHROME.surface.light;
+  const layers = [];
+
+  layers.push({
+    data: { values: segments },
+    mark: {
+      type: 'line', interpolate: 'linear', strokeCap: 'round', strokeJoin: 'round',
+      strokeWidth: averaged ? 1.5 : 2, opacity: averaged ? 0.4 : 1
+    },
+    encoding: {
+      x, y: y('value'), color,
+      detail: { field: 'series' },
+      strokeDash: {
+        field: 'seg', type: 'nominal', legend: null,
+        scale: { domain: ['whole', 'partial'], range: [[1, 0], [4, 4]] }
+      }
+    }
+  });
+
+  if (averaged) {
+    layers.push({
+      transform: [{ filter: 'isValid(datum.average)' }],
+      mark: { type: 'line', interpolate: 'linear', strokeWidth: 2.5, strokeCap: 'round', strokeJoin: 'round' },
+      encoding: { x, y: y('average'), color, detail: { field: 'series' } }
+    });
+  }
+
+  if (markers) {
+    layers.push({
+      transform: [{ filter: '!datum.partial' }],
+      mark: { type: 'circle', size: 52, opacity: 1, stroke: surface, strokeWidth: 1.5 },
+      encoding: { x, y: y('value'), color }
+    });
+  }
+
+  // The period under way: hollow, since its value is not final.
+  layers.push({
+    transform: [{ filter: 'datum.partial' }],
+    mark: { type: 'point', shape: 'circle', size: 52, filled: true, fill: surface, strokeWidth: 2, opacity: 1 },
+    encoding: { x, y: y('value'), stroke: color }
+  });
+
+  if (!multi) {
+    // The latest value, written above its point, or below it when the line
+    // falls into the point and would run through text placed above.
+    const field = averaged ? 'average' : 'value';
+    const whole = points.filter(p => !p.partial && Number.isFinite(p[field]));
+    const last = whole[whole.length - 1];
+    if (last) {
+      const prev = whole[whole.length - 2];
+      const below = prev !== undefined && prev[field] > last[field];
+      layers.push({
+        data: { values: [last] },
+        layer: [
+          ...(markers ? [] : [{
+            mark: { type: 'circle', size: 64, opacity: 1, stroke: surface, strokeWidth: 2 },
+            encoding: { x, y: y(field), color }
+          }]),
+          {
+            mark: {
+              type: 'text', align: 'center', baseline: below ? 'top' : 'bottom', dy: below ? 9 : -9,
+              fontSize: 12, fontWeight: 'bold', color: CHROME.ink.light
+            },
+            encoding: { x, y: y(field), text: { field, format: fmt } }
+          }
+        ]
+      });
+    }
+  }
+
+  return layers;
+}
 
 /**
  * Build the Vega-Lite spec.
@@ -268,15 +388,15 @@ export function buildSubtitle({ kind, monthly, points, units, metrics, today, fm
 export function buildSpec({ datasets, settings, today }) {
   const metrics = datasets.map(ds => ds.metric);
   const units = datasets[0]?.units || '';
-  const kind = chartKind({ chartType: settings.chartType, source: settings.source, units });
-  const averageDays = settings.averageDays ?? 7;
-  const data = prepareData(datasets, { today, timePeriod: settings.timePeriod, kind, averageDays });
+  const kind = chartKind({ chartType: settings.chartType });
+  const additive = metrics.every(metric => isAdditive({ source: settings.source, metric }));
+  const averageDays = Number.isFinite(settings.averageDays) ? settings.averageDays : 0;
+  const data = prepareData(datasets, { today, timePeriod: settings.timePeriod, additive, averageDays });
   const { monthly } = data;
   const names = displayNames(metrics);
   const points = data.points.map(p => ({ ...p, series: names.get(p.series) }));
   const fmt = valueFormat(units, points);
   const multi = metrics.length > 1;
-  const hasAverage = points.some(p => p.average !== undefined);
 
   // A series keeps the slot of its place in the configured list, even when
   // an earlier one has no data this time.
@@ -292,7 +412,8 @@ export function buildSpec({ datasets, settings, today }) {
 
   const title = settings.chartTitle ||
     (multi ? metrics.join(' vs ') : metrics[0] || 'Graph');
-  const subtitle = buildSubtitle({ kind, monthly, points, units, metrics: seriesNames, today, fmt, averageDays });
+  let subtitle = buildSubtitle({ additive, monthly, points, units, metrics: seriesNames, today, fmt, averageDays });
+  if (kind === 'bar') subtitle = subtitle.replace('so far is dashed', 'so far is faded');
 
   // autosize "fit" makes this the size of the whole image; the plot area is
   // what remains after title, axes and legend. Bar widths use the estimate.
@@ -311,13 +432,14 @@ export function buildSpec({ datasets, settings, today }) {
   const layers = [];
 
   if (monthly) {
-    // Months are categories here; grouped bars sit side by side in each one.
+    // Months are categories here, one point (or bar group) in each.
     const months = [];
     for (let d = new Date(toUtc(data.start)); toIso(d.getTime()) <= data.end; d.setUTCMonth(d.getUTCMonth() + 1)) {
       months.push(shortMonth(toIso(d.getTime())));
     }
     x = {
-      field: 'label', type: 'ordinal', sort: months, scale: { domain: months, paddingInner: 0.25 },
+      field: 'label', type: 'ordinal', sort: months,
+      scale: kind === 'bar' ? { domain: months, paddingInner: 0.25 } : { domain: months, padding: 0.4 },
       axis: { title: settings.xAxisLabel || null, labelAngle: 0, labelOverlap: 'greedy', ticks: false }
     };
   } else {
@@ -338,7 +460,8 @@ export function buildSpec({ datasets, settings, today }) {
 
   const y = (field, extra = {}) => ({
     field, type: 'quantitative',
-    scale: { zero: kind === 'bar', nice: true },
+    // Amounts are measured from zero; readings use the room they need.
+    scale: { zero: additive || kind === 'bar', nice: true },
     axis: yAxis,
     ...extra
   });
@@ -359,31 +482,8 @@ export function buildSpec({ datasets, settings, today }) {
         opacity: { condition: { test: 'datum.partial', value: 0.35 }, value: 1 }
       }
     });
-  } else if (hasAverage) {
-    // Daily readings as quiet dots; the trend line is what to read.
-    layers.push({
-      mark: { type: 'circle', size: 30, opacity: 0.5 },
-      encoding: { x, y: y('value'), color }
-    });
-    layers.push({
-      mark: { type: 'line', strokeWidth: 2.5, strokeCap: 'round', strokeJoin: 'round', interpolate: 'linear' },
-      encoding: { x, y: y('average'), color }
-    });
-    layers.push({
-      transform: [{ window: [{ op: 'row_number', as: 'rn' }], sort: [{ field: 'date', order: 'descending' }], groupby: ['series'] }, { filter: 'datum.rn === 1' }],
-      layer: [
-        { mark: { type: 'circle', size: 64, opacity: 1, stroke: CHROME.surface.light, strokeWidth: 2 }, encoding: { x, y: y('average'), color } },
-        {
-          mark: { type: 'text', align: 'right', dx: -2, dy: -14, fontSize: 12, fontWeight: 600, color: CHROME.ink.light },
-          encoding: { x, y: y('average'), text: { field: 'average', format: fmt } }
-        }
-      ]
-    });
   } else {
-    layers.push({
-      mark: { type: 'line', strokeWidth: 2, strokeCap: 'round', strokeJoin: 'round', interpolate: 'linear', point: { size: 40, filled: true } },
-      encoding: { x, y: y('value'), color }
-    });
+    layers.push(...lineLayers({ points, x, y, color, multi, fmt, averageDays }));
   }
 
   if (Number.isFinite(settings.goal)) {

@@ -1,15 +1,15 @@
 /**
  * data-graphing: how a chart is built from query rows.
  *
- * The plugin draws bars for amounts that add up and lines for readings,
- * leaves out a partial first month, fades the period still under way, and
+ * The plugin draws line graphs (bars only on request), leaves out a partial
+ * first month, marks an amount still adding up with a dashed segment, and
  * writes SVG that carries its own dark palette.
  */
 
 import * as vega from 'vega';
 import { compile } from 'vega-lite';
 import {
-  chartKind, windowStart, prepareData, displayNames, tickLabelExpr,
+  chartKind, isAdditive, windowStart, prepareData, displayNames, tickLabelExpr,
   dayTicks, buildSubtitle, buildSpec, addDarkMode, SERIES, CHROME
 } from '../plugins/data-graphing/chart-spec.js';
 
@@ -27,21 +27,23 @@ function days(from, n, valueOf) {
 const baseSettings = {
   source: 'health', metrics: [], colors: [], timePeriod: '30 days',
   width: 800, height: 450, chartTitle: '', xAxisLabel: '', yAxisLabel: '',
-  chartType: 'auto', goal: NaN, averageDays: 7
+  chartType: 'line', goal: NaN, averageDays: 0
 };
 
-describe('chartKind', () => {
-  test('health readings are lines, daily amounts are bars', () => {
-    expect(chartKind({ source: 'health', units: 'lb' })).toBe('line');
-    expect(chartKind({ source: 'health', units: 'count/min' })).toBe('line');
-    expect(chartKind({ source: 'health', units: 'count' })).toBe('bar');
-    expect(chartKind({ source: 'health', units: 'min' })).toBe('bar');
+describe('chart kind and metric meaning', () => {
+  test('graphs are lines unless bars are asked for', () => {
+    expect(chartKind({})).toBe('line');
+    expect(chartKind({ chartType: 'auto' })).toBe('line');
+    expect(chartKind({ chartType: 'bar' })).toBe('bar');
   });
 
-  test('other sources are totals, and chart_type overrides', () => {
-    expect(chartKind({ source: 'finance', units: '$' })).toBe('bar');
-    expect(chartKind({ source: 'finance', units: '$', chartType: 'line' })).toBe('line');
-    expect(chartKind({ source: 'health', units: 'lb', chartType: 'bar' })).toBe('bar');
+  test('amounts add up whatever their unit; readings do not', () => {
+    expect(isAdditive({ source: 'health', metric: 'Steps' })).toBe(true);
+    expect(isAdditive({ source: 'health', metric: 'Protein' })).toBe(true);
+    expect(isAdditive({ source: 'health', metric: 'Caffeine' })).toBe(true);
+    expect(isAdditive({ source: 'health', metric: 'Weight' })).toBe(false);
+    expect(isAdditive({ source: 'health', metric: 'BMI' })).toBe(false);
+    expect(isAdditive({ source: 'finance', metric: 'Income' })).toBe(true);
   });
 });
 
@@ -58,7 +60,7 @@ describe('prepareData', () => {
   test('a monthly window starting mid-month drops that partial first month', () => {
     const rows = ['2025-11', '2025-12', '2026-10', '2026-11'].map(m => day(m, 100));
     const data = prepareData([{ metric: 'Income', rows }], {
-      today: '2026-11-22', timePeriod: '12 months', kind: 'bar'
+      today: '2026-11-22', timePeriod: '12 months', additive: true
     });
     expect(data.monthly).toBe(true);
     expect(data.skippedPartial).toBe(true);
@@ -70,22 +72,22 @@ describe('prepareData', () => {
 
   test("today's amount is partial; a reading is not", () => {
     const rows = days('2026-11-20', 3, () => 5000);
-    const bars = prepareData([{ metric: 'Steps', rows }], { today: '2026-11-22', timePeriod: '30 days', kind: 'bar' });
-    expect(bars.points.map(p => p.partial)).toEqual([false, false, true]);
-    const line = prepareData([{ metric: 'Weight', rows }], { today: '2026-11-22', timePeriod: '30 days', kind: 'line' });
-    expect(line.points.some(p => p.partial)).toBe(false);
+    const steps = prepareData([{ metric: 'Steps', rows }], { today: '2026-11-22', timePeriod: '30 days', additive: true });
+    expect(steps.points.map(p => p.partial)).toEqual([false, false, true]);
+    const weight = prepareData([{ metric: 'Weight', rows }], { today: '2026-11-22', timePeriod: '30 days', additive: false });
+    expect(weight.points.some(p => p.partial)).toBe(false);
   });
 
   test('daily data starting late moves the axis start up, but never the end', () => {
     const rows = days('2026-11-01', 5, () => 1);
-    const data = prepareData([{ metric: 'Steps', rows }], { today: '2026-11-22', timePeriod: '6 months', kind: 'bar' });
+    const data = prepareData([{ metric: 'Steps', rows }], { today: '2026-11-22', timePeriod: '6 months', additive: true });
     expect(data.start).toBe('2026-11-01');
     expect(data.end).toBe('2026-11-22');
   });
 
   test('rows outside the window are dropped', () => {
     const rows = [day('2026-10-01', 1), day('2026-11-20', 2), day('2026-11-23', 3)];
-    const data = prepareData([{ metric: 'Steps', rows }], { today: '2026-11-22', timePeriod: '14 days', kind: 'bar' });
+    const data = prepareData([{ metric: 'Steps', rows }], { today: '2026-11-22', timePeriod: '14 days', additive: true });
     expect(data.points.map(p => p.value)).toEqual([2]);
   });
 
@@ -93,15 +95,28 @@ describe('prepareData', () => {
     // Readings of 100 on Nov 1-10, then 200 on Nov 14: the window for Nov 14
     // is Nov 8-14, which holds three 100s and the 200, not the last 7 rows.
     const rows = [...days('2026-11-01', 10, () => 100), day('2026-11-14', 200)];
-    const data = prepareData([{ metric: 'Weight', rows }], { today: '2026-11-22', timePeriod: '30 days', kind: 'line', averageDays: 7 });
+    const data = prepareData([{ metric: 'Weight', rows }], { today: '2026-11-22', timePeriod: '30 days', additive: false, averageDays: 7 });
     const last = data.points[data.points.length - 1];
     expect(last.average).toBeCloseTo((100 * 3 + 200) / 4);
     expect(data.points[0].average).toBe(100);
   });
 
+  test('no average unless one is asked for', () => {
+    const rows = days('2026-10-24', 30, () => 100);
+    const data = prepareData([{ metric: 'Weight', rows }], { today: '2026-11-22', timePeriod: '30 days', additive: false });
+    expect(data.points.every(p => p.average === undefined)).toBe(true);
+  });
+
+  test('a partial day stays out of the average', () => {
+    const rows = [...days('2026-11-12', 10, () => 8000), day('2026-11-22', 100)];
+    const data = prepareData([{ metric: 'Steps', rows }], { today: '2026-11-22', timePeriod: '30 days', additive: true, averageDays: 7 });
+    expect(data.points.find(p => p.date === '2026-11-21').average).toBe(8000);
+    expect(data.points.find(p => p.date === '2026-11-22').average).toBeUndefined();
+  });
+
   test('too few readings for an average leaves it off', () => {
     const rows = days('2026-11-15', 5, i => 100 + i);
-    const data = prepareData([{ metric: 'Weight', rows }], { today: '2026-11-22', timePeriod: '30 days', kind: 'line', averageDays: 7 });
+    const data = prepareData([{ metric: 'Weight', rows }], { today: '2026-11-22', timePeriod: '30 days', additive: false, averageDays: 7 });
     expect(data.points.every(p => p.average === undefined)).toBe(true);
   });
 });
@@ -141,7 +156,7 @@ describe('labels', () => {
   test('the subtitle says when data has stopped arriving', () => {
     const points = [{ series: 'Weight', date: '2026-11-15', label: 'Nov 15', value: 168.5, partial: false }];
     const text = buildSubtitle({
-      kind: 'line', monthly: false, points, units: 'lb', metrics: ['Weight'],
+      additive: false, monthly: false, points, units: 'lb', metrics: ['Weight'],
       today: '2026-11-22', fmt: ',.1f', averageDays: 7
     });
     expect(text).toBe('Latest 168.5 lb · no data since Nov 15');
@@ -153,10 +168,22 @@ describe('labels', () => {
       { date: '2026-11-22', label: 'Nov 22', value: 100, partial: true }
     ];
     const text = buildSubtitle({
-      kind: 'bar', monthly: false, points, units: 'count', metrics: ['Steps'],
+      additive: true, monthly: false, points, units: 'count', metrics: ['Steps'],
       today: '2026-11-22', fmt: ',.0f', averageDays: 7
     });
-    expect(text).toBe('Average 8,000 a day · best 8,000 on Nov 21 · today so far is faded');
+    expect(text).toBe('Average 8,000 a day · best 8,000 on Nov 21 · today so far is dashed');
+  });
+
+  test('readings in several series are compared by latest value, never summed', () => {
+    const points = [
+      { series: 'Me', date: '2026-11-21', label: 'Nov 21', value: 160, partial: false },
+      { series: 'Partner', date: '2026-11-21', label: 'Nov 21', value: 161, partial: false }
+    ];
+    const text = buildSubtitle({
+      additive: false, monthly: false, points, units: 'lb', metrics: ['Me', 'Partner'],
+      today: '2026-11-22', fmt: ',.0f', averageDays: 0
+    });
+    expect(text).toBe('Latest: Me 160 lb · Partner 161 lb');
   });
 });
 
@@ -166,27 +193,55 @@ describe('buildSpec renders', () => {
     return view.toSVG();
   }
 
-  test('daily bars with a goal line', async () => {
+  const marks = (spec) => spec.layer.flatMap(l => (l.layer ? l.layer.map(m => m.mark.type) : [l.mark.type]));
+
+  test('daily amounts: a line, a dashed reach to today, a goal line', async () => {
     const spec = buildSpec({
       datasets: [{ metric: 'Steps', units: 'count', rows: days('2026-10-24', 30, i => 4000 + i * 200) }],
       settings: { ...baseSettings, metrics: ['Steps'], goal: 8000 },
       today: '2026-11-22'
     });
-    expect(spec.layer[0].mark.type).toBe('bar');
-    expect(spec.layer[0].mark.width).toBeLessThanOrEqual(24);
+    const line = spec.layer[0];
+    expect(line.mark.type).toBe('line');
+    expect(line.mark.interpolate).toBe('linear');
+    const dashed = line.data.values.filter(v => v.seg === 'partial').map(v => v.date);
+    expect(dashed).toEqual(['2026-11-21', '2026-11-22']);
+    expect(line.encoding.y.scale.zero).toBe(true);
     const svg = await render(spec);
     expect(svg).toContain('Goal 8,000');
-    expect(svg).toContain('Average');
+    expect(svg).toContain('today so far is dashed');
   });
 
-  test('a noisy reading draws dots under a rolling average', async () => {
+  test('a reading is a line off zero, with its latest value written', async () => {
     const spec = buildSpec({
       datasets: [{ metric: 'Weight', units: 'lb', rows: days('2026-10-23', 30, i => 168 + Math.sin(i)) }],
-      settings: { ...baseSettings, source: 'health', metrics: ['Weight'], timePeriod: '6 months' },
+      settings: { ...baseSettings, metrics: ['Weight'], timePeriod: '6 months' },
       today: '2026-11-22'
     });
-    expect(spec.layer.map(l => l.mark?.type)).toEqual(['circle', 'line', undefined]);
+    expect(marks(spec)).toEqual(['line', 'circle', 'point', 'text']);
+    expect(spec.layer[0].encoding.y.scale.zero).toBe(false);
+    expect(await render(spec)).toContain('Latest');
+  });
+
+  test('average_days adds an average line over the daily one', async () => {
+    const spec = buildSpec({
+      datasets: [{ metric: 'Weight', units: 'lb', rows: days('2026-10-23', 30, i => 168 + Math.sin(i)) }],
+      settings: { ...baseSettings, metrics: ['Weight'], averageDays: 7 },
+      today: '2026-11-22'
+    });
+    expect(marks(spec).filter(m => m === 'line')).toHaveLength(2);
     expect(await render(spec)).toContain('7-day average');
+  });
+
+  test('chart_type = "bar" still draws slim bars', async () => {
+    const spec = buildSpec({
+      datasets: [{ metric: 'Steps', units: 'count', rows: days('2026-10-24', 30, () => 5000) }],
+      settings: { ...baseSettings, metrics: ['Steps'], chartType: 'bar' },
+      today: '2026-11-22'
+    });
+    expect(spec.layer[0].mark.type).toBe('bar');
+    expect(spec.layer[0].mark.width).toBeLessThanOrEqual(24);
+    expect(await render(spec)).toContain('today so far is faded');
   });
 
   test('two monthly series share a legend and keep configured colors', async () => {
