@@ -1,0 +1,61 @@
+# Markdown Recipes Plugin
+# Syncs a vault directory of recipe markdown files to the database
+
+name = "markdown-recipes"
+displayName = "Markdown Recipes"
+description = "A recipe library kept as markdown files in your vault"
+type = "recipes"
+
+longDescription = """
+Keeps your recipe library as one markdown file per recipe under
+`recipes_directory` (subfolders are fine), and syncs it to the database for
+searching and meal planning. Edit, add or delete recipes in the vault; the
+database follows.
+
+Files use the layout Pestle exports, so a Pestle markdown export can be
+unzipped straight into the directory:
+
+```markdown
+# Butter Chickpeas
+
+A short description.
+
+**Category** dinner
+**Cuisine** american, indian
+**Total Time** 25m
+**Servings** 2
+**Source** thealmondeater.com
+
+## Ingredients
+
+* 2 tbsp butter
+* 1 small onion (diced)
+
+## Instructions
+
+1. Melt the butter...
+
+## Nutrition
+
+**Calories** 271 kcal
+**Protein** 8 g
+
+## Notes
+
+Anything else.
+```
+
+Every field and section is optional. **Prep Time** and **Cook Time** are
+also read. Query the library with `bin/recipes`.
+"""
+
+aiInstructions = """
+Suggest recipes from the library first (`bin/recipes search`, `bin/recipes list --category`),
+and say so when a suggestion is not in it. Nutrition is per serving.
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+recipes_directory = { type = "string", default = "vault/recipes", description = "Directory of recipe markdown files" }

@@ -401,6 +401,7 @@ Each plugin type has a defined schema. Data is stored in a shared table for that
 | `health` | `health_metrics` | Health measurements (steps, weight, sleep) |
 | `issues` | `issues` | Tickets, bugs, alerts from external systems |
 | `projects` | `projects` | Project tracking with status and progress |
+| `recipes` | `recipes` | Recipe library (ingredients, instructions, nutrition) |
 | `tasks` | `tasks` | To-do items with priority and due dates |
 | `time-logs` | `time_logs` | Time tracking entries with start/end times |
 | `utility` | *(none)* | Maintenance tasks (cleanup, linting) |

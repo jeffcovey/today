@@ -1,0 +1,165 @@
+#!/usr/bin/env node
+
+// Recipes CLI - queries the recipe library from the plugin system
+import { autoDotenvx } from './lib/dotenvx-loader.js';
+autoDotenvx();
+
+import { getDatabase } from '../src/database-service.js';
+import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
+import { program } from 'commander';
+import { colors } from '../src/cli-utils.js';
+
+const SUMMARY_COLUMNS = 'id, title, categories, total_time_minutes, calories, protein_grams';
+
+function tableExists(db) {
+  return Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'recipes'").get());
+}
+
+function parseJson(value, fallback) {
+  if (!value) return fallback;
+  try { return JSON.parse(value); } catch { return fallback; }
+}
+
+function formatMinutes(minutes) {
+  if (minutes == null) return null;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h ? (m ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+}
+
+function summaryLine(recipe) {
+  const parts = [
+    parseJson(recipe.categories, []).join(', '),
+    formatMinutes(recipe.total_time_minutes),
+    recipe.calories != null ? `${Math.round(recipe.calories)} kcal` : null,
+    recipe.protein_grams != null ? `${recipe.protein_grams} g protein` : null
+  ].filter(Boolean);
+  return `  ${colors.bold(recipe.title)}${parts.length ? colors.dim(' · ' + parts.join(' · ')) : ''}`;
+}
+
+async function openLibrary() {
+  const db = getDatabase();
+  await ensureSyncForType(db, 'recipes');
+  if (!tableExists(db)) {
+    console.log('No recipe library yet. Enable the markdown-recipes plugin and add recipe files to it.');
+    process.exit(0);
+  }
+  return db;
+}
+
+function printRows(db, rows, emptyMessage) {
+  if (rows.length === 0) {
+    console.log(emptyMessage);
+  } else {
+    rows.forEach(r => console.log(summaryLine(r)));
+    console.log(`\n${rows.length} recipe(s)`);
+  }
+  console.log(getSyncStatusMessage(db, 'recipes'));
+}
+
+program
+  .name('recipes')
+  .description('Browse and search the recipe library');
+
+program
+  .command('list')
+  .description('List recipes, optionally by category')
+  .option('-c, --category <category>', 'Only recipes in this category')
+  .action(async (options) => {
+    const db = await openLibrary();
+    const rows = options.category
+      ? db.prepare(`SELECT ${SUMMARY_COLUMNS} FROM recipes
+                    WHERE EXISTS (SELECT 1 FROM json_each(recipes.categories) WHERE lower(value) = lower(?))
+                    ORDER BY title`).all(options.category)
+      : db.prepare(`SELECT ${SUMMARY_COLUMNS} FROM recipes ORDER BY title`).all();
+    printRows(db, rows, 'No recipes found.');
+  });
+
+program
+  .command('search <term>')
+  .description('Search titles, ingredients, categories, cuisines, descriptions and notes')
+  .action(async (term) => {
+    const db = await openLibrary();
+    const like = `%${term}%`;
+    const rows = db.prepare(`
+      SELECT ${SUMMARY_COLUMNS} FROM recipes
+      WHERE title LIKE ? OR ingredients LIKE ? OR categories LIKE ?
+         OR cuisines LIKE ? OR description LIKE ? OR notes LIKE ?
+      ORDER BY title
+    `).all(like, like, like, like, like, like);
+    printRows(db, rows, `No recipes match "${term}".`);
+  });
+
+program
+  .command('show <title>')
+  .description('Show a whole recipe (exact title or file path, else the first title containing it)')
+  .action(async (title) => {
+    const db = await openLibrary();
+    const recipe =
+      db.prepare('SELECT * FROM recipes WHERE lower(title) = lower(?) OR id = ?').get(title, title) ||
+      db.prepare('SELECT * FROM recipes WHERE title LIKE ? ORDER BY length(title) LIMIT 1').get(`%${title}%`);
+    if (!recipe) {
+      console.log(`No recipe matches "${title}".`);
+      return;
+    }
+
+    console.log(`${colors.bold(recipe.title)}`);
+    if (recipe.description) console.log(`\n${recipe.description}`);
+
+    const meta = parseJson(recipe.metadata, {});
+    const facts = [
+      ['Category', parseJson(recipe.categories, []).join(', ')],
+      ['Cuisine', parseJson(recipe.cuisines, []).join(', ')],
+      ['Prep time', formatMinutes(meta.prep_time_minutes)],
+      ['Cook time', formatMinutes(meta.cook_time_minutes)],
+      ['Total time', formatMinutes(recipe.total_time_minutes)],
+      ['Servings', recipe.servings],
+      ['Source', recipe.recipe_source],
+      ['File', meta.file_path]
+    ].filter(([, value]) => value);
+    console.log();
+    facts.forEach(([label, value]) => console.log(`${label}: ${value}`));
+
+    const ingredients = parseJson(recipe.ingredients, []);
+    if (ingredients.length) {
+      console.log(`\n${colors.bold('Ingredients')}`);
+      ingredients.forEach(line => console.log(`  • ${line}`));
+    }
+
+    const instructions = parseJson(recipe.instructions, []);
+    if (instructions.length) {
+      console.log(`\n${colors.bold('Instructions')}`);
+      instructions.forEach((step, i) => console.log(`  ${i + 1}. ${step}`));
+    }
+
+    const nutrition = parseJson(recipe.nutrition, {});
+    if (Object.keys(nutrition).length) {
+      console.log(`\n${colors.bold('Nutrition (per serving)')}`);
+      console.log('  ' + Object.entries(nutrition).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(' · '));
+    }
+
+    if (recipe.notes) console.log(`\n${colors.bold('Notes')}\n${recipe.notes}`);
+  });
+
+program
+  .command('stats')
+  .description('Summarize the library')
+  .action(async () => {
+    const db = await openLibrary();
+    const { total, with_nutrition } = db.prepare(
+      'SELECT COUNT(*) AS total, COUNT(calories) AS with_nutrition FROM recipes'
+    ).get();
+    const categories = db.prepare(`
+      SELECT lower(json_each.value) AS category, COUNT(*) AS n
+      FROM recipes, json_each(recipes.categories)
+      GROUP BY category ORDER BY n DESC, category
+    `).all();
+
+    console.log(`Recipe library: ${total} recipes, ${with_nutrition} with nutrition`);
+    if (categories.length) {
+      console.log(`By category: ${categories.map(c => `${c.category} ${c.n}`).join(', ')}`);
+    }
+    console.log(getSyncStatusMessage(db, 'recipes'));
+  });
+
+program.parseAsync(process.argv);
