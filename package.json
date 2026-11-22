@@ -34,7 +34,6 @@
     "better-sqlite3": "^12.11.1",
     "better-sqlite3-session-store": "^0.1.0",
     "canvas": "^3.2.3",
-    "chart.js": "^4.6.1",
     "cheerio": "^1.2.0",
     "chokidar": "^6.0.0",
     "cli-table3": "^0.6.5",
@@ -66,6 +65,8 @@
     "react": "^19.3.1",
     "smol-toml": "^1.8.0",
     "tsdav": "^2.5.1",
+    "vega": "^6.4.0",
+    "vega-lite": "^6.4.3",
     "ws": "^8.23.0",
     "zod": "^4.6.7"
   },

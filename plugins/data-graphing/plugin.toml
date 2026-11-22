@@ -10,6 +10,30 @@ longDescription = """
 Generates time-series graphs from data sources in your Today system.
 Supports multiple data curves on a single chart.
 
+Charts are drawn with Vega-Lite and written as SVG by default. An SVG carries
+its own dark palette, so it follows the viewer's light or dark mode, and stays
+sharp at any size. Set `image_format = "png"` for a raster image (drawn at 2x).
+
+**How a chart is drawn:**
+- Lines with straight segments between the real data points, so nothing is
+  invented between days. Points are marked while there is room for them, and
+  a single series has its latest value written at its end.
+- A monthly window starting mid-month leaves out that partial first month.
+  An amount for the day or month still under way (today's steps, this
+  month's spending) is reached by a dashed segment and a hollow point.
+- The subtitle gives the latest value, the average or the totals, and says
+  when data has stopped arriving.
+- A series is drawn in one unit, the unit of its latest row: kg and lb
+  (and other convertible units) are converted; a row that can't be is left
+  out, and the subtitle says how many. Units the tick labels can't carry
+  title the y axis.
+- For finance, tasks and time logs a day or month with nothing in it counts
+  as zero; a missing health reading stays missing.
+- `average_days = 7` adds a rolling average over daily data; the daily line
+  then goes quiet behind it.
+- `chart_type = "bar"` draws bars instead of a line.
+- `goal = 8000` draws a target line.
+
 Run `bin/graph sources` to see available sources.
 Run `bin/graph metrics <source>` to see available metrics.
 
@@ -60,13 +84,16 @@ filename = { type = "string", default = "", description = "Output filename (with
 
 # Output settings
 output_path = { type = "string", default = "vault/graphs", description = "Directory for graph images" }
-image_format = { type = "string", default = "png", description = "Image format (png, jpg)" }
+image_format = { type = "string", default = "svg", description = "Image format (svg, png, jpg); svg follows light/dark mode" }
 width = { type = "number", default = 800, description = "Graph width in pixels" }
-height = { type = "number", default = 600, description = "Graph height in pixels" }
+height = { type = "number", default = 450, description = "Graph height in pixels" }
 
 # Styling
 chart_title = { type = "string", default = "", description = "Chart title" }
-x_axis_label = { type = "string", default = "Date", description = "X-axis label" }
-y_axis_label = { type = "string", default = "", description = "Y-axis label" }
-data_color = { type = "string", default = "#2196f3", description = "Single-curve color (hex)" }
+x_axis_label = { type = "string", default = "", description = "X-axis label (dates need none)" }
+y_axis_label = { type = "string", default = "", description = "Y-axis label (tick labels already carry $, lb, min)" }
+chart_type = { type = "string", default = "line", description = "line or bar" }
+goal = { type = "number", default = "", description = "Draw a target line at this value" }
+average_days = { type = "number", default = 0, description = "Days in a rolling average over daily data (0 for none)" }
+data_color = { type = "string", default = "", description = "Single-curve color (hex); defaults to the palette, which has a dark-mode step" }
 colors = { type = "string", default = "", description = "JSON array of colors for multi-curve charts" }
