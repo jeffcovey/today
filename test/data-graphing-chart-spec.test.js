@@ -181,6 +181,31 @@ describe('prepareData', () => {
     expect(weight.end).toBe('2026-11-22');
   });
 
+  test('a chart of a reading and an amount cuts each series on its own', () => {
+    const spec = buildSpec({
+      datasets: [
+        { metric: 'Weight', units: 'lb', rows: days('2026-11-20', 3, () => 168).map(r => ({ ...r, units: 'lb' })) },
+        { metric: 'Steps', units: 'count', rows: days('2026-11-20', 3, () => 5000).map(r => ({ ...r, units: 'count' })) }
+      ],
+      settings: { ...baseSettings, metrics: ['Weight', 'Steps'] },
+      today: '2026-11-22'
+    });
+    const values = spec.layer[0].data.values;
+    const datesOf = (series) => values.filter(v => v.series === series).map(v => v.date);
+    expect(datesOf('Weight')).toEqual(['2026-11-20', '2026-11-21', '2026-11-22']);
+    expect(datesOf('Steps')).toEqual(['2026-11-20', '2026-11-21']);
+    expect(values.some(v => v.partial)).toBe(false);
+  });
+
+  test('with include_current, only the amount is marked partial', () => {
+    const data = prepareData([
+      { metric: 'Weight', additive: false, rows: days('2026-11-21', 2, () => 168) },
+      { metric: 'Steps', additive: true, rows: days('2026-11-21', 2, () => 5000) }
+    ], { today: '2026-11-22', timePeriod: '30 days', includeCurrent: true });
+    expect(data.points.filter(p => p.partial).map(p => p.series)).toEqual(['Steps']);
+    expect(data.end).toBe('2026-11-22');
+  });
+
   test('include_current draws the period under way, marked partial', () => {
     const rows = ['2026-10', '2026-11'].map(m => day(m, 100));
     const data = prepareData([{ metric: 'Income', rows }], { today: '2026-11-22', timePeriod: '3 months', additive: true, includeCurrent: true });
