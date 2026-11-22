@@ -11,9 +11,11 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
-import { createCanvas } from 'canvas';
-import Chart from 'chart.js/auto';
+import * as vega from 'vega';
+import { compile } from 'vega-lite';
 import { buildQuery, parseTimePeriod } from '../../src/graph-sources.js';
+import { getTodayDate } from '../../src/date-utils.js';
+import { buildSpec, addDarkMode } from './chart-spec.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,12 +25,6 @@ const config = JSON.parse(process.env.PLUGIN_CONFIG || '{}');
 const contextOnly = process.env.CONTEXT_ONLY === 'true';
 const sourceId = process.env.SOURCE_ID || '';
 const sourceName = sourceId.split('/').pop() || 'graph';
-
-// Default color palette for multi-curve charts
-const DEFAULT_COLORS = [
-  '#2196f3', '#4CAF50', '#e53935', '#FF9800', '#9C27B0',
-  '#00BCD4', '#795548', '#607D8B', '#E91E63', '#3F51B5'
-];
 
 // Parse config — support both single metric and multi-metric
 const metrics = config.metrics
@@ -46,11 +42,14 @@ const settings = {
   timePeriod: config.time_period || '6 months',
   filename: config.filename || sourceName,
   outputPath: config.output_path || 'vault/graphs',
-  imageFormat: config.image_format || 'png',
+  imageFormat: (config.image_format || 'svg').toLowerCase(),
   width: parseInt(config.width) || 800,
-  height: parseInt(config.height) || 600,
+  height: parseInt(config.height) || 450,
+  chartType: config.chart_type || 'auto',
+  goal: config.goal === undefined || config.goal === '' ? NaN : Number(config.goal),
+  averageDays: config.average_days === undefined || config.average_days === '' ? 0 : parseInt(config.average_days, 10),
   chartTitle: config.chart_title || '',
-  xAxisLabel: config.x_axis_label || 'Date',
+  xAxisLabel: config.x_axis_label || '',
   yAxisLabel: config.y_axis_label || ''
 };
 
@@ -85,79 +84,36 @@ function queryMetric(metric) {
 }
 
 /**
- * Create chart with one or more datasets
+ * Render the chart: SVG (with its own dark palette) or a 2x raster.
  */
-function createChart(datasets) {
-  const canvas = createCanvas(settings.width, settings.height);
-  const ctx = canvas.getContext('2d');
+async function renderChart(datasets) {
+  const spec = buildSpec({ datasets, settings, today: getTodayDate() });
+  const view = new vega.View(vega.parse(compile(spec).spec), { renderer: 'none' });
 
-  // Merge all x-axis labels from all datasets and sort
-  const allDates = new Set();
-  for (const ds of datasets) {
-    for (const row of ds.rows) {
-      allDates.add(row.date);
-    }
+  if (settings.imageFormat === 'svg') {
+    const svg = await view.toSVG();
+    return Buffer.from(addDarkMode(svg, spec.usermeta.colors) + '\n');
   }
-  const labels = [...allDates].sort();
 
-  // Build Chart.js datasets
-  const chartDatasets = datasets.map((ds, i) => {
-    const color = settings.colors[i] || DEFAULT_COLORS[i % DEFAULT_COLORS.length];
-
-    // Map rows to the shared x-axis, filling gaps with null
-    const dateMap = new Map(ds.rows.map(r => [r.date, r.value]));
-    const data = labels.map(d => dateMap.get(d) ?? null);
-
-    return {
-      label: ds.metric,
-      data,
-      borderColor: color,
-      backgroundColor: color + '20',
-      fill: datasets.length === 1,
-      tension: 0.1,
-      spanGaps: true
-    };
-  });
-
-  const title = settings.chartTitle ||
-    (datasets.length === 1
-      ? `${datasets[0].metric} - ${settings.timePeriod}`
-      : settings.metrics.join(' vs ') + ` - ${settings.timePeriod}`);
-
-  const yLabel = settings.yAxisLabel ||
-    (datasets[0].units ? `Value (${datasets[0].units})` : '');
-
-  new Chart(ctx, {
-    type: 'line',
-    data: { labels, datasets: chartDatasets },
-    options: {
-      responsive: false,
-      animation: false,
-      plugins: {
-        title: { display: true, text: title }
-      },
-      scales: {
-        x: { title: { display: true, text: settings.xAxisLabel } },
-        y: { title: { display: !!yLabel, text: yLabel } }
-      }
-    }
-  });
-
-  return canvas;
+  // Raster formats go through node-canvas at twice the size, for sharp
+  // text on high-density screens.
+  const canvas = await view.toCanvas(2);
+  const type = settings.imageFormat === 'jpg' || settings.imageFormat === 'jpeg' ? 'image/jpeg' : 'image/png';
+  return canvas.toBuffer(type);
 }
 
 /**
  * Save chart to file
  */
-function saveChart(canvas) {
-  const outputDir = path.join(PROJECT_ROOT, settings.outputPath);
+function saveChart(buffer) {
+  const outputDir = path.resolve(PROJECT_ROOT, settings.outputPath);
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
   const filename = `${settings.filename}.${settings.imageFormat}`;
   const filepath = path.join(outputDir, filename);
-  fs.writeFileSync(filepath, canvas.toBuffer(`image/${settings.imageFormat}`));
+  fs.writeFileSync(filepath, buffer);
   return { filename, filepath };
 }
 
@@ -197,8 +153,7 @@ async function main() {
       return;
     }
 
-    const canvas = createChart(datasets);
-    const fileInfo = saveChart(canvas);
+    const fileInfo = saveChart(await renderChart(datasets));
 
     console.log(JSON.stringify({
       generated_graph: {
