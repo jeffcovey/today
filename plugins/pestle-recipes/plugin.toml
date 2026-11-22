@@ -1,0 +1,31 @@
+name = "pestle-recipes"
+displayName = "Pestle Recipes"
+description = "Import and manage a recipe library from Pestle app exports"
+type = "recipes"
+
+longDescription = """
+Builds a searchable recipe library from Pestle app export files (.pestle).
+
+Drop a .pestle export file into the inbox directory and sync — the plugin
+imports all recipes into the database and moves the file to the recipes
+directory for archiving. Recipes already in the library (matched by ID)
+are updated in place.
+
+The library powers the chef role agent and the `bin/recipes` accessor.
+"""
+
+aiInstructions = """
+Recipe data for meal planning and dietary advice.
+- Use `bin/recipes search "term"` to find recipes by keyword, ingredient, or category
+- Use `bin/recipes show <id>` to get full details including ingredients and instructions
+- Use `bin/recipes categories` to see what categories exist
+- Nutrition data (calories, protein, fat, carbs) is available on most imported recipes
+- Prep and cook times are in minutes
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+inbox_directory = { type = "string", default = "vault/inbox", description = "Directory to scan for new .pestle export files" }
+recipes_directory = { type = "string", default = "vault/recipes", description = "Directory where .pestle files are archived after import" }

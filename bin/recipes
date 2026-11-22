@@ -1,0 +1,207 @@
+#!/usr/bin/env node
+
+// Recipes CLI — queries the recipe library
+import { autoDotenvx } from './lib/dotenvx-loader.js';
+autoDotenvx();
+
+import { getDatabase } from '../src/database-service.js';
+import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
+import { program } from 'commander';
+import { colors } from '../src/cli-utils.js';
+
+async function ensureSync(db) {
+  await ensureSyncForType(db, 'recipes');
+}
+
+function tableExists(db) {
+  try {
+    db.prepare('SELECT 1 FROM recipes LIMIT 1').get();
+    return true;
+  } catch (err) {
+    if (err.code === 'SQLITE_ERROR' && err.message.includes('no such table')) return false;
+    throw err;
+  }
+}
+
+function formatMinutes(mins) {
+  if (mins == null) return null;
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+function parseJson(val) {
+  if (!val) return [];
+  try { return JSON.parse(val); } catch { return []; }
+}
+
+function printRecipeSummary(r) {
+  const cats = parseJson(r.categories);
+  const timeStr = r.total_time_minutes ? ` · ${formatMinutes(r.total_time_minutes)}` : '';
+  const catStr = cats.length > 0 ? ` · ${cats.join(', ')}` : '';
+  const rating = r.rating != null ? ` · ★${r.rating.toFixed(1)}` : '';
+  console.log(`${colors.bold(r.title)}${timeStr}${catStr}${rating}`);
+  console.log(`  ${colors.dim(r.id)}`);
+}
+
+program
+  .name('bin/recipes')
+  .description('Search and browse the recipe library');
+
+program.command('list')
+  .description('List all recipes')
+  .option('-c, --category <cat>', 'Filter by category')
+  .option('-n, --limit <n>', 'Max results', '50')
+  .action(async (opts) => {
+    const db = getDatabase();
+    await ensureSync(db);
+    if (!tableExists(db)) { console.log('No recipe library yet — add a .pestle file to vault/inbox/ and sync.'); db.close(); return; }
+
+    let query = 'SELECT id, title, categories, total_time_minutes, rating FROM recipes';
+    const params = [];
+    if (opts.category) {
+      query += ` WHERE categories LIKE ?`;
+      params.push(`%${opts.category}%`);
+    }
+    query += ` ORDER BY title LIMIT ${parseInt(opts.limit, 10)}`;
+    const rows = db.prepare(query).all(...params);
+    if (rows.length === 0) { console.log('No recipes found.'); db.close(); return; }
+    rows.forEach(printRecipeSummary);
+    console.log(`\n${colors.dim(getSyncStatusMessage(db, 'recipes'))}`);
+    db.close();
+  });
+
+program.command('search <term>')
+  .description('Search recipes by title, ingredient, category, or cuisine')
+  .option('-n, --limit <n>', 'Max results', '20')
+  .action(async (term, opts) => {
+    const db = getDatabase();
+    await ensureSync(db);
+    if (!tableExists(db)) { console.log('No recipe library yet.'); db.close(); return; }
+
+    const like = `%${term}%`;
+    const rows = db.prepare(`
+      SELECT id, title, categories, total_time_minutes, rating
+      FROM recipes
+      WHERE title LIKE ?
+         OR ingredients LIKE ?
+         OR categories LIKE ?
+         OR cuisines LIKE ?
+         OR keywords LIKE ?
+         OR description LIKE ?
+      ORDER BY title
+      LIMIT ${parseInt(opts.limit, 10)}
+    `).all(like, like, like, like, like, like);
+
+    if (rows.length === 0) { console.log(`No recipes found matching "${term}".`); db.close(); return; }
+    console.log(`${colors.bold(`Recipes matching "${term}":`)} (${rows.length})\n`);
+    rows.forEach(printRecipeSummary);
+    db.close();
+  });
+
+program.command('show <id>')
+  .description('Show full details of a recipe')
+  .action(async (id) => {
+    const db = getDatabase();
+    await ensureSync(db);
+    if (!tableExists(db)) { console.log('No recipe library yet.'); db.close(); return; }
+
+    const row = db.prepare('SELECT * FROM recipes WHERE id = ? OR title LIKE ?').get(id, `%${id}%`);
+    if (!row) { console.log(`Recipe not found: ${id}`); db.close(); return; }
+
+    console.log(`\n${colors.bold(row.title)}`);
+    if (row.description) console.log(row.description);
+    console.log();
+
+    const cats = parseJson(row.categories);
+    const cuisines = parseJson(row.cuisines);
+    if (cats.length) console.log(`Category: ${cats.join(', ')}`);
+    if (cuisines.length) console.log(`Cuisine:  ${cuisines.join(', ')}`);
+    if (row.servings) console.log(`Servings: ${row.servings}`);
+
+    const times = [];
+    if (row.prep_time_minutes) times.push(`Prep: ${formatMinutes(row.prep_time_minutes)}`);
+    if (row.cook_time_minutes) times.push(`Cook: ${formatMinutes(row.cook_time_minutes)}`);
+    if (row.total_time_minutes) times.push(`Total: ${formatMinutes(row.total_time_minutes)}`);
+    if (times.length) console.log(times.join('  '));
+    if (row.rating != null) console.log(`Rating: ★${row.rating.toFixed(1)} (${row.rating_count ?? '?'} reviews)`);
+    if (row.url) console.log(`Source: ${row.url}`);
+    if (row.author) console.log(`Author: ${row.author}`);
+
+    const ingredients = parseJson(row.ingredients);
+    if (ingredients.length) {
+      console.log(`\n${colors.bold('Ingredients:')}`);
+      ingredients.forEach(ing => console.log(`  · ${ing.text || ing.name}`));
+    }
+
+    const instructions = parseJson(row.instructions);
+    if (instructions.length) {
+      console.log(`\n${colors.bold('Instructions:')}`);
+      instructions.forEach((step, i) => console.log(`  ${i + 1}. ${step}`));
+    }
+
+    if (row.nutrition) {
+      const nut = JSON.parse(row.nutrition);
+      const nutParts = [];
+      if (nut.calories) nutParts.push(`Calories: ${nut.calories}`);
+      if (nut.proteinContent) nutParts.push(`Protein: ${nut.proteinContent}`);
+      if (nut.fatContent) nutParts.push(`Fat: ${nut.fatContent}`);
+      if (nut.carbohydrateContent) nutParts.push(`Carbs: ${nut.carbohydrateContent}`);
+      if (nut.fiberContent) nutParts.push(`Fiber: ${nut.fiberContent}`);
+      if (nutParts.length) console.log(`\n${colors.bold('Nutrition:')} ${nutParts.join('  ')}`);
+    }
+
+    console.log(`\n${colors.dim(`ID: ${row.id}`)}`);
+    db.close();
+  });
+
+program.command('categories')
+  .description('List all categories in the library')
+  .action(async () => {
+    const db = getDatabase();
+    await ensureSync(db);
+    if (!tableExists(db)) { console.log('No recipe library yet.'); db.close(); return; }
+
+    const rows = db.prepare('SELECT categories FROM recipes WHERE categories IS NOT NULL').all();
+    const counts = {};
+    rows.forEach(r => {
+      parseJson(r.categories).forEach(cat => {
+        counts[cat] = (counts[cat] || 0) + 1;
+      });
+    });
+
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    if (sorted.length === 0) { console.log('No categories found.'); db.close(); return; }
+    console.log(colors.bold('Recipe categories:'));
+    sorted.forEach(([cat, count]) => console.log(`  ${cat.padEnd(24)} ${count}`));
+    db.close();
+  });
+
+program.command('stats')
+  .description('Show library statistics')
+  .action(async () => {
+    const db = getDatabase();
+    await ensureSync(db);
+    if (!tableExists(db)) { console.log('No recipe library yet.'); db.close(); return; }
+
+    const total = db.prepare('SELECT COUNT(*) as n FROM recipes').get().n;
+    const withNutrition = db.prepare("SELECT COUNT(*) as n FROM recipes WHERE nutrition IS NOT NULL").get().n;
+    const avgTime = db.prepare('SELECT ROUND(AVG(total_time_minutes)) as avg FROM recipes WHERE total_time_minutes IS NOT NULL').get().avg;
+    const sources = db.prepare('SELECT source, COUNT(*) as n FROM recipes GROUP BY source').all();
+
+    console.log(colors.bold('Recipe Library'));
+    console.log(`  Total recipes:    ${total}`);
+    console.log(`  With nutrition:   ${withNutrition}`);
+    if (avgTime) console.log(`  Avg total time:   ${formatMinutes(avgTime)}`);
+    console.log();
+    console.log(colors.bold('By source:'));
+    sources.forEach(s => console.log(`  ${s.source.padEnd(30)} ${s.n}`));
+    console.log(`\n${colors.dim(getSyncStatusMessage(db, 'recipes'))}`);
+    db.close();
+  });
+
+program.parseAsync(process.argv).catch(err => {
+  console.error(err.message);
+  process.exit(1);
+});

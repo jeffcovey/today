@@ -1140,6 +1140,164 @@ Common queries:
     indexes: ['source', 'full_name', 'birthday']
   },
 
+  'recipes': {
+    table: 'recipes',
+    staleMinutes: 0, // File-based source; sync when files change
+    ai: {
+      name: 'Recipes',
+      description: `A library of saved recipes imported from Pestle and other sources.
+Each recipe has ingredients, instructions, nutrition info, prep/cook times, and categories.
+Use this data for meal planning, dietary advice, and answering cooking questions.`,
+      defaultCommand: 'bin/recipes list',
+      queryInstructions: `Commands: bin/recipes list, bin/recipes search "term", bin/recipes show <id>, bin/recipes categories
+SQL: SELECT title, categories, total_time_minutes, servings, rating FROM recipes ORDER BY title`
+    },
+    fields: {
+      id: {
+        sqlType: 'TEXT PRIMARY KEY',
+        jsType: 'string',
+        required: false,
+        description: 'Unique identifier (Pestle UUID or generated)'
+      },
+      source: {
+        sqlType: 'TEXT NOT NULL',
+        dbOnly: true,
+        description: 'Plugin source identifier (e.g., pestle-recipes/default)'
+      },
+      title: {
+        sqlType: 'TEXT NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Recipe name'
+      },
+      description: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Recipe description or notes'
+      },
+      author: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Recipe author or source site'
+      },
+      url: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Original recipe URL'
+      },
+      prep_time_minutes: {
+        sqlType: 'INTEGER',
+        jsType: 'number',
+        required: false,
+        description: 'Prep time in minutes'
+      },
+      cook_time_minutes: {
+        sqlType: 'INTEGER',
+        jsType: 'number',
+        required: false,
+        description: 'Cook time in minutes'
+      },
+      total_time_minutes: {
+        sqlType: 'INTEGER',
+        jsType: 'number',
+        required: false,
+        description: 'Total time in minutes'
+      },
+      servings: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Number of servings'
+      },
+      categories: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON array of category strings (e.g. ["breakfast", "quick"])'
+      },
+      cuisines: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON array of cuisine strings'
+      },
+      keywords: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON array of keywords'
+      },
+      ingredients: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON array of ingredient objects ({name, quantity, unit, text})'
+      },
+      instructions: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON array of instruction step strings'
+      },
+      nutrition: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON blob of nutrition info (calories, protein, fat, carbs, etc.)'
+      },
+      image_url: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'URL of the recipe image'
+      },
+      rating: {
+        sqlType: 'REAL',
+        jsType: 'number',
+        required: false,
+        description: 'Aggregate rating (0–5)'
+      },
+      rating_count: {
+        sqlType: 'INTEGER',
+        jsType: 'number',
+        required: false,
+        description: 'Number of ratings'
+      },
+      user_created: {
+        sqlType: 'INTEGER DEFAULT 0',
+        jsType: 'number',
+        required: false,
+        description: '1 if the user authored this recipe (not imported from a site)'
+      },
+      added_at: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'ISO 8601 date when this recipe was added to the library'
+      },
+      metadata: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON blob for source-specific extra data'
+      },
+      created_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record creation timestamp'
+      },
+      updated_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record update timestamp'
+      }
+    },
+    indexes: ['source', 'title', 'categories']
+  },
+
   'utility': {
     // Utility plugins perform maintenance tasks and don't store data
     // They have no AI context (ai: null) because there's nothing to query
