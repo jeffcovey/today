@@ -6,8 +6,16 @@ autoDotenvx();
 
 import { getDatabase } from '../src/database-service.js';
 import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
+import { getFullConfig } from '../src/config.js';
+import { writeFileAtomic } from '../src/fs-atomic.js';
+import { fileNameFor, pestleToMarkdown } from '../plugins/markdown-recipes/pestle.js';
 import { program } from 'commander';
 import { colors } from '../src/cli-utils.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const SUMMARY_COLUMNS = 'id, title, categories, total_time_minutes, calories, protein_grams';
 
@@ -77,16 +85,16 @@ program
 
 program
   .command('search <term>')
-  .description('Search titles, ingredients, categories, cuisines, descriptions and notes')
+  .description('Search titles, ingredients, categories, cuisines, keywords, descriptions and notes')
   .action(async (term) => {
     const db = await openLibrary();
     const like = `%${term}%`;
     const rows = db.prepare(`
       SELECT ${SUMMARY_COLUMNS} FROM recipes
-      WHERE title LIKE ? OR ingredients LIKE ? OR categories LIKE ?
-         OR cuisines LIKE ? OR description LIKE ? OR notes LIKE ?
+      WHERE title LIKE ? OR ingredients LIKE ? OR categories LIKE ? OR cuisines LIKE ?
+         OR keywords LIKE ? OR description LIKE ? OR notes LIKE ?
       ORDER BY title
-    `).all(like, like, like, like, like, like);
+    `).all(like, like, like, like, like, like, like);
     printRows(db, rows, `No recipes match "${term}".`);
   });
 
@@ -97,8 +105,7 @@ program
     const db = await openLibrary();
     const recipe =
       db.prepare(`SELECT * FROM recipes
-                  WHERE lower(title) = lower(?) OR id = ?
-                     OR json_extract(metadata, '$.file_path') = ?`).get(title, title, title) ||
+                  WHERE lower(title) = lower(?) OR json_extract(metadata, '$.file_path') = ?`).get(title, title) ||
       db.prepare('SELECT * FROM recipes WHERE title LIKE ? ORDER BY length(title) LIMIT 1').get(`%${title}%`);
     if (!recipe) {
       console.log(`No recipe matches "${title}".`);
@@ -112,11 +119,17 @@ program
     const facts = [
       ['Category', parseJson(recipe.categories, []).join(', ')],
       ['Cuisine', parseJson(recipe.cuisines, []).join(', ')],
-      ['Prep time', formatMinutes(meta.prep_time_minutes)],
-      ['Cook time', formatMinutes(meta.cook_time_minutes)],
+      ['Keywords', parseJson(recipe.keywords, []).join(', ')],
+      ['Prep time', formatMinutes(recipe.prep_time_minutes)],
+      ['Cook time', formatMinutes(recipe.cook_time_minutes)],
       ['Total time', formatMinutes(recipe.total_time_minutes)],
       ['Servings', recipe.servings],
-      ['Source', recipe.recipe_source],
+      ['Rating', recipe.rating != null ? `${recipe.rating}${meta.rating_count ? ` (${meta.rating_count} ratings)` : ''}` : null],
+      ['Author', recipe.author],
+      ['Recipe', recipe.url],
+      ['Photo', recipe.image_url],
+      ['Video', meta.video?.contentUrl || meta.video?.embedUrl || null],
+      ['Added', recipe.date_added],
       ['File', meta.file_path]
     ].filter(([, value]) => value);
     console.log();
@@ -137,10 +150,41 @@ program
     const nutrition = parseJson(recipe.nutrition, {});
     if (Object.keys(nutrition).length) {
       console.log(`\n${colors.bold('Nutrition (per serving)')}`);
-      console.log('  ' + Object.entries(nutrition).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(' · '));
+      const label = key => key.replace(/Content$/, '').replace(/([A-Z])/g, ' $1').toLowerCase();
+      console.log('  ' + Object.entries(nutrition).map(([k, v]) => `${label(k)}: ${v}`).join(' · '));
     }
 
     if (recipe.notes) console.log(`\n${colors.bold('Notes')}\n${recipe.notes}`);
+  });
+
+program
+  .command('import <file>')
+  .description('Convert a Pestle export (.pestle) into recipe files; existing files are left alone')
+  .option('-d, --dir <directory>', 'Recipe directory (default: the markdown-recipes plugin setting)')
+  .option('--overwrite', 'Replace recipe files that already exist')
+  .action(async (file, options) => {
+    const sources = getFullConfig().plugins?.['markdown-recipes'] || {};
+    const configured = Object.values(sources).find(s => s?.enabled)?.recipes_directory;
+    const dir = path.resolve(PROJECT_ROOT, options.dir || configured || 'vault/recipes');
+
+    const recipes = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (!Array.isArray(recipes)) throw new Error(`${file} is not a Pestle export (expected a JSON array of recipes)`);
+
+    fs.mkdirSync(dir, { recursive: true });
+    const written = [];
+    const skipped = [];
+    for (const recipe of recipes) {
+      const target = path.join(dir, fileNameFor(recipe.name));
+      if (fs.existsSync(target) && !options.overwrite) {
+        skipped.push(path.basename(target));
+        continue;
+      }
+      writeFileAtomic(target, pestleToMarkdown(recipe));
+      written.push(path.basename(target));
+    }
+
+    console.log(`Wrote ${written.length} recipe file(s) to ${path.relative(PROJECT_ROOT, dir) || dir}`);
+    if (skipped.length) console.log(`Skipped ${skipped.length} that already exist (use --overwrite to replace): ${skipped.join(', ')}`);
   });
 
 program

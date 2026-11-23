@@ -1145,12 +1145,13 @@ Common queries:
     staleMinutes: 30, // Recipe files change rarely; the vault watcher catches edits
     ai: {
       name: 'Recipes',
-      description: `The user's recipe library: one markdown file per recipe in the vault,
-with ingredients, instructions, times, servings and (usually) nutrition per serving.
+      description: `The user's recipe library: one markdown file per recipe in the vault
+(schema.org Recipe properties in frontmatter), with ingredients, instructions,
+times, servings, a photo link and (usually) nutrition per serving.
 Use it for meal planning and for suggesting what to cook. Suggest recipes from the
 library before inventing new ones, and say when a suggestion isn't in it.`,
       defaultCommand: 'bin/recipes stats',
-      queryInstructions: `Commands: bin/recipes list [--category X], bin/recipes search "term", bin/recipes show "title", bin/recipes stats
+      queryInstructions: `Commands: bin/recipes list [--category X], bin/recipes search "term", bin/recipes show "title", bin/recipes stats, bin/recipes import <export.pestle>
 SQL: SELECT title, categories, total_time_minutes, calories, protein_grams FROM recipes ORDER BY title`
     },
     fields: {
@@ -1189,6 +1190,24 @@ SQL: SELECT title, categories, total_time_minutes, calories, protein_grams FROM 
         required: false,
         description: 'JSON array of cuisines (e.g. ["indian"])'
       },
+      keywords: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON array of keywords'
+      },
+      prep_time_minutes: {
+        sqlType: 'INTEGER',
+        jsType: 'number',
+        required: false,
+        description: 'Prep time in minutes'
+      },
+      cook_time_minutes: {
+        sqlType: 'INTEGER',
+        jsType: 'number',
+        required: false,
+        description: 'Cook time in minutes'
+      },
       total_time_minutes: {
         sqlType: 'INTEGER',
         jsType: 'number',
@@ -1199,13 +1218,31 @@ SQL: SELECT title, categories, total_time_minutes, calories, protein_grams FROM 
         sqlType: 'TEXT',
         jsType: 'string',
         required: false,
-        description: 'Number of servings'
+        description: 'Number of servings (recipeYield)'
       },
-      recipe_source: {
+      url: {
         sqlType: 'TEXT',
         jsType: 'string',
         required: false,
-        description: 'Where the recipe came from (site, book, person)'
+        description: 'Link to the original recipe'
+      },
+      author: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Recipe author'
+      },
+      image_url: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Photo of the finished dish'
+      },
+      rating: {
+        sqlType: 'REAL',
+        jsType: 'number',
+        required: false,
+        description: 'Average rating from the original site'
       },
       ingredients: {
         sqlType: 'TEXT',
@@ -1243,11 +1280,17 @@ SQL: SELECT title, categories, total_time_minutes, calories, protein_grams FROM 
         required: false,
         description: 'Free-form notes about the recipe'
       },
+      date_added: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Date the recipe was added to the library (YYYY-MM-DD)'
+      },
       metadata: {
         sqlType: 'TEXT',
         jsType: 'string',
         required: false,
-        description: 'JSON blob for other fields (file_path, prep/cook times, etc.)'
+        description: 'JSON blob for other fields (file_path, rating_count, date_published, identifier, video)'
       },
       created_at: {
         sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',

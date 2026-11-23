@@ -12,41 +12,60 @@ Keeps your recipe library as one markdown file per recipe under
 searching and meal planning. Edit, add or delete recipes in the vault; the
 database follows.
 
-Files use the layout Pestle exports, so a Pestle markdown export can be
-unzipped straight into the directory:
+Recipe details go in YAML frontmatter, using the property names of the
+schema.org Recipe vocabulary (what recipe sites and apps such as Pestle use).
+The body holds the photo, description, ingredients, steps and notes:
 
 ```markdown
+---
+name: Butter Chickpeas
+url: https://thealmondeater.com/butter-chickpeas/
+image: https://thealmondeater.com/butter-chickpeas.jpg
+author: Jane Cook
+dateAdded: 2025-03-01
+recipeCategory: [dinner]
+recipeCuisine: [american, indian]
+keywords: [vegan, curry]
+recipeYield: "2"
+prepTime: PT5M
+cookTime: PT20M
+totalTime: PT25M
+nutrition:
+  calories: 271 kcal
+  proteinContent: 8 g
+aggregateRating:
+  ratingValue: 4.8
+  ratingCount: 120
+---
+
 # Butter Chickpeas
+
+![Butter Chickpeas](https://thealmondeater.com/butter-chickpeas.jpg)
 
 A short description.
 
-**Category** dinner
-**Cuisine** american, indian
-**Total Time** 25m
-**Servings** 2
-**Source** thealmondeater.com
-
 ## Ingredients
 
-* 2 tbsp butter
-* 1 small onion (diced)
+- 2 tbsp butter
+- 1 small onion (diced)
 
 ## Instructions
 
-1. Melt the butter...
-
-## Nutrition
-
-**Calories** 271 kcal
-**Protein** 8 g
+1. Melt the butter.
+2. Add the onion.
 
 ## Notes
 
 Anything else.
 ```
 
-Every field and section is optional. **Prep Time** and **Cook Time** are
-also read. Query the library with `bin/recipes`.
+Every field and section is optional. Times can be ISO 8601 (`PT1H30M`) or
+plain (`1h 30m`). `### Headings` inside Instructions split the steps into
+sections.
+
+To import from Pestle, export your recipes as a `.pestle` file and run
+`bin/recipes import <file>.pestle`. Recipes that already have a file are
+skipped, so your edits are kept.
 """
 
 aiInstructions = """

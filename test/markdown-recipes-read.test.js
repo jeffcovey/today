@@ -4,6 +4,7 @@ import path from 'path';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import Database from 'better-sqlite3';
+import { getSqlColumns } from '../src/plugin-schemas.js';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const readScript = path.join(repoRoot, 'plugins/markdown-recipes/read.js');
@@ -59,16 +60,12 @@ describe('markdown-recipes read', () => {
     const filePath = 'vault/recipes/keep.md';
     fs.mkdirSync(path.join(root, '.data'), { recursive: true });
     const db = new Database(path.join(root, '.data/today.db'));
-    db.exec(`CREATE TABLE recipes (
-      id TEXT, title TEXT, description TEXT, categories TEXT, cuisines TEXT,
-      total_time_minutes INTEGER, servings TEXT, recipe_source TEXT,
-      ingredients TEXT, instructions TEXT, nutrition TEXT, calories REAL,
-      protein_grams REAL, notes TEXT, metadata TEXT
-    )`);
+    db.exec(`CREATE TABLE recipes (${getSqlColumns('recipes')})`);
     db.prepare(`INSERT INTO recipes (
-      id, title, description, categories, cuisines, ingredients, instructions, metadata
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      id, source, title, description, categories, cuisines, ingredients, instructions, metadata
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       'markdown-recipes/default:vault/recipes/keep.md',
+      'markdown-recipes/default',
       'Keep',
       null,
       '[]',

@@ -25,20 +25,16 @@ function findRecipeFiles(dir) {
   return files;
 }
 
-const filterFiles = fileFilter
-  ? fileFilter.split(',').map(f => path.join(projectRoot, f.trim()))
+const inLibrary = f => f.endsWith('.md') && f.startsWith(rootDir + path.sep);
+const requested = fileFilter
+  ? fileFilter.split(',').map(f => path.resolve(projectRoot, f.trim())).filter(inLibrary)
   : null;
 
-const hasMissingRecipe = filterFiles?.some(f => {
-  const relativePath = path.relative(rootDir, f);
-  const isInsideRecipeDirectory = relativePath && !relativePath.startsWith(`..${path.sep}`)
-    && relativePath !== '..' && !path.isAbsolute(relativePath);
-  return isInsideRecipeDirectory && f.endsWith('.md') && !fs.existsSync(f);
-});
-
-const recipeFiles = filterFiles && !hasMissingRecipe
-  ? filterFiles.filter(f => fs.existsSync(f) && f.endsWith('.md') && f.startsWith(rootDir + path.sep))
-  : findRecipeFiles(rootDir);
+// The loader only removes rows for deleted files on a full read, so a
+// filtered read that names a vanished recipe (deleted or renamed) reads
+// everything instead.
+const incremental = requested !== null && requested.every(f => fs.existsSync(f));
+const recipeFiles = incremental ? requested : findRecipeFiles(rootDir);
 
 const entries = [];
 for (const filePath of recipeFiles) {
@@ -58,23 +54,29 @@ for (const filePath of recipeFiles) {
     description: recipe.description,
     categories: JSON.stringify(recipe.categories),
     cuisines: JSON.stringify(recipe.cuisines),
+    keywords: JSON.stringify(recipe.keywords),
+    prep_time_minutes: recipe.prep_time_minutes,
+    cook_time_minutes: recipe.cook_time_minutes,
     total_time_minutes: recipe.total_time_minutes,
     servings: recipe.servings,
-    recipe_source: recipe.recipe_source,
+    url: recipe.url,
+    author: recipe.author,
+    image_url: recipe.image_url,
+    rating: recipe.rating,
     ingredients: JSON.stringify(recipe.ingredients),
     instructions: JSON.stringify(recipe.instructions),
     nutrition: Object.keys(recipe.nutrition).length ? JSON.stringify(recipe.nutrition) : null,
     calories: recipe.calories,
     protein_grams: recipe.protein_grams,
     notes: recipe.notes,
+    date_added: recipe.date_added,
     metadata: JSON.stringify({ file_path: relativePath, ...recipe.extra })
   });
 }
 
-// A full read (no FILE_FILTER) omits files_processed so the loader replaces
-// every row, which drops recipes whose files were deleted or renamed.
+// A full read omits files_processed so the loader replaces every row.
 const output = { entries };
-if (filterFiles && !hasMissingRecipe) {
+if (incremental) {
   output.files_processed = recipeFiles.map(f => path.relative(projectRoot, f));
   output.incremental = true;
 }
