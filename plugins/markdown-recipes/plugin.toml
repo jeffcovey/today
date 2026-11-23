@@ -13,7 +13,7 @@ searching and meal planning. Edit, add or delete recipes in the vault; the
 database follows.
 
 Recipe details go in YAML frontmatter, using the property names of the
-schema.org Recipe vocabulary (what recipe sites and apps such as Pestle use).
+schema.org Recipe vocabulary (what recipe sites and apps use).
 The body holds the photo, description, ingredients, steps and notes:
 
 ```markdown
@@ -62,10 +62,6 @@ Anything else.
 Every field and section is optional. Times can be ISO 8601 (`PT1H30M`) or
 plain (`1h 30m`). `### Headings` inside Instructions split the steps into
 sections.
-
-To import from Pestle, export your recipes as a `.pestle` file and run
-`bin/recipes import <file>.pestle`. Recipes that already have a file are
-skipped, so your edits are kept.
 """
 
 aiInstructions = """

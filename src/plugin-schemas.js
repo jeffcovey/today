@@ -1151,7 +1151,7 @@ times, servings, a photo link and (usually) nutrition per serving.
 Use it for meal planning and for suggesting what to cook. Suggest recipes from the
 library before inventing new ones, and say when a suggestion isn't in it.`,
       defaultCommand: 'bin/recipes stats',
-      queryInstructions: `Commands: bin/recipes list [--category X], bin/recipes search "term", bin/recipes show "title", bin/recipes stats, bin/recipes import <export.pestle>
+      queryInstructions: `Commands: bin/recipes list [--category X], bin/recipes search "term", bin/recipes show "title", bin/recipes stats
 SQL: SELECT title, categories, total_time_minutes, calories, protein_grams FROM recipes ORDER BY title`
     },
     fields: {

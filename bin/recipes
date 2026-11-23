@@ -6,16 +6,8 @@ autoDotenvx();
 
 import { getDatabase } from '../src/database-service.js';
 import { ensureSyncForType, getSyncStatusMessage } from '../src/plugin-loader.js';
-import { getFullConfig } from '../src/config.js';
-import { writeFileAtomic } from '../src/fs-atomic.js';
-import { fileNameFor, pestleToMarkdown } from '../plugins/markdown-recipes/pestle.js';
 import { program } from 'commander';
 import { colors } from '../src/cli-utils.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const SUMMARY_COLUMNS = 'id, title, categories, total_time_minutes, calories, protein_grams';
 
@@ -155,36 +147,6 @@ program
     }
 
     if (recipe.notes) console.log(`\n${colors.bold('Notes')}\n${recipe.notes}`);
-  });
-
-program
-  .command('import <file>')
-  .description('Convert a Pestle export (.pestle) into recipe files; existing files are left alone')
-  .option('-d, --dir <directory>', 'Recipe directory (default: the markdown-recipes plugin setting)')
-  .option('--overwrite', 'Replace recipe files that already exist')
-  .action(async (file, options) => {
-    const sources = getFullConfig().plugins?.['markdown-recipes'] || {};
-    const configured = Object.values(sources).find(s => s?.enabled)?.recipes_directory;
-    const dir = path.resolve(PROJECT_ROOT, options.dir || configured || 'vault/recipes');
-
-    const recipes = JSON.parse(fs.readFileSync(file, 'utf8'));
-    if (!Array.isArray(recipes)) throw new Error(`${file} is not a Pestle export (expected a JSON array of recipes)`);
-
-    fs.mkdirSync(dir, { recursive: true });
-    const written = [];
-    const skipped = [];
-    for (const recipe of recipes) {
-      const target = path.join(dir, fileNameFor(recipe.name));
-      if (fs.existsSync(target) && !options.overwrite) {
-        skipped.push(path.basename(target));
-        continue;
-      }
-      writeFileAtomic(target, pestleToMarkdown(recipe));
-      written.push(path.basename(target));
-    }
-
-    console.log(`Wrote ${written.length} recipe file(s) to ${path.relative(PROJECT_ROOT, dir) || dir}`);
-    if (skipped.length) console.log(`Skipped ${skipped.length} that already exist (use --overwrite to replace): ${skipped.join(', ')}`);
   });
 
 program
