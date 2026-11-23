@@ -101,6 +101,14 @@ export function windowStart(today, timePeriod) {
 
 // ---------------------------------------------------------------- data
 
+/** The day or month before the one starting on `iso`. */
+function previousPeriod(iso, monthly) {
+  const d = new Date(toUtc(iso));
+  if (monthly) d.setUTCMonth(d.getUTCMonth() - 1);
+  else d.setUTCDate(d.getUTCDate() - 1);
+  return toIso(d.getTime());
+}
+
 // Units that can be converted into one another, as a factor to a base unit
 // of their kind.
 const CONVERSIONS = {
@@ -166,11 +174,15 @@ export function isAdditive({ source, metric }) {
 /**
  * Turn query rows into plot rows on one calendar.
  *
- * @param {Array<{metric: string, rows: Array<{date: string, value: number}>}>} datasets
- * @param {{today: string, timePeriod: string, additive: boolean, averageDays: number, zeroFill: boolean}} opts
+ * Whether a series adds up is decided per series (`ds.additive`, falling
+ * back to `opts.additive`), so a chart holding both Weight and Steps keeps
+ * today's weigh-in and leaves out today's unfinished steps.
+ *
+ * @param {Array<{metric: string, rows: Array<{date: string, value: number}>, additive?: boolean}>} datasets
+ * @param {{today: string, timePeriod: string, additive: boolean, averageDays: number, zeroFill: boolean, includeCurrent: boolean}} opts
  * @returns {{monthly: boolean, start: string, end: string, points: object[], skippedPartial: boolean}}
  */
-export function prepareData(datasets, { today, timePeriod, additive, averageDays = 0, zeroFill = false }) {
+export function prepareData(datasets, { today, timePeriod, additive, averageDays = 0, zeroFill = false, includeCurrent = false }) {
   const monthly = datasets.some(ds => ds.rows.some(r => /^\d{4}-\d{2}$/.test(r.date)));
   let start = windowStart(today, timePeriod);
   let skippedPartial = false;
@@ -188,26 +200,41 @@ export function prepareData(datasets, { today, timePeriod, additive, averageDays
   }
 
   const currentPeriod = monthly ? today.slice(0, 7) : today;
-  const last = monthly ? `${currentPeriod}-01` : today;
+  const currentStart = monthly ? `${currentPeriod}-01` : today;
+  // An amount for the day or month still under way isn't finished, so its
+  // series ends at the last finished one unless include_current asks for
+  // it. A reading taken today is complete, so readings run through today.
+  const lastFor = (seriesAdditive) =>
+    (seriesAdditive && !includeCurrent ? previousPeriod(currentStart, monthly) : currentStart);
+  const additiveOf = (ds) => (ds.additive ?? additive);
+  // The axis runs to the latest any series may reach.
+  const end = datasets.some(ds => !additiveOf(ds)) || includeCurrent || datasets.length === 0
+    ? currentStart
+    : lastFor(true);
   const points = [];
 
-  // Every day or month in the window, for sources where a missing one is zero.
-  const periods = [];
-  if (zeroFill) {
+  // Every day or month in the window up to `until`, for sources where a
+  // missing one is zero.
+  const periodsUntil = (until) => {
+    const out = [];
     const d = new Date(toUtc(start));
-    for (; toIso(d.getTime()) <= last; monthly ? d.setUTCMonth(d.getUTCMonth() + 1) : d.setUTCDate(d.getUTCDate() + 1)) {
-      periods.push(toIso(d.getTime()));
+    for (; toIso(d.getTime()) <= until; monthly ? d.setUTCMonth(d.getUTCMonth() + 1) : d.setUTCDate(d.getUTCDate() + 1)) {
+      out.push(toIso(d.getTime()));
     }
-  }
+    return out;
+  };
 
   for (const ds of datasets) {
+    const seriesAdditive = additiveOf(ds);
+    const last = lastFor(seriesAdditive);
     let rows = ds.rows
       .filter(r => Number.isFinite(r.value))
       .map(r => ({ ...r, date: monthly && r.date.length === 7 ? `${r.date}-01` : r.date }))
       .filter(r => r.date >= start && r.date <= last)
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    if (zeroFill) {
+    if (zeroFill && seriesAdditive) {
+      const periods = periodsUntil(last);
       const have = new Set(rows.map(r => r.date));
       rows = [...rows, ...periods.filter(d => !have.has(d)).map(date => ({ date, value: 0 }))]
         .sort((a, b) => a.date.localeCompare(b.date));
@@ -220,7 +247,7 @@ export function prepareData(datasets, { today, timePeriod, additive, averageDays
         label: monthly ? shortMonth(r.date) : shortDate(r.date),
         value: r.value,
         // The period still under way: an amount that is still adding up.
-        partial: additive && (monthly ? r.date.slice(0, 7) === currentPeriod : r.date === today)
+        partial: seriesAdditive && (monthly ? r.date.slice(0, 7) === currentPeriod : r.date === today)
       };
       points.push(point);
     }
@@ -228,7 +255,7 @@ export function prepareData(datasets, { today, timePeriod, additive, averageDays
     if (!monthly && averageDays > 1 && rows.length >= averageDays + 3) {
       // Trailing mean over calendar days, not rows, so a gap in the data
       // doesn't stretch the window. A partial day stays out of it.
-      const whole = rows.filter(r => !(additive && r.date === today));
+      const whole = rows.filter(r => !(seriesAdditive && r.date === today));
       const byPoint = points.filter(p => p.series === ds.metric && !p.partial);
       for (const p of byPoint) {
         const from = toIso(toUtc(p.date) - (averageDays - 1) * DAY_MS);
@@ -246,7 +273,7 @@ export function prepareData(datasets, { today, timePeriod, additive, averageDays
     if (first > start) start = first;
   }
 
-  return { monthly, start, end: last, points, skippedPartial };
+  return { monthly, start, end, points, skippedPartial };
 }
 
 // ---------------------------------------------------------------- formatting
@@ -478,11 +505,15 @@ export function buildSpec({ datasets: raw, settings, today }) {
   const metrics = datasets.map(ds => ds.metric);
   const units = datasets[0]?.units || '';
   const kind = chartKind({ chartType: settings.chartType });
-  const additive = metrics.every(metric => isAdditive({ source: settings.source, metric }));
+  for (const ds of datasets) ds.additive = isAdditive({ source: settings.source, metric: ds.metric });
+  // The chart as a whole counts as amounts (zero baseline, totals in the
+  // subtitle) only when every series is one.
+  const additive = datasets.length > 0 && datasets.every(ds => ds.additive);
   const averageDays = Number.isFinite(settings.averageDays) ? settings.averageDays : 0;
   const data = prepareData(datasets, {
     today, timePeriod: settings.timePeriod, additive, averageDays,
-    zeroFill: additive && zeroWhenMissing(settings.source)
+    zeroFill: zeroWhenMissing(settings.source),
+    includeCurrent: settings.includeCurrent === true
   });
   const { monthly } = data;
   const names = displayNames(metrics);
