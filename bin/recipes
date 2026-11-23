@@ -96,7 +96,9 @@ program
   .action(async (title) => {
     const db = await openLibrary();
     const recipe =
-      db.prepare('SELECT * FROM recipes WHERE lower(title) = lower(?) OR id = ?').get(title, title) ||
+      db.prepare(`SELECT * FROM recipes
+                  WHERE lower(title) = lower(?) OR id = ?
+                     OR json_extract(metadata, '$.file_path') = ?`).get(title, title, title) ||
       db.prepare('SELECT * FROM recipes WHERE title LIKE ? ORDER BY length(title) LIMIT 1').get(`%${title}%`);
     if (!recipe) {
       console.log(`No recipe matches "${title}".`);

@@ -29,7 +29,14 @@ const filterFiles = fileFilter
   ? fileFilter.split(',').map(f => path.join(projectRoot, f.trim()))
   : null;
 
-const recipeFiles = filterFiles
+const hasMissingRecipe = filterFiles?.some(f => {
+  const relativePath = path.relative(rootDir, f);
+  const isInsideRecipeDirectory = relativePath && !relativePath.startsWith(`..${path.sep}`)
+    && relativePath !== '..' && !path.isAbsolute(relativePath);
+  return isInsideRecipeDirectory && f.endsWith('.md') && !fs.existsSync(f);
+});
+
+const recipeFiles = filterFiles && !hasMissingRecipe
   ? filterFiles.filter(f => fs.existsSync(f) && f.endsWith('.md') && f.startsWith(rootDir + path.sep))
   : findRecipeFiles(rootDir);
 
@@ -67,7 +74,7 @@ for (const filePath of recipeFiles) {
 // A full read (no FILE_FILTER) omits files_processed so the loader replaces
 // every row, which drops recipes whose files were deleted or renamed.
 const output = { entries };
-if (filterFiles) {
+if (filterFiles && !hasMissingRecipe) {
   output.files_processed = recipeFiles.map(f => path.relative(projectRoot, f));
   output.incremental = true;
 }
