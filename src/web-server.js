@@ -105,6 +105,7 @@ import { roleBlocksToCards } from '../plugins/roles/web-cards.js';
 import { CANCELLED_CHECKBOX_ATTRS, enableTaskCheckboxes, isCancelledTaskLine, markTaskListItems } from './task-checkboxes.js';
 import { getProjectsDueForReview } from './projects.js';
 import { pullVault } from './git-pull.js';
+import { warmRequestAllowed, WARM_TOKEN_HEADER } from './cache-warm-auth.js';
 import {
   formatInlineDataviewValue,
   generateTableOfContentsHtml,
@@ -6140,12 +6141,12 @@ app.post('/_cache/clear', sessionAuth, async (req, res) => {
 // Restricted to localhost so no session auth is required (safe for cron jobs).
 let cacheWarmInProgress = false;
 app.post('/_cache/warm', async (req, res) => {
-  // Use the raw socket address (not req.ip) to bypass trust-proxy header spoofing.
-  // This endpoint must only be reachable from the local machine.
+  // The local machine, or a caller with the warm token (the scheduler in its
+  // own container). Uses the raw socket address, not req.ip, which trusts
+  // proxy headers.
   const ip = req.socket?.remoteAddress || '';
-  const isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
-  if (!isLocal) {
-    return res.status(403).json({ error: 'Forbidden - localhost only' });
+  if (!warmRequestAllowed(ip, req.get(WARM_TOKEN_HEADER), process.env.SESSION_SECRET)) {
+    return res.status(403).json({ error: 'Forbidden - localhost or warm token only' });
   }
 
   if (cacheWarmInProgress) {

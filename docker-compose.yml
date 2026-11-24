@@ -64,6 +64,8 @@ services:
     command: ["npx", "dotenvx", "run", "--", "node", "src/scheduler.js"]
     environment:
       - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY:-}
+      # The web server is another container; the prerender job warms its cache there
+      - TODAY_WEB_INTERNAL_URL=http://vault-web:${TODAY_WEB_PORT:-3000}
       - SKIP_DEP_CHECK=true
       - OLLAMA_HOST=http://ollama:11434
       # Where Today's AI calls reach Ollama when [ai] provider = "ollama"
