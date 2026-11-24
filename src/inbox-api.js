@@ -131,7 +131,9 @@ app.get('/inbox/list', authenticateApiKey, async (req, res) => {
 
 // Start server
 const PORT = process.env.INBOX_API_PORT || 3333;
-app.listen(PORT, '127.0.0.1', () => {
+// Loopback by default; docker-compose sets INBOX_API_HOST=0.0.0.0.
+const HOST = process.env.INBOX_API_HOST || '127.0.0.1';
+app.listen(PORT, HOST, () => {
   console.log(`Inbox API listening on port ${PORT}`);
   console.log(`API Key: ${API_KEY}`);
   console.log('\nTo test:');

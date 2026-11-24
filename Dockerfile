@@ -11,7 +11,19 @@ WORKDIR /app
 RUN apk add --no-cache \
     python3 make g++ pkgconfig \
     curl sqlite bash git openssh-client github-cli \
+    # GNU grep: BusyBox grep lacks --exclude-dir (markdown-tasks finds task files with it)
+    grep \
+    # For the web console (/_console): mail (config in vault/today/neomuttrc,
+    # HTML through lynx) and tmux
+    neomutt lynx tmux \
     cairo-dev pango-dev jpeg-dev giflib-dev librsvg-dev
+
+# neomutt as on the Mac mini, so plain `neomutt` works in the web console: its
+# config is the vault's today/neomuttrc, and HTML mail goes through lynx via
+# config/neomutt/mailcap. Both links resolve through the /app bind mount.
+RUN mkdir -p /root/.config/neomutt \
+    && ln -sf /app/vault/today/neomuttrc /root/.config/neomutt/neomuttrc \
+    && ln -sf /app/config/neomutt/mailcap /root/.mailcap
 
 # Copy package files
 COPY package*.json ./
