@@ -33,6 +33,8 @@ services:
       # tokens in .env, and need the `project` scope). Kept apart from the
       # host's ~/.config/gh; empty if missing, which leaves gh logged out.
       - ${TODAY_GH_CONFIG:-${HOST_HOME:-~}/.config/today-gh}:/root/.config/gh
+      # Claude Code's settings and sessions (CLAUDE_CONFIG_DIR in the image)
+      - claude-home:/root/.claude
       # Mount Claude CLI config directory for authentication persistence
       - ${HOST_HOME:-~}/.config/claude:/root/.config/claude
     stdin_open: true
@@ -71,6 +73,8 @@ services:
       # tokens in .env, and need the `project` scope). Kept apart from the
       # host's ~/.config/gh; empty if missing, which leaves gh logged out.
       - ${TODAY_GH_CONFIG:-${HOST_HOME:-~}/.config/today-gh}:/root/.config/gh
+      # Claude Code's settings and sessions (CLAUDE_CONFIG_DIR in the image)
+      - claude-home:/root/.claude
     restart: unless-stopped
 
   # Runs node src/web-server.js — the vault web UI.
@@ -99,6 +103,8 @@ services:
       # tokens in .env, and need the `project` scope). Kept apart from the
       # host's ~/.config/gh; empty if missing, which leaves gh logged out.
       - ${TODAY_GH_CONFIG:-${HOST_HOME:-~}/.config/today-gh}:/root/.config/gh
+      # Claude Code's settings and sessions (CLAUDE_CONFIG_DIR in the image)
+      - claude-home:/root/.claude
     ports:
       - "127.0.0.1:${TODAY_WEB_PORT:-3000}:${TODAY_WEB_PORT:-3000}"
     restart: unless-stopped
@@ -171,6 +177,7 @@ services:
     # command: ["ollama serve & sleep 5 && ollama pull tinyllama && tail -f /dev/null"]
 
 volumes:
+  claude-home:
   neomutt-cache:
   calendar-cache:
     driver: local

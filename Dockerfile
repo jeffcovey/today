@@ -16,7 +16,21 @@ RUN apk add --no-cache \
     # For the web console (/_console): mail (config in vault/today/neomuttrc,
     # HTML through lynx) and tmux
     neomutt lynx tmux \
+    # Claude Code's native build on Alpine needs these, and uses the system ripgrep
+    libgcc libstdc++ ripgrep \
     cairo-dev pango-dev jpeg-dev giflib-dev librsvg-dev
+
+# Claude Code CLI, for bin/today (the roles plugin's runs, and the web console).
+# Login: CLAUDE_CODE_OAUTH_TOKEN in .env, a one-year token from
+# `claude setup-token`, so there's no session to expire. Settings and
+# sessions live in CLAUDE_CONFIG_DIR, a volume in docker-compose.yml.
+# Updates come from rebuilding the image, not the CLI's auto-updater.
+ENV USE_BUILTIN_RIPGREP=0 \
+    DISABLE_AUTOUPDATER=1 \
+    CLAUDE_CONFIG_DIR=/root/.claude
+RUN curl -fsSL https://claude.ai/install.sh | bash \
+    && ln -sf /root/.local/bin/claude /usr/local/bin/claude \
+    && claude --version
 
 # neomutt as on the Mac mini, so plain `neomutt` works in the web console: its
 # config is the vault's today/neomuttrc, and HTML mail goes through lynx via
