@@ -5,10 +5,18 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import { existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.dirname(__dirname);
+
+// INBOX_API_KEY can live in Today's encrypted .env (the Docker setup) or come
+// from the environment (the droplet's systemd unit); the environment wins.
+if (!process.env.INBOX_API_KEY && existsSync(path.join(projectRoot, '.env'))) {
+  const dotenvx = await import('@dotenvx/dotenvx');
+  dotenvx.default.config({ path: path.join(projectRoot, '.env'), quiet: true });
+}
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -134,11 +142,8 @@ const PORT = process.env.INBOX_API_PORT || 3333;
 // Loopback by default; docker-compose sets INBOX_API_HOST=0.0.0.0.
 const HOST = process.env.INBOX_API_HOST || '127.0.0.1';
 app.listen(PORT, HOST, () => {
-  console.log(`Inbox API listening on port ${PORT}`);
-  console.log(`API Key: ${API_KEY}`);
-  console.log('\nTo test:');
-  console.log(`curl -X POST http://localhost:${PORT}/inbox/upload \\`);
-  console.log(`  -H "X-API-Key: ${API_KEY}" \\`);
-  console.log(`  -H "Content-Type: text/plain" \\`);
-  console.log(`  -d "# Test Note\\n\\nThis is a test"`);
+  console.log(`Inbox API listening on ${HOST}:${PORT}`);
+  if (!process.env.INBOX_API_KEY) {
+    console.warn('INBOX_API_KEY is not set; using a random key, so no client can upload until it is.');
+  }
 });
