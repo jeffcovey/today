@@ -20,12 +20,15 @@ const PULL = ['-c', 'core.quotePath=false', 'pull'];
  * `gitBinary` lets tests substitute a git that fails on cue.
  */
 export function pullVault(repoPath, { gitBinary = 'git' } = {}) {
+  // Vault filenames are passed to git as-is, so every pathspec is literal:
+  // `note[1].md` must not also match `note1.md`.
+  const env = { ...process.env, GIT_LITERAL_PATHSPECS: '1' };
   const git = (args, timeout = 30000) => execFileSync(gitBinary, args, {
-    cwd: repoPath, encoding: 'utf8', timeout, maxBuffer: 10 * 1024 * 1024
+    cwd: repoPath, env, encoding: 'utf8', timeout, maxBuffer: 10 * 1024 * 1024
   });
   // File contents as raw bytes, so non-UTF-8 and binary files aren't mangled.
   const gitBytes = (args) => execFileSync(gitBinary, args, {
-    cwd: repoPath, timeout: 30000, maxBuffer: 100 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe']
+    cwd: repoPath, env, timeout: 30000, maxBuffer: 100 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe']
   });
 
   let pullErr;
@@ -98,9 +101,14 @@ export function pullVault(repoPath, { gitBinary = 'git' } = {}) {
   const moveUntrackedAside = (files) => {
     try {
       for (const file of files) {
+        // Only an ordinary file can be an identical copy; anything else (a
+        // symlink, say: hashing it would read its target) is renamed aside.
+        const regular = fs.lstatSync(path.join(repoPath, file)).isFile();
         let incoming = '';
-        try { incoming = git(['rev-parse', '@{upstream}:' + file]).trim(); } catch {}
-        const local = git(['hash-object', '--', file]).trim();
+        if (regular) {
+          try { incoming = git(['rev-parse', '@{upstream}:' + file]).trim(); } catch {}
+        }
+        const local = incoming ? git(['hash-object', '--', file]).trim() : '';
         if (incoming && incoming === local) {
           const { mode } = fs.statSync(path.join(repoPath, file));
           fs.rmSync(path.join(repoPath, file));
@@ -152,9 +160,15 @@ export function pullVault(repoPath, { gitBinary = 'git' } = {}) {
   }
 
   // What was staged before, so the files re-applied below can be returned
-  // to exactly that state.
+  // to that state; and which files were only partly staged (staged edits
+  // plus further unstaged ones), which a conflicted pop can't restore.
   let stagedBefore = [];
-  try { stagedBefore = git(['diff', '--cached', '--name-only', '-z']).split('\0').filter(Boolean); } catch {}
+  let partlyStaged = [];
+  try {
+    stagedBefore = git(['diff', '--cached', '--name-only', '-z']).split('\0').filter(Boolean);
+    const unstaged = git(['diff', '--name-only', '-z']).split('\0').filter(Boolean);
+    partlyStaged = stagedBefore.filter(f => unstaged.includes(f));
+  } catch {}
 
   try {
     git(['--literal-pathspecs', 'stash', 'push', '-m', 'Today: pull', '--', ...toStash]);
@@ -201,6 +215,16 @@ export function pullVault(repoPath, { gitBinary = 'git' } = {}) {
     // NUL-delimited, so names come back exactly (no quoting of non-ASCII
     // characters, no trimming).
     try { conflicted = git(['diff', '--name-only', '-z', '--diff-filter=U']).split('\0').filter(Boolean); } catch {}
+    // A file that was partly staged would come back wholly staged (git
+    // stages every re-applied file after a conflict), so the next commit
+    // would take edits that were left unstaged. Don't resolve anything then.
+    let reapplied = [];
+    try { reapplied = git(['stash', 'show', '--name-only', '-z', 'stash@{0}']).split('\0').filter(Boolean); } catch {}
+    const partlyStagedReapplied = reapplied.filter(f => partlyStaged.includes(f));
+    if (partlyStagedReapplied.length) {
+      const why = String(popErr.stderr || '').trim() || popErr.message;
+      return { status: 500, body: { error: `Pulled, but re-applying your local changes hit a conflict, and these files had both staged and unstaged edits, which can't be put back as they were: ${partlyStagedReapplied.join(', ')}\n\nYour changes are kept in the git stash ("Today: pull"); restore them with git stash pop.\n\n${why}`, setAside } };
+    }
     if (conflicted.length) {
       const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'git-union-'));
       for (const file of conflicted) {
@@ -245,8 +269,6 @@ export function pullVault(repoPath, { gitBinary = 'git' } = {}) {
     // All resolved: the stash entry is no longer needed. A conflicted pop
     // leaves every re-applied file staged, the cleanly merged ones too, so
     // unstage all of them except what was staged before the pull.
-    let reapplied = [];
-    try { reapplied = git(['stash', 'show', '--name-only', '-z', 'stash@{0}']).split('\0').filter(Boolean); } catch {}
     try { git(['stash', 'drop']); } catch {}
     const unstage = [...new Set([...reapplied, ...resolved])].filter(f => !stagedBefore.includes(f));
     if (unstage.length) {

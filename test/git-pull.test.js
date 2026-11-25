@@ -274,3 +274,50 @@ test('after a conflicted pop, cleanly merged files are unstaged too; earlier sta
   expect(staged().trim().split('\n')).toEqual(['staged.md']);
   expect(stashes()).toBe('');
 });
+
+// Third review of #755.
+
+test('filenames are literal pathspecs: resolving note[1].md does not stage note1.md', () => {
+  pushUpstream({ 'note[1].md': 'a\nb\nc\n', 'note1.md': 'one\n' }, 'add notes');
+  git(local, 'pull', '-q');
+  pushUpstream({ 'note[1].md': 'a\nb upstream\nc\n' });
+  write(local, 'note[1].md', 'a\nb local\nc\n');
+  write(local, 'note1.md', 'one\nlocal, not to be staged\n');
+
+  const { status, body } = pullVault(local);
+  expect(status).toBe(200);
+  expect(body.resolved).toEqual(['note[1].md']);
+  expect(staged()).toBe('');
+  expect(read(local, 'note1.md')).toBe('one\nlocal, not to be staged\n');
+});
+
+test('a conflict in a partly staged file is left unresolved, the stash kept', () => {
+  pushUpstream({ 'diary.md': 'line 1\nline 2 upstream\nline 3\n' });
+  write(local, 'diary.md', 'line 1\nline 2 staged\nline 3\n');
+  git(local, 'add', 'diary.md');
+  write(local, 'diary.md', 'line 1\nline 2 staged\nline 3\nunstaged\n');
+
+  const { status, body } = pullVault(local);
+  expect(status).toBe(500);
+  expect(body.error).toMatch(/both staged and unstaged edits.*diary\.md/);
+  expect(stashes()).toMatch(/Today: pull/);
+  expect(git(local, 'show', 'stash@{0}:diary.md')).toBe('line 1\nline 2 staged\nline 3\nunstaged\n');
+  expect(git(local, 'show', 'stash@{0}^2:diary.md')).toBe('line 1\nline 2 staged\nline 3\n');
+});
+
+test('an untracked symlink whose target matches the incoming file is renamed aside, not deleted', () => {
+  const target = path.join(dir, 'target.md');
+  fs.writeFileSync(target, 'from GitHub\n');
+  pushUpstream({ 'plans/new.md': 'from GitHub\n' });
+  fs.mkdirSync(path.join(local, 'plans'));
+  fs.symlinkSync(target, path.join(local, 'plans/new.md'));
+
+  const { status, body } = pullVault(local);
+  expect(status).toBe(200);
+  expect(body.setAside).toHaveLength(1);
+  const aside = path.join(local, body.setAside[0]);
+  expect(fs.lstatSync(aside).isSymbolicLink()).toBe(true);
+  expect(fs.readlinkSync(aside)).toBe(target);
+  expect(read(local, 'plans/new.md')).toBe('from GitHub\n');
+  expect(fs.lstatSync(path.join(local, 'plans/new.md')).isFile()).toBe(true);
+});
