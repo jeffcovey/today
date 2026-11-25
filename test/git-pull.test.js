@@ -210,3 +210,67 @@ test('a conflict in a non-ASCII filename is union-merged', () => {
   expect(merged).toContain('line 2 local');
   expect(stashes()).toBe('');
 });
+
+// Second review of #755.
+
+test('a conflict in a tracked symlink is left unresolved and the stash kept', () => {
+  const outside = path.join(dir, 'outside.txt');
+  fs.writeFileSync(outside, 'outside the vault\n');
+  fs.symlinkSync('one', path.join(up, 'link'));
+  git(up, 'add', '-A');
+  git(up, 'commit', '-q', '-m', 'link');
+  git(up, 'push', '-q', 'origin', 'main');
+  git(local, 'pull', '-q');
+  fs.unlinkSync(path.join(up, 'link'));
+  fs.symlinkSync('two', path.join(up, 'link'));
+  git(up, 'add', '-A');
+  git(up, 'commit', '-q', '-m', 'retarget');
+  git(up, 'push', '-q', 'origin', 'main');
+  fs.unlinkSync(path.join(local, 'link'));
+  fs.symlinkSync(outside, path.join(local, 'link'));
+
+  const { status, body } = pullVault(local);
+  expect(status).toBe(500);
+  expect(body.error).toMatch(/Unresolved: link/);
+  expect(fs.readFileSync(outside, 'utf8')).toBe('outside the vault\n');
+  expect(stashes()).toMatch(/Today: pull/);
+});
+
+test('with pull.rebase, only the changed tracked files are stashed; untracked blockers are set aside', () => {
+  git(local, 'config', 'pull.rebase', 'true');
+  pushUpstream({ 'notes.md': 'notes\nmore\n', 'plans/new.md': 'from GitHub\n' });
+  write(local, 'diary.md', 'line 0 local\nline 1\nline 2\nline 3\n');
+  write(local, 'plans/new.md', 'my own version\n');
+  write(local, 'unrelated.md', 'keep me\n');
+
+  // Stashing untracked files (which reads every one, iCloud placeholders
+  // included) must not happen.
+  const { status, body } = pullVault(local, failOn('*include-untracked*|*--all*'));
+  expect(status).toBe(200);
+  expect(body).toMatchObject({ ok: true, stashed: true });
+  expect(read(local, 'notes.md')).toBe('notes\nmore\n');
+  expect(read(local, 'diary.md')).toBe('line 0 local\nline 1\nline 2\nline 3\n');
+  expect(read(local, 'plans/new.md')).toBe('from GitHub\n');
+  expect(body.setAside).toHaveLength(1);
+  expect(read(local, body.setAside[0])).toBe('my own version\n');
+  expect(read(local, 'unrelated.md')).toBe('keep me\n');
+  expect(stashes()).toBe('');
+});
+
+test('after a conflicted pop, cleanly merged files are unstaged too; earlier staging is kept', () => {
+  pushUpstream({
+    'diary.md': 'line 1\nline 2 upstream\nline 3\n',
+    'notes.md': 'notes\nupstream end\n'
+  });
+  write(local, 'diary.md', 'line 1\nline 2 local\nline 3\n'); // conflicts
+  write(local, 'notes.md', 'local start\nnotes\n'); // merges cleanly
+  write(local, 'staged.md', 'staged before the pull\n');
+  git(local, 'add', 'staged.md');
+
+  const { status, body } = pullVault(local);
+  expect(status).toBe(200);
+  expect(body.resolved).toEqual(['diary.md']);
+  expect(read(local, 'notes.md')).toBe('local start\nnotes\nupstream end\n');
+  expect(staged().trim().split('\n')).toEqual(['staged.md']);
+  expect(stashes()).toBe('');
+});

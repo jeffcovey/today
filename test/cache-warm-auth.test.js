@@ -34,3 +34,9 @@ describe('warmToken', () => {
     expect(warmToken(SECRET)).toMatch(/^[0-9a-f]{64}$/);
   });
 });
+
+test('a token with as many characters but more bytes is refused, not thrown on', () => {
+  const token = 'é'.repeat(warmToken(SECRET).length);
+  expect(() => warmRequestAllowed('172.18.0.5', token, SECRET)).not.toThrow();
+  expect(warmRequestAllowed('172.18.0.5', token, SECRET)).toBe(false);
+});

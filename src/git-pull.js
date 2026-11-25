@@ -93,32 +93,55 @@ export function pullVault(repoPath, { gitBinary = 'git' } = {}) {
   // skips the stashed edits too. If the local copy matches what's arriving
   // (common when iCloud or Unison already delivered it), remove it and let
   // the pull bring it back; otherwise keep it as "<name>.local-<time>".
-  try {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    for (const file of untracked) {
-      let incoming = '';
-      try { incoming = git(['rev-parse', '@{upstream}:' + file]).trim(); } catch {}
-      const local = git(['hash-object', '--', file]).trim();
-      if (incoming && incoming === local) {
-        const { mode } = fs.statSync(path.join(repoPath, file));
-        fs.rmSync(path.join(repoPath, file));
-        removed.push({ file, blob: incoming, mode });
-      } else {
-        const aside = `${file}.local-${stamp}`;
-        fs.renameSync(path.join(repoPath, file), path.join(repoPath, aside));
-        setAside.push(aside);
-        movedAside.push({ file, aside });
+  // Returns an error response if that fails (after putting files back).
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const moveUntrackedAside = (files) => {
+    try {
+      for (const file of files) {
+        let incoming = '';
+        try { incoming = git(['rev-parse', '@{upstream}:' + file]).trim(); } catch {}
+        const local = git(['hash-object', '--', file]).trim();
+        if (incoming && incoming === local) {
+          const { mode } = fs.statSync(path.join(repoPath, file));
+          fs.rmSync(path.join(repoPath, file));
+          removed.push({ file, blob: incoming, mode });
+        } else {
+          const aside = `${file}.local-${stamp}`;
+          fs.renameSync(path.join(repoPath, file), path.join(repoPath, aside));
+          setAside.push(aside);
+          movedAside.push({ file, aside });
+        }
       }
+      return null;
+    } catch (prepErr) {
+      const note = restoreUntracked();
+      const why = String(prepErr.stderr || '').trim() || prepErr.message || 'unknown error';
+      const hint = placeholderHint(why);
+      return { status: 500, body: { error: `Pull was blocked by local files, and setting them aside failed:\n${why}${hint ? '\n\n' + hint : ''}${note}`, setAside } };
     }
-  } catch (prepErr) {
-    const note = restoreUntracked();
-    const why = String(prepErr.stderr || '').trim() || prepErr.message || 'unknown error';
-    const hint = placeholderHint(why);
-    return { status: 500, body: { error: `Pull was blocked by local files, and setting them aside failed:\n${why}${hint ? '\n\n' + hint : ''}${note}`, setAside } };
+  };
+
+  const prepFailed = moveUntrackedAside(untracked);
+  if (prepFailed) return prepFailed;
+
+  // The tracked files to stash. When git didn't name them ("cannot pull
+  // with rebase: You have unstaged changes"), ask it which tracked files
+  // have local changes, rather than stashing everything (which would read
+  // every untracked file too).
+  let toStash = changed;
+  if (!listed) {
+    const names = (args) => git(args).split('\0').filter(Boolean);
+    try {
+      toStash = [...new Set([...names(['diff', '--name-only', '-z']), ...names(['diff', '--cached', '--name-only', '-z'])])];
+    } catch (diffErr) {
+      return { status: 500, body: { error: `Pull was blocked by local changes, and listing them failed:\n${String(diffErr.stderr || '').trim() || diffErr.message}\n\nOriginal pull error:\n${pullErr.stderr || ''}`, setAside } };
+    }
   }
 
-  if (listed && changed.length === 0) {
-    // Only untracked files were in the way, and they're handled.
+  if (toStash.length === 0) {
+    // Only untracked files were in the way, and they're handled (or git
+    // named nothing we can move: report its error).
+    if (!listed) return { status: 500, body: { error: String(pullErr.stderr || '') || 'Failed to pull', setAside } };
     try {
       git(PULL);
       return { status: 200, body: { ok: true, setAside } };
@@ -128,11 +151,13 @@ export function pullVault(repoPath, { gitBinary = 'git' } = {}) {
     }
   }
 
-  const stashArgs = listed
-    ? ['--literal-pathspecs', 'stash', 'push', '-m', 'Today: pull', '--', ...changed]
-    : ['stash', 'push', '--include-untracked', '-m', 'Today: pull'];
+  // What was staged before, so the files re-applied below can be returned
+  // to exactly that state.
+  let stagedBefore = [];
+  try { stagedBefore = git(['diff', '--cached', '--name-only', '-z']).split('\0').filter(Boolean); } catch {}
+
   try {
-    git(stashArgs);
+    git(['--literal-pathspecs', 'stash', 'push', '-m', 'Today: pull', '--', ...toStash]);
   } catch (stashErr) {
     const note = restoreUntracked();
     const why = String(stashErr.stderr || '').trim() || stashErr.message || 'unknown error';
@@ -140,13 +165,30 @@ export function pullVault(repoPath, { gitBinary = 'git' } = {}) {
     return { status: 500, body: { error: `Pull was blocked by local changes, and stashing them failed:\n${why}${hint ? '\n\n' + hint : ''}\n\nOriginal pull error:\n${pullErr.stderr || ''}${note}`, setAside } };
   }
 
-  try {
-    git(PULL);
-  } catch (retryErr) {
+  const retryFailed = (retryErr) => {
     // Pull still failed after the stash: put the changes back and report.
     try { git(['stash', 'pop']); } catch {}
     const note = restoreUntracked();
     return { status: 500, body: { error: (String(retryErr.stderr || '') || 'Pull failed even after stashing changes') + note, setAside } };
+  };
+  try {
+    git(PULL);
+  } catch (retryErr) {
+    // With the tracked changes out of the way, git may now name untracked
+    // files that are in the way (it checks those later, e.g. when
+    // rebasing): set those aside too and try once more.
+    const more = pathsBlockingPull(retryErr.stderr).untracked;
+    if (listed || more.length === 0) return retryFailed(retryErr);
+    const morePrepFailed = moveUntrackedAside(more);
+    if (morePrepFailed) {
+      try { git(['stash', 'pop']); } catch {}
+      return morePrepFailed;
+    }
+    try {
+      git(PULL);
+    } catch (againErr) {
+      return retryFailed(againErr);
+    }
   }
 
   const resolved = [];
@@ -175,7 +217,16 @@ export function pullVault(repoPath, { gitBinary = 'git' } = {}) {
           // If it fails (a binary file, say), the error goes to the catch
           // below: the file stays unresolved and the stash is kept.
           execFileSync(gitBinary, ['merge-file', '--union', ours, base, theirs], { cwd: repoPath, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-          fs.copyFileSync(ours, path.join(repoPath, file));
+          // Only ordinary files: copying onto a symlink would write to
+          // wherever it points, perhaps outside the vault. Anything else
+          // stays unresolved, and the stash is kept.
+          const modes = git(['ls-files', '-s', '-z', '--', file]).split('\0').filter(Boolean).map(entry => entry.split(' ')[0]);
+          if (modes.some(mode => mode !== '100644' && mode !== '100755')) throw new Error('not a regular file in git (mode ' + modes.join(', ') + ')');
+          const target = path.join(repoPath, file);
+          let stat = null;
+          try { stat = fs.lstatSync(target); } catch {}
+          if (stat && !stat.isFile()) throw new Error('not a regular file in the working tree');
+          fs.copyFileSync(ours, target);
           git(['add', '--', file]);
           resolved.push(file);
         } catch (e) {
@@ -191,10 +242,16 @@ export function pullVault(repoPath, { gitBinary = 'git' } = {}) {
       const why = String(popErr.stderr || '').trim() || popErr.message;
       return { status: 500, body: { error: `Pulled, but re-applying your local changes failed. They are kept in the git stash ("Today: pull"); restore them with git stash pop.\n${unresolved.length ? '\nUnresolved: ' + unresolved.join(', ') + '\n' : ''}\n${why}`, setAside } };
     }
-    // All resolved: the stash entry is no longer needed, and the resolved
-    // files go back to being ordinary local changes.
+    // All resolved: the stash entry is no longer needed. A conflicted pop
+    // leaves every re-applied file staged, the cleanly merged ones too, so
+    // unstage all of them except what was staged before the pull.
+    let reapplied = [];
+    try { reapplied = git(['stash', 'show', '--name-only', '-z', 'stash@{0}']).split('\0').filter(Boolean); } catch {}
     try { git(['stash', 'drop']); } catch {}
-    try { git(['--literal-pathspecs', 'reset', '-q', '--', ...resolved]); } catch {}
+    const unstage = [...new Set([...reapplied, ...resolved])].filter(f => !stagedBefore.includes(f));
+    if (unstage.length) {
+      try { git(['--literal-pathspecs', 'reset', '-q', '--', ...unstage]); } catch {}
+    }
   }
   return { status: 200, body: { ok: true, stashed: true, resolved, setAside } };
 }

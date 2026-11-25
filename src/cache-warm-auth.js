@@ -26,6 +26,11 @@ export function warmToken(sessionSecret) {
 export function warmRequestAllowed(remoteAddress, token, sessionSecret) {
   if (LOCAL_ADDRESSES.has(remoteAddress || '')) return true;
   const expected = warmToken(sessionSecret);
-  if (!expected || typeof token !== 'string' || token.length !== expected.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected));
+  if (!expected || typeof token !== 'string') return false;
+  // timingSafeEqual needs equal byte lengths; a header's character count
+  // isn't its UTF-8 byte count.
+  const given = Buffer.from(token, 'utf8');
+  const wanted = Buffer.from(expected, 'utf8');
+  if (given.length !== wanted.length) return false;
+  return crypto.timingSafeEqual(given, wanted);
 }
