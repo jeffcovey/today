@@ -113,3 +113,100 @@ test('a failure stashing cannot fix is reported without touching the vault', () 
   expect(read(local, 'unrelated.md')).toBe('keep me\n');
   expect(stashes()).toBe('');
 });
+
+// Review fixes for PR #755.
+
+// A git that fails on cue: a shell script that runs `caseArms` (arms of a
+// `case "$*"` over its arguments) and then the real git. (File permissions
+// won't do for failures, since tests may run as root.)
+const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
+const fakeGit = (caseArms) => {
+  const file = path.join(dir, 'fake-git');
+  fs.writeFileSync(file, `#!/bin/sh\ncase "$*" in\n${caseArms}\nesac\nexec "${realGit}" "$@"\n`, { mode: 0o755 });
+  return { gitBinary: file };
+};
+const failOn = (pattern) => fakeGit(`${pattern}) echo "fatal: injected failure" >&2; exit 1;;`);
+
+test('a removed identical file is put back when setting the others aside fails', () => {
+  pushUpstream({ 'plans/a.md': 'same\n', 'plans/b.md': 'from GitHub\n' });
+  write(local, 'plans/a.md', 'same\n'); // identical: removed first
+  write(local, 'plans/b.md', 'my own version\n');
+
+  const { status, body } = pullVault(local, failOn("'hash-object -- plans/b.md'"));
+  expect(status).toBe(500);
+  expect(body.error).toMatch(/setting them aside failed/);
+  expect(read(local, 'plans/a.md')).toBe('same\n');
+  expect(read(local, 'plans/b.md')).toBe('my own version\n');
+  expect(body.setAside).toEqual([]);
+});
+
+test('removed and renamed untracked files are put back when stashing fails', () => {
+  pushUpstream({
+    'diary.md': 'line 1\nline 2\nline 3\nline 4 upstream\n',
+    'plans/a.md': 'same\n',
+    'plans/b.md': 'from GitHub\n'
+  });
+  write(local, 'plans/a.md', 'same\n');
+  write(local, 'plans/b.md', 'my own version\n');
+  write(local, 'diary.md', 'line 0 local\nline 1\nline 2\nline 3\n');
+
+  const { status, body } = pullVault(local, failOn("*'stash push'*"));
+  expect(status).toBe(500);
+  expect(body.error).toMatch(/stashing them failed/);
+  expect(body.setAside).toEqual([]);
+  expect(read(local, 'plans/a.md')).toBe('same\n');
+  expect(read(local, 'plans/b.md')).toBe('my own version\n');
+  expect(fs.readdirSync(path.join(local, 'plans')).sort()).toEqual(['a.md', 'b.md']);
+  expect(read(local, 'diary.md')).toBe('line 0 local\nline 1\nline 2\nline 3\n');
+});
+
+test('untracked files are put back when the retried pull fails', () => {
+  pushUpstream({ 'plans/a.md': 'same\n', 'plans/b.md': 'from GitHub\n' });
+  write(local, 'plans/a.md', 'same\n');
+  write(local, 'plans/b.md', 'my own version\n');
+  // The first pull really runs (and is blocked by the files); the retry,
+  // which only happens once they've been moved, fails.
+  const { status, body } = pullVault(local, fakeGit(
+    `*pull*) [ -e plans/a.md ] || { echo "fatal: network down" >&2; exit 1; };;`
+  ));
+  expect(status).toBe(500);
+  expect(body.error).toMatch(/network down/);
+  expect(body.setAside).toEqual([]);
+  expect(read(local, 'plans/a.md')).toBe('same\n');
+  expect(read(local, 'plans/b.md')).toBe('my own version\n');
+});
+
+test('a conflict merge-file cannot merge (binary) keeps the local edit in the stash', () => {
+  write(up, 'photo.bin', Buffer.from([0, 1, 2, 3, 0, 10, 0]));
+  git(up, 'add', '-A');
+  git(up, 'commit', '-q', '-m', 'binary');
+  git(up, 'push', '-q', 'origin', 'main');
+  git(local, 'pull', '-q');
+  pushUpstream({ 'photo.bin': Buffer.from([0, 9, 9, 9, 0, 10, 0]) });
+  const mine = Buffer.from([0, 7, 7, 7, 0, 10, 0]);
+  fs.writeFileSync(path.join(local, 'photo.bin'), mine);
+
+  const { status, body } = pullVault(local);
+  expect(status).toBe(500);
+  expect(body.error).toMatch(/kept in the git stash/);
+  expect(body.error).toMatch(/Unresolved: photo\.bin/);
+  expect(stashes()).toMatch(/Today: pull/);
+  const stashed = execFileSync('git', ['show', 'stash@{0}:photo.bin'], { cwd: local });
+  expect(Buffer.compare(stashed, mine)).toBe(0);
+});
+
+test('a conflict in a non-ASCII filename is union-merged', () => {
+  const file = '日記.md';
+  pushUpstream({ [file]: 'line 1\nline 2\nline 3\n' }, 'add diary');
+  git(local, 'pull', '-q');
+  pushUpstream({ [file]: 'line 1\nline 2 upstream\nline 3\n' });
+  write(local, file, 'line 1\nline 2 local\nline 3\n');
+
+  const { status, body } = pullVault(local);
+  expect(status).toBe(200);
+  expect(body).toMatchObject({ ok: true, stashed: true, resolved: [file] });
+  const merged = read(local, file);
+  expect(merged).toContain('line 2 upstream');
+  expect(merged).toContain('line 2 local');
+  expect(stashes()).toBe('');
+});

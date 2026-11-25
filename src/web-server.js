@@ -6739,6 +6739,23 @@ app.get('/_git', authMiddleware, async (req, res) => {
       }
     }
 
+    // The alert text for a Pull result, or '' when there's nothing to say.
+    // Files set aside are listed on failure too, since they've moved.
+    function pullResultMessage(data) {
+      const aside = data.setAside && data.setAside.length > 0 ? data.setAside.join('\\n') : '';
+      if (data.error) {
+        return aside ? data.error + '\\n\\nYour copies of these files were moved aside and kept as:\\n' + aside : data.error;
+      }
+      const notes = [];
+      if (data.resolved && data.resolved.length > 0) {
+        notes.push('Conflicts in ' + data.resolved.length + ' file(s) were auto-resolved (union merge):\\n' + data.resolved.join('\\n'));
+      } else if (data.stashed) {
+        notes.push('Local changes were stashed and re-applied.');
+      }
+      if (aside) notes.push('Your copies of these files differed from the pulled versions and were kept as:\\n' + aside);
+      return notes.length ? 'Pull succeeded.\\n\\n' + notes.join('\\n\\n') : '';
+    }
+
     async function gitPull() {
       const btn = document.getElementById('pullBtn');
       if (!btn) return;
@@ -6746,17 +6763,9 @@ app.get('/_git', authMiddleware, async (req, res) => {
       btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Pulling...';
       try {
         const data = await postGit('/_git/pull', {});
-        if (data.error) { alert(data.error); return; }
-        const notes = [];
-        if (data.resolved && data.resolved.length > 0) {
-          notes.push('Conflicts in ' + data.resolved.length + ' file(s) were auto-resolved (union merge):\\n' + data.resolved.join('\\n'));
-        } else if (data.stashed) {
-          notes.push('Local changes were stashed and re-applied.');
-        }
-        if (data.setAside && data.setAside.length > 0) {
-          notes.push('Your copies of these files differed from the pulled versions and were kept as:\\n' + data.setAside.join('\\n'));
-        }
-        if (notes.length) alert('Pull succeeded.\\n\\n' + notes.join('\\n\\n'));
+        const message = pullResultMessage(data);
+        if (data.error) { alert(message); return; }
+        if (message) alert(message);
         location.reload();
       } catch (err) {
         alert('Pull failed: ' + err.message);
