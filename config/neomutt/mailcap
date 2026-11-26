@@ -1,0 +1,5 @@
+# Used by NeoMutt in Today's containers (config: vault/today/neomuttrc); the image links ~/.mailcap here.
+# Viewing an HTML attachment opens it in lynx, where links can be followed.
+text/html; lynx -assume_charset=%{charset} -display_charset=utf-8 -force_html %s; needsterminal; nametemplate=%s.html
+# Inline display of HTML mail (auto_view), as on the Droplet: lynx -dump.
+text/html; lynx -assume_charset=%{charset} -display_charset=utf-8 -force_html -dump %s; copiousoutput; nametemplate=%s.html
