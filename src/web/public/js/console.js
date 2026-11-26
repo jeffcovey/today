@@ -7,7 +7,9 @@
   if (!container || !statusEl || !reconnectBtn || typeof Terminal === 'undefined') return;
 
   const socketPath = (document.currentScript && document.currentScript.dataset.socketPath) || '/_console/socket';
-  const socketUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + socketPath;
+  const socketCommand = document.currentScript && document.currentScript.dataset.command;
+  const socketUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + socketPath +
+    (socketCommand ? '?command=' + encodeURIComponent(socketCommand) : '');
 
   // xterm.js has one set of these for both modes, and it can't read well on both.
   // minimumContrastRatio would be simpler, but it greys out reverse-video text.

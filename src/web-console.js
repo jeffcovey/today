@@ -204,6 +204,14 @@ export function attachConsole(server, {
         return;
       }
 
+      // A ?command= query param on the WebSocket URL overrides the configured
+      // startup command for this connection only (e.g. from the Focus tab).
+      const upgradeParams = new URL(req.url, 'http://localhost').searchParams;
+      const commandOverride = upgradeParams.get('command');
+      if (commandOverride) {
+        config = { ...config, command: commandOverride.replace(/[\r\n]+/g, ' ').trim() };
+      }
+
       let authenticated = false;
       try {
         authenticated = await authenticate(req, { bearerOnly: !hasOrigin });

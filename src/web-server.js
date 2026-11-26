@@ -38,7 +38,7 @@ import { getDatabase } from './database-service.js';
 import { replaceTagsWithEmojis } from './tag-emoji-mappings.js';
 import { convertEmojisToIcons } from './emoji-mappings.js';
 import { getMarkdownFileCache } from './markdown-file-cache.js';
-import { getAbsoluteVaultPath, getAppDirectory, getConfig, getPublicBaseUrl, getVaultPath } from './config.js';
+import { getAbsoluteVaultPath, getAppDirectory, getConfig, getFocusPresets, getPublicBaseUrl, getVaultPath } from './config.js';
 import { formatDate, formatDisplayDate, getDayName, getTodayDate } from './date-utils.js';
 import { RECURRENCE_TERMINATOR_PATTERN, toggleTaskInLines } from './task-toggle.js';
 import { isPluginConfigured, getPluginSources, getPlugin, applyPluginSettingsDefaults } from './plugin-loader.js';
@@ -2079,7 +2079,7 @@ function renderMomentPanel(displayName, stageNames, links = []) {
 // plugin: that arrives from a CDN, and a card whose only content is behind a
 // tab should not depend on a third-party script to open.
 function renderHomeTabCard(tabs, links = null) {
-  const nav = tabs.map((tab, index) => `
+  const renderTab = (tab, index) => `
             <li class="nav-item" role="presentation">
               <button type="button" role="tab" id="homeTab-${tab.id}" data-home-tab="${tab.id}"
                 class="nav-link${index === 0 ? ' active' : ''}"
@@ -2087,7 +2087,10 @@ function renderHomeTabCard(tabs, links = null) {
                 tabindex="${index === 0 ? '0' : '-1'}" onclick="selectHomeTab('${tab.id}')">
                 <i class="fas ${tab.icon} me-2" aria-hidden="true"></i>${tab.label}
               </button>
-            </li>`).join('');
+            </li>`;
+  // A trailing tab sits after the links, at the far end of the row.
+  const nav = tabs.map((tab, index) => (tab.trailing ? '' : renderTab(tab, index))).join('');
+  const trailingNav = tabs.map((tab, index) => (tab.trailing ? renderTab(tab, index) : '')).join('');
 
   // Deliberately a second list, outside the tablist. These leave the page
   // rather than swapping a panel, and a link inside role="tablist" would tell
@@ -2112,6 +2115,8 @@ function renderHomeTabCard(tabs, links = null) {
             <ul class="nav home-tabs" role="tablist" onkeydown="moveHomeTab(event)">${nav}
             </ul>${linkNav ? `
             <ul class="nav home-tabs home-tab-links">${linkNav}
+            </ul>` : ''}${trailingNav ? `
+            <ul class="nav home-tabs" role="tablist" onkeydown="moveHomeTab(event)">${trailingNav}
             </ul>` : ''}
           </div>${panels}
         </div>`;
@@ -2340,6 +2345,33 @@ async function renderDirectory(dirPath, urlPath) {
                   </div>
                 </div>`
     });
+
+    if (getConsoleConfig().enabled) {
+      let focusBody = `
+                <div class="list-group list-group-flush" id="focusList">
+                  <div class="list-group-item focus-custom-item">
+                    <div class="d-flex align-items-start gap-2 py-1">
+                      <i class="fas fa-terminal text-muted mt-1 flex-shrink-0" aria-hidden="true"></i>
+                      <div class="flex-grow-1">
+                        <textarea id="focusCustomCommand" class="form-control form-control-sm mb-2"
+                          placeholder="Optional command or question (leave blank for a general session)" rows="2"
+                          style="resize:vertical"></textarea>
+                        <button class="btn btn-sm btn-outline-primary" type="button"
+                          onclick="openFocusConsole('')">Open Today</button>
+                      </div>
+                    </div>
+                  </div>`;
+      for (const [name, preset] of Object.entries(getFocusPresets())) {
+        focusBody += `
+                  <button type="button" class="list-group-item list-group-item-action focus-preset-item"
+                    onclick="openFocusConsole(${escapeHtmlEntities(JSON.stringify(name))})">
+                    <i class="fas fa-crosshairs text-muted me-2" aria-hidden="true"></i>${escapeHtmlEntities(preset.description || name)}
+                  </button>`;
+      }
+      focusBody += `
+                </div>`;
+      homeTabs.push({ id: 'focus', label: 'Focus', icon: 'fa-crosshairs', body: focusBody, trailing: true });
+    }
   }
   
   let listingHtml = '';
@@ -6253,6 +6285,8 @@ app.get(CONSOLE_PATH, authMiddleware, async (req, res) => {
       'The console is switched off. Add a [console] section with enabled = true to config.toml to turn it on.'));
     return;
   }
+  const consoleCommand = typeof req.query.command === 'string' ? req.query.command.replace(/[\r\n]+/g, ' ').trim() : '';
+  const commandAttr = consoleCommand ? ` data-command="${escapeHtmlEntities(consoleCommand)}"` : '';
   res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6272,7 +6306,7 @@ app.get(CONSOLE_PATH, authMiddleware, async (req, res) => {
   <script src="${CONSOLE_PATH}/vendor/xterm/lib/xterm.js"></script>
   <script src="${CONSOLE_PATH}/vendor/addon-fit/lib/addon-fit.js"></script>
   <script src="${CONSOLE_PATH}/vendor/addon-web-links/lib/addon-web-links.js"></script>
-  <script src="/static/js/console.js?v=${STATIC_VERSION}" data-socket-path="${CONSOLE_SOCKET_PATH}"></script>
+  <script src="/static/js/console.js?v=${STATIC_VERSION}" data-socket-path="${CONSOLE_SOCKET_PATH}"${commandAttr}></script>
   ${pageScripts}
 </body>
 </html>`);

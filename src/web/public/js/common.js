@@ -982,6 +982,22 @@ function moveHomeTab(event) {
   tabs[next].focus();
 }
 
+function openFocusConsole(presetName) {
+  const extra = presetName ? '' : (document.getElementById('focusCustomCommand')?.value.trim() || '');
+  let cmd;
+  if (presetName) {
+    cmd = 'bin/today --focus ' + presetName + ' --no-sync';
+  } else {
+    cmd = extra ? 'bin/today --no-sync ' + extra : 'bin/today --no-sync';
+  }
+  const name = presetName || 'today';
+  // Use single-quote shell quoting: replace each ' with '"'"'
+  const shellQuote = (s) => "'" + s.replace(/'/g, "'\"'\"'") + "'";
+  const shellCmd = 'tmux has-session 2>/dev/null && tmux new-window -n ' + shellQuote(name) +
+    ' ' + shellQuote(cmd) + ' && tmux attach || ' + cmd;
+  window.location.href = '/_console?command=' + encodeURIComponent(shellCmd);
+}
+
 function toggleCollapse(sectionId) {
   const section = document.getElementById(sectionId);
   if (!section) return;
