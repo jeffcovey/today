@@ -1,8 +1,9 @@
 /**
  * data-graphing: how a chart is built from query rows.
  *
- * The plugin draws line graphs (bars only on request), leaves out a partial
- * first month, marks an amount still adding up with a dashed segment, and
+ * The plugin draws line graphs (bars only on request) of finished periods
+ * only: no partial first month, and no amount for the day or month still
+ * under way unless include_current asks for it, as a dashed segment. It
  * writes SVG that carries its own dark palette.
  */
 
@@ -125,7 +126,7 @@ describe('periods with nothing in them', () => {
   test('a month with no transactions is a zero month', () => {
     const data = prepareData(
       [{ metric: 'Expenses', rows: [day('2026-09', 100), day('2026-11', 50)] }],
-      { today: '2026-11-22', timePeriod: '3 months', additive: true, zeroFill: true }
+      { today: '2026-11-22', timePeriod: '3 months', additive: true, zeroFill: true, includeCurrent: true }
     );
     expect(data.points.map(p => [p.date, p.value])).toEqual([
       ['2026-09-01', 100], ['2026-10-01', 0], ['2026-11-01', 50]
@@ -159,14 +160,61 @@ describe('prepareData', () => {
     expect(data.monthly).toBe(true);
     expect(data.skippedPartial).toBe(true);
     expect(data.start).toBe('2025-12-01');
-    expect(data.points.map(p => p.date)).toEqual(['2025-12-01', '2026-10-01', '2026-11-01']);
-    expect(data.points.map(p => p.partial)).toEqual([false, false, true]);
     expect(data.points[0].label).toBe("Dec '25");
+  });
+
+  test('amounts end at the last finished day or month', () => {
+    const months = ['2026-09', '2026-10', '2026-11'].map(m => day(m, 100));
+    const monthly = prepareData([{ metric: 'Income', rows: months }], { today: '2026-11-22', timePeriod: '3 months', additive: true });
+    expect(monthly.points.map(p => p.date)).toEqual(['2026-09-01', '2026-10-01']);
+    expect(monthly.end).toBe('2026-10-01');
+
+    const steps = prepareData([{ metric: 'Steps', rows: days('2026-11-20', 3, () => 5000) }], { today: '2026-11-22', timePeriod: '30 days', additive: true });
+    expect(steps.points.map(p => p.date)).toEqual(['2026-11-20', '2026-11-21']);
+    expect(steps.end).toBe('2026-11-21');
+    expect(steps.points.some(p => p.partial)).toBe(false);
+  });
+
+  test('a reading taken today is complete and stays', () => {
+    const weight = prepareData([{ metric: 'Weight', rows: days('2026-11-20', 3, () => 168) }], { today: '2026-11-22', timePeriod: '30 days', additive: false });
+    expect(weight.points.map(p => p.date)).toEqual(['2026-11-20', '2026-11-21', '2026-11-22']);
+    expect(weight.end).toBe('2026-11-22');
+  });
+
+  test('a chart of a reading and an amount cuts each series on its own', () => {
+    const spec = buildSpec({
+      datasets: [
+        { metric: 'Weight', units: 'lb', rows: days('2026-11-20', 3, () => 168).map(r => ({ ...r, units: 'lb' })) },
+        { metric: 'Steps', units: 'count', rows: days('2026-11-20', 3, () => 5000).map(r => ({ ...r, units: 'count' })) }
+      ],
+      settings: { ...baseSettings, metrics: ['Weight', 'Steps'] },
+      today: '2026-11-22'
+    });
+    const values = spec.layer[0].data.values;
+    const datesOf = (series) => values.filter(v => v.series === series).map(v => v.date);
+    expect(datesOf('Weight')).toEqual(['2026-11-20', '2026-11-21', '2026-11-22']);
+    expect(datesOf('Steps')).toEqual(['2026-11-20', '2026-11-21']);
+    expect(values.some(v => v.partial)).toBe(false);
+  });
+
+  test('with include_current, only the amount is marked partial', () => {
+    const data = prepareData([
+      { metric: 'Weight', additive: false, rows: days('2026-11-21', 2, () => 168) },
+      { metric: 'Steps', additive: true, rows: days('2026-11-21', 2, () => 5000) }
+    ], { today: '2026-11-22', timePeriod: '30 days', includeCurrent: true });
+    expect(data.points.filter(p => p.partial).map(p => p.series)).toEqual(['Steps']);
+    expect(data.end).toBe('2026-11-22');
+  });
+
+  test('include_current draws the period under way, marked partial', () => {
+    const rows = ['2026-10', '2026-11'].map(m => day(m, 100));
+    const data = prepareData([{ metric: 'Income', rows }], { today: '2026-11-22', timePeriod: '3 months', additive: true, includeCurrent: true });
+    expect(data.points.map(p => [p.date, p.partial])).toEqual([['2026-10-01', false], ['2026-11-01', true]]);
   });
 
   test("today's amount is partial; a reading is not", () => {
     const rows = days('2026-11-20', 3, () => 5000);
-    const steps = prepareData([{ metric: 'Steps', rows }], { today: '2026-11-22', timePeriod: '30 days', additive: true });
+    const steps = prepareData([{ metric: 'Steps', rows }], { today: '2026-11-22', timePeriod: '30 days', additive: true, includeCurrent: true });
     expect(steps.points.map(p => p.partial)).toEqual([false, false, true]);
     const weight = prepareData([{ metric: 'Weight', rows }], { today: '2026-11-22', timePeriod: '30 days', additive: false });
     expect(weight.points.some(p => p.partial)).toBe(false);
@@ -174,7 +222,7 @@ describe('prepareData', () => {
 
   test('daily data starting late moves the axis start up, but never the end', () => {
     const rows = days('2026-11-01', 5, () => 1);
-    const data = prepareData([{ metric: 'Steps', rows }], { today: '2026-11-22', timePeriod: '6 months', additive: true });
+    const data = prepareData([{ metric: 'Weight', rows }], { today: '2026-11-22', timePeriod: '6 months', additive: false });
     expect(data.start).toBe('2026-11-01');
     expect(data.end).toBe('2026-11-22');
   });
@@ -203,7 +251,7 @@ describe('prepareData', () => {
 
   test('a partial day stays out of the average', () => {
     const rows = [...days('2026-11-12', 10, () => 8000), day('2026-11-22', 100)];
-    const data = prepareData([{ metric: 'Steps', rows }], { today: '2026-11-22', timePeriod: '30 days', additive: true, averageDays: 7 });
+    const data = prepareData([{ metric: 'Steps', rows }], { today: '2026-11-22', timePeriod: '30 days', additive: true, averageDays: 7, includeCurrent: true });
     expect(data.points.find(p => p.date === '2026-11-21').average).toBe(8000);
     expect(data.points.find(p => p.date === '2026-11-22').average).toBeUndefined();
   });
@@ -289,10 +337,23 @@ describe('buildSpec renders', () => {
 
   const marks = (spec) => spec.layer.flatMap(l => (l.layer ? l.layer.map(m => m.mark.type) : [l.mark.type]));
 
-  test('daily amounts: a line, a dashed reach to today, a goal line', async () => {
+  test('daily amounts end yesterday', async () => {
     const spec = buildSpec({
       datasets: [{ metric: 'Steps', units: 'count', rows: days('2026-10-24', 30, i => 4000 + i * 200) }],
-      settings: { ...baseSettings, metrics: ['Steps'], goal: 8000 },
+      settings: { ...baseSettings, metrics: ['Steps'] },
+      today: '2026-11-22'
+    });
+    const values = spec.layer[0].data.values;
+    expect(values[values.length - 1].date).toBe('2026-11-21');
+    expect(values.some(v => v.seg === 'partial')).toBe(false);
+    const svg = await render(spec);
+    expect(svg).not.toContain('so far');
+  });
+
+  test('with include_current: a line, a dashed reach to today, a goal line', async () => {
+    const spec = buildSpec({
+      datasets: [{ metric: 'Steps', units: 'count', rows: days('2026-10-24', 30, i => 4000 + i * 200) }],
+      settings: { ...baseSettings, metrics: ['Steps'], goal: 8000, includeCurrent: true },
       today: '2026-11-22'
     });
     const line = spec.layer[0];
@@ -330,7 +391,7 @@ describe('buildSpec renders', () => {
   test('chart_type = "bar" still draws slim bars', async () => {
     const spec = buildSpec({
       datasets: [{ metric: 'Steps', units: 'count', rows: days('2026-10-24', 30, () => 5000) }],
-      settings: { ...baseSettings, metrics: ['Steps'], chartType: 'bar' },
+      settings: { ...baseSettings, metrics: ['Steps'], chartType: 'bar', includeCurrent: true },
       today: '2026-11-22'
     });
     expect(spec.layer[0].mark.type).toBe('bar');

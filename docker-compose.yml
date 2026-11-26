@@ -20,6 +20,8 @@ services:
       - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY:-}
       - SKIP_DEP_CHECK=${SKIP_DEP_CHECK:-false}
       - OLLAMA_HOST=http://ollama:11434
+      # Where Today's AI calls reach Ollama when [ai] provider = "ollama"
+      - OLLAMA_BASE_URL=http://ollama:11434
     volumes:
       # Mount the entire project directory
       - ${HOST_PROJECT_PATH:-.}:/app
@@ -29,6 +31,12 @@ services:
       - /app/node_modules
       # Mount SSH directory for git operations (read-only)
       - ${HOST_HOME:-~}/.ssh:/root/.ssh:ro
+      # GitHub CLI login for the GitHub plugins (they use gh's own login, not
+      # tokens in .env, and need the `project` scope). Kept apart from the
+      # host's ~/.config/gh; empty if missing, which leaves gh logged out.
+      - ${TODAY_GH_CONFIG:-${HOST_HOME:-~}/.config/today-gh}:/root/.config/gh
+      # Claude Code's settings and sessions (CLAUDE_CONFIG_DIR in the image)
+      - claude-home:/root/.claude
       # Mount Claude CLI config directory for authentication persistence
       - ${HOST_HOME:-~}/.config/claude:/root/.config/claude
     stdin_open: true
@@ -56,19 +64,30 @@ services:
     command: ["npx", "dotenvx", "run", "--", "node", "src/scheduler.js"]
     environment:
       - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY:-}
+      # The web server is another container; the prerender job warms its cache there
+      - TODAY_WEB_INTERNAL_URL=http://vault-web:${TODAY_WEB_PORT:-3000}
       - SKIP_DEP_CHECK=true
       - OLLAMA_HOST=http://ollama:11434
+      # Where Today's AI calls reach Ollama when [ai] provider = "ollama"
+      - OLLAMA_BASE_URL=http://ollama:11434
     volumes:
       - ${HOST_PROJECT_PATH:-.}:/app
       - calendar-cache:/app/.calendar-cache
       - /app/node_modules
       - ${HOST_HOME:-~}/.ssh:/root/.ssh:ro
+      # GitHub CLI login for the GitHub plugins (they use gh's own login, not
+      # tokens in .env, and need the `project` scope). Kept apart from the
+      # host's ~/.config/gh; empty if missing, which leaves gh logged out.
+      - ${TODAY_GH_CONFIG:-${HOST_HOME:-~}/.config/today-gh}:/root/.config/gh
+      # Claude Code's settings and sessions (CLAUDE_CONFIG_DIR in the image)
+      - claude-home:/root/.claude
     restart: unless-stopped
 
   # Runs node src/web-server.js — the vault web UI.
-  # No port mapping here — WEB_PORT is user-configured (encrypted in .env,
-  # decrypted by dotenvx at runtime) so compose can't know it at parse time.
-  # VS Code auto-forwards the port when it detects the server listening.
+  # WEB_PORT is user-configured (encrypted in .env, decrypted by dotenvx at
+  # runtime) so compose can't read it at parse time. Set TODAY_WEB_PORT as a
+  # plaintext line in .env to the same value; the port is published on the
+  # host's loopback only (front it with e.g. `tailscale serve`).
   vault-web:
     image: today-app:latest
     container_name: today-vault-web
@@ -77,10 +96,24 @@ services:
       - DOTENV_PRIVATE_KEY=${DOTENV_PRIVATE_KEY:-}
       - SKIP_DEP_CHECK=true
       - NODE_ENV=production
+      - WEB_HOST=0.0.0.0
+      - OLLAMA_BASE_URL=http://ollama:11434
     volumes:
       - ${HOST_PROJECT_PATH:-.}:/app
       - calendar-cache:/app/.calendar-cache
       - /app/node_modules
+      # SSH for the Git Changes page's pull and push (read-only)
+      - ${HOST_HOME:-~}/.ssh:/root/.ssh:ro
+      # neomutt's header and message caches (vault/today/neomuttrc), for the web console
+      - neomutt-cache:/root/.cache/neomutt
+      # GitHub CLI login for the GitHub plugins (they use gh's own login, not
+      # tokens in .env, and need the `project` scope). Kept apart from the
+      # host's ~/.config/gh; empty if missing, which leaves gh logged out.
+      - ${TODAY_GH_CONFIG:-${HOST_HOME:-~}/.config/today-gh}:/root/.config/gh
+      # Claude Code's settings and sessions (CLAUDE_CONFIG_DIR in the image)
+      - claude-home:/root/.claude
+    ports:
+      - "127.0.0.1:${TODAY_WEB_PORT:-3000}:${TODAY_WEB_PORT:-3000}"
     restart: unless-stopped
 
   # Runs node src/vault-watcher.js — real-time file change watcher.
@@ -108,12 +141,13 @@ services:
       - SKIP_DEP_CHECK=true
       - NODE_ENV=production
       - INBOX_API_PORT=3333
+      - INBOX_API_HOST=0.0.0.0
     volumes:
       - ${HOST_PROJECT_PATH:-.}:/app
       - calendar-cache:/app/.calendar-cache
       - /app/node_modules
     ports:
-      - "3333:3333"
+      - "127.0.0.1:3333:3333"
     restart: unless-stopped
 
   # Bidirectional working-tree sync via Unison over SSH.
@@ -143,13 +177,15 @@ services:
     volumes:
       - ollama-data:/root/.ollama
     ports:
-      - "11434:11434"
+      - "127.0.0.1:11434:11434"
     restart: unless-stopped
     # Uncomment to auto-pull a model on startup:
     # entrypoint: ["/bin/bash", "-c"]
     # command: ["ollama serve & sleep 5 && ollama pull tinyllama && tail -f /dev/null"]
 
 volumes:
+  claude-home:
+  neomutt-cache:
   calendar-cache:
     driver: local
   ollama-data:

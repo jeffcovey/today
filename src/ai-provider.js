@@ -84,9 +84,12 @@ async function getGoogleModel(modelName) {
 async function getOllamaModel(modelName, options = {}) {
   if (!ollamaProvider) {
     const { createOllama } = await import('ollama-ai-provider-v2');
-    ollamaProvider = createOllama({
-      baseURL: options.baseURL || process.env.OLLAMA_BASE_URL || 'http://localhost:11434/api',
-    });
+    // base_url / OLLAMA_BASE_URL is the server's root (as the availability and
+    // context-size checks use it); the provider wants its /api endpoint.
+    const root = (options.baseURL || process.env.OLLAMA_BASE_URL || 'http://localhost:11434')
+      .replace(/\/+$/, '')
+      .replace(/\/api$/, '');
+    ollamaProvider = createOllama({ baseURL: `${root}/api` });
   }
   return ollamaProvider(modelName);
 }

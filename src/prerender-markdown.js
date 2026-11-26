@@ -14,18 +14,28 @@
  *   bin/prerender
  *
  * The server must already be running.  WEB_PORT (default 3000) controls
- * which port is targeted.
+ * which port is targeted on this machine.  TODAY_WEB_INTERNAL_URL (e.g.
+ * http://vault-web:3001) points at a server elsewhere, such as another
+ * Docker container; the request then carries the warm token derived from
+ * SESSION_SECRET (src/cache-warm-auth.js).
  */
 
+import { warmToken, WARM_TOKEN_HEADER } from './cache-warm-auth.js';
+
 const PORT = process.env.WEB_PORT || 3000;
-const WARM_URL = `http://127.0.0.1:${PORT}/_cache/warm`;
+const BASE_URL = (process.env.TODAY_WEB_INTERNAL_URL || `http://127.0.0.1:${PORT}`).replace(/\/+$/, '');
+const WARM_URL = `${BASE_URL}/_cache/warm`;
 
 async function main() {
   console.log(`[prerender] Requesting cache warm from ${WARM_URL} …`);
 
+  const headers = {};
+  const token = warmToken(process.env.SESSION_SECRET);
+  if (token) headers[WARM_TOKEN_HEADER] = token;
+
   let res;
   try {
-    res = await fetch(WARM_URL, { method: 'POST' });
+    res = await fetch(WARM_URL, { method: 'POST', headers });
   } catch (err) {
     console.error(`[prerender] Could not reach web server at ${WARM_URL}: ${err.message}`);
     console.error('[prerender] Make sure the web server is running before running this script.');

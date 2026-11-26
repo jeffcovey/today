@@ -104,6 +104,8 @@ import { injectRoleReplyForms, saveRoleReply, ROLE_REPLY_ENDPOINT } from '../plu
 import { roleBlocksToCards } from '../plugins/roles/web-cards.js';
 import { CANCELLED_CHECKBOX_ATTRS, enableTaskCheckboxes, isCancelledTaskLine, markTaskListItems } from './task-checkboxes.js';
 import { getProjectsDueForReview } from './projects.js';
+import { pullVault } from './git-pull.js';
+import { warmRequestAllowed, WARM_TOKEN_HEADER } from './cache-warm-auth.js';
 import {
   formatInlineDataviewValue,
   generateTableOfContentsHtml,
@@ -6139,12 +6141,12 @@ app.post('/_cache/clear', sessionAuth, async (req, res) => {
 // Restricted to localhost so no session auth is required (safe for cron jobs).
 let cacheWarmInProgress = false;
 app.post('/_cache/warm', async (req, res) => {
-  // Use the raw socket address (not req.ip) to bypass trust-proxy header spoofing.
-  // This endpoint must only be reachable from the local machine.
+  // The local machine, or a caller with the warm token (the scheduler in its
+  // own container). Uses the raw socket address, not req.ip, which trusts
+  // proxy headers.
   const ip = req.socket?.remoteAddress || '';
-  const isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
-  if (!isLocal) {
-    return res.status(403).json({ error: 'Forbidden - localhost only' });
+  if (!warmRequestAllowed(ip, req.get(WARM_TOKEN_HEADER), process.env.SESSION_SECRET)) {
+    return res.status(403).json({ error: 'Forbidden - localhost or warm token only' });
   }
 
   if (cacheWarmInProgress) {
@@ -6737,6 +6739,23 @@ app.get('/_git', authMiddleware, async (req, res) => {
       }
     }
 
+    // The alert text for a Pull result, or '' when there's nothing to say.
+    // Files set aside are listed on failure too, since they've moved.
+    function pullResultMessage(data) {
+      const aside = data.setAside && data.setAside.length > 0 ? data.setAside.join('\\n') : '';
+      if (data.error) {
+        return aside ? data.error + '\\n\\nYour copies of these files were moved aside and kept as:\\n' + aside : data.error;
+      }
+      const notes = [];
+      if (data.resolved && data.resolved.length > 0) {
+        notes.push('Conflicts in ' + data.resolved.length + ' file(s) were auto-resolved (union merge):\\n' + data.resolved.join('\\n'));
+      } else if (data.stashed) {
+        notes.push('Local changes were stashed and re-applied.');
+      }
+      if (aside) notes.push('Your copies of these files differed from the pulled versions and were kept as:\\n' + aside);
+      return notes.length ? 'Pull succeeded.\\n\\n' + notes.join('\\n\\n') : '';
+    }
+
     async function gitPull() {
       const btn = document.getElementById('pullBtn');
       if (!btn) return;
@@ -6744,12 +6763,9 @@ app.get('/_git', authMiddleware, async (req, res) => {
       btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Pulling...';
       try {
         const data = await postGit('/_git/pull', {});
-        if (data.error) { alert(data.error); return; }
-        if (data.resolved && data.resolved.length > 0) {
-          alert('Pull succeeded. Conflicts in ' + data.resolved.length + ' file(s) were auto-resolved (union merge):\\n\\n' + data.resolved.join('\\n'));
-        } else if (data.stashed) {
-          alert('Pull succeeded (local changes were stashed and re-applied).');
-        }
+        const message = pullResultMessage(data);
+        if (data.error) { alert(message); return; }
+        if (message) alert(message);
         location.reload();
       } catch (err) {
         alert('Pull failed: ' + err.message);
@@ -6868,61 +6884,9 @@ app.post('/_git/commit', authMiddleware, (req, res) => {
 });
 
 app.post('/_git/pull', authMiddleware, (req, res) => {
-  try {
-    gitExec(['pull'], { timeout: 30000 });
-    res.json({ ok: true });
-  } catch (pullErr) {
-    // Pull failed — try stash, pull, stash pop
-    try {
-      gitExec(['stash', '--include-untracked'], { timeout: 10000 });
-      try {
-        gitExec(['pull'], { timeout: 30000 });
-      } catch (retryErr) {
-        // Pull still failed after stash — restore stash and report error
-        try { gitExec(['stash', 'pop']); } catch {}
-        console.error('Error pulling (after stash):', retryErr);
-        return res.status(500).json({ error: retryErr.stderr || 'Pull failed even after stashing changes' });
-      }
-      let resolved = [];
-      try {
-        gitExec(['stash', 'pop']);
-      } catch {
-        // stash pop produced merge conflicts — auto-resolve with union merge
-        try {
-          const conflicted = gitExec(['diff', '--name-only', '--diff-filter=U']).trim();
-          if (conflicted) {
-            const files = conflicted.split('\n');
-            const tmpDir = fsSync.mkdtempSync(path.join(require('os').tmpdir(), 'git-union-'));
-            for (const file of files) {
-              try {
-                // Extract the three merge stages from the index:
-                // stage 1 = base, stage 2 = ours (pulled), stage 3 = theirs (stashed)
-                const base = path.join(tmpDir, 'base');
-                const ours = path.join(tmpDir, 'ours');
-                const theirs = path.join(tmpDir, 'theirs');
-                try { fsSync.writeFileSync(base, gitExec(['show', ':1:' + file])); }
-                catch { fsSync.writeFileSync(base, ''); } // no base = new file on one side
-                fsSync.writeFileSync(ours, gitExec(['show', ':2:' + file]));
-                fsSync.writeFileSync(theirs, gitExec(['show', ':3:' + file]));
-                // merge-file writes result into the first file; --union keeps both sides
-                try { execFileSync('git', ['merge-file', '--union', ours, base, theirs], { cwd: VAULT_PATH, encoding: 'utf8' }); } catch {}
-                fsSync.copyFileSync(ours, path.join(VAULT_PATH, file));
-                gitExec(['add', '--', file]);
-                resolved.push(file);
-              } catch (e) {
-                console.error('Union merge failed for ' + file + ':', e.message);
-              }
-            }
-            try { fsSync.rmSync(tmpDir, { recursive: true }); } catch {}
-          }
-        } catch {}
-      }
-      res.json({ ok: true, stashed: true, resolved });
-    } catch (stashErr) {
-      console.error('Error pulling:', pullErr);
-      res.status(500).json({ error: pullErr.stderr || 'Failed to pull' });
-    }
-  }
+  const { status, body } = pullVault(VAULT_PATH);
+  if (status !== 200) console.error('Error pulling:', body.error);
+  res.status(status).json(body);
 });
 
 app.post('/_git/push', authMiddleware, (req, res) => {
@@ -8937,7 +8901,10 @@ try {
 }
 
 // Start server with extended timeout
-const server = app.listen(PORT, '127.0.0.1', () => {
+// Bind to loopback by default (nginx fronts it on a VPS). Docker sets
+// WEB_HOST=0.0.0.0 so the published port can reach the container.
+const HOST = process.env.WEB_HOST || '127.0.0.1';
+const server = app.listen(PORT, HOST, () => {
   console.log(`Web server running on http://localhost:${PORT}`);
   console.log(`Username: ${process.env.WEB_USER || 'admin'}`);
   console.log(`Password: ${process.env.WEB_PASSWORD || '(set WEB_PASSWORD in .env)'}`);

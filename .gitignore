@@ -90,3 +90,5 @@ backups/
 # =============================================================================
 .internal/
 coverage/
+# Backups of .env made before editing it (they hold secrets)
+.env.bak*

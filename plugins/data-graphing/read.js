@@ -47,6 +47,7 @@ const settings = {
   height: parseInt(config.height) || 450,
   chartType: config.chart_type || 'auto',
   goal: config.goal === undefined || config.goal === '' ? NaN : Number(config.goal),
+  includeCurrent: config.include_current === true || config.include_current === 'true',
   averageDays: config.average_days === undefined || config.average_days === '' ? 0 : parseInt(config.average_days, 10),
   chartTitle: config.chart_title || '',
   xAxisLabel: config.x_axis_label || '',
