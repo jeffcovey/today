@@ -982,6 +982,24 @@ function moveHomeTab(event) {
   tabs[next].focus();
 }
 
+async function openFocusConsole(presetName) {
+  const body = presetName
+    ? { preset: presetName }
+    : { request: document.getElementById('focusCustomCommand')?.value || '' };
+  try {
+    const response = await fetch('/_console/launch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || response.statusText);
+    window.location.href = result.url;
+  } catch (error) {
+    alert('Could not start the session: ' + error.message);
+  }
+}
+
 function toggleCollapse(sectionId) {
   const section = document.getElementById(sectionId);
   if (!section) return;

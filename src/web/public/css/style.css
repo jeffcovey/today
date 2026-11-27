@@ -2481,6 +2481,15 @@ html[data-theme="dark"] .list-group-item.git-dir-header {
   border-bottom-right-radius: inherit;
 }
 
+.focus-custom-item {
+  padding: 0.75rem 1rem;
+}
+
+.focus-preset-item {
+  display: flex;
+  align-items: center;
+}
+
 /* Chips on a phone, in one row that slides sideways. Seven folder tabs wrap
    to three lines at 390px; as chips on a single scrolling row they cost one,
    and each is still a 32px-tall target.
