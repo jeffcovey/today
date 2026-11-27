@@ -1140,6 +1140,172 @@ Common queries:
     indexes: ['source', 'full_name', 'birthday']
   },
 
+  'recipes': {
+    table: 'recipes',
+    staleMinutes: 30, // Recipe files change rarely; the vault watcher catches edits
+    ai: {
+      name: 'Recipes',
+      description: `The user's recipe library: one markdown file per recipe in the vault
+(schema.org Recipe properties in frontmatter), with ingredients, instructions,
+times, servings, a photo link and (usually) nutrition per serving.
+Use it for meal planning and for suggesting what to cook. Suggest recipes from the
+library before inventing new ones, and say when a suggestion isn't in it.`,
+      defaultCommand: 'bin/recipes stats',
+      queryInstructions: `Commands: bin/recipes list [--category X], bin/recipes search "term", bin/recipes show "title", bin/recipes stats
+SQL: SELECT title, categories, total_time_minutes, calories, protein_grams FROM recipes ORDER BY title`
+    },
+    fields: {
+      id: {
+        sqlType: 'TEXT PRIMARY KEY',
+        jsType: 'string',
+        required: false,
+        description: 'Unique identifier (the recipe file path)'
+      },
+      source: {
+        sqlType: 'TEXT NOT NULL',
+        dbOnly: true,
+        description: 'Plugin source identifier (e.g., markdown-recipes/default)'
+      },
+      title: {
+        sqlType: 'TEXT NOT NULL',
+        jsType: 'string',
+        required: true,
+        description: 'Recipe name'
+      },
+      description: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Introductory text about the recipe'
+      },
+      categories: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON array of categories (e.g. ["dinner"])'
+      },
+      cuisines: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON array of cuisines (e.g. ["indian"])'
+      },
+      keywords: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON array of keywords'
+      },
+      prep_time_minutes: {
+        sqlType: 'INTEGER',
+        jsType: 'number',
+        required: false,
+        description: 'Prep time in minutes'
+      },
+      cook_time_minutes: {
+        sqlType: 'INTEGER',
+        jsType: 'number',
+        required: false,
+        description: 'Cook time in minutes'
+      },
+      total_time_minutes: {
+        sqlType: 'INTEGER',
+        jsType: 'number',
+        required: false,
+        description: 'Total time in minutes'
+      },
+      servings: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Number of servings (recipeYield)'
+      },
+      url: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Link to the original recipe'
+      },
+      author: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Recipe author'
+      },
+      image_url: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Photo of the finished dish'
+      },
+      rating: {
+        sqlType: 'REAL',
+        jsType: 'number',
+        required: false,
+        description: 'Average rating from the original site'
+      },
+      ingredients: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON array of ingredient lines'
+      },
+      instructions: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON array of instruction steps'
+      },
+      nutrition: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON object of nutrition per serving (calories, fat, protein, sodium, etc.)'
+      },
+      calories: {
+        sqlType: 'REAL',
+        jsType: 'number',
+        required: false,
+        description: 'Calories per serving'
+      },
+      protein_grams: {
+        sqlType: 'REAL',
+        jsType: 'number',
+        required: false,
+        description: 'Protein per serving, in grams'
+      },
+      notes: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Free-form notes about the recipe'
+      },
+      date_added: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'Date the recipe was added to the library (YYYY-MM-DD)'
+      },
+      metadata: {
+        sqlType: 'TEXT',
+        jsType: 'string',
+        required: false,
+        description: 'JSON blob for other fields (file_path, rating_count, date_published, identifier, video)'
+      },
+      created_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record creation timestamp'
+      },
+      updated_at: {
+        sqlType: 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+        dbOnly: true,
+        description: 'Record update timestamp'
+      }
+    },
+    indexes: ['source', 'title']
+  },
+
   'utility': {
     // Utility plugins perform maintenance tasks and don't store data
     // They have no AI context (ai: null) because there's nothing to query

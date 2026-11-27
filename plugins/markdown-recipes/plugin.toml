@@ -1,0 +1,76 @@
+# Markdown Recipes Plugin
+# Syncs a vault directory of recipe markdown files to the database
+
+name = "markdown-recipes"
+displayName = "Markdown Recipes"
+description = "A recipe library kept as markdown files in your vault"
+type = "recipes"
+
+longDescription = """
+Keeps your recipe library as one markdown file per recipe under
+`recipes_directory` (subfolders are fine), and syncs it to the database for
+searching and meal planning. Edit, add or delete recipes in the vault; the
+database follows.
+
+Recipe details go in YAML frontmatter, using the property names of the
+schema.org Recipe vocabulary (what recipe sites and apps use).
+The body holds the photo, description, ingredients, steps and notes:
+
+```markdown
+---
+name: Butter Chickpeas
+url: https://thealmondeater.com/butter-chickpeas/
+image: https://thealmondeater.com/butter-chickpeas.jpg
+author: Jane Cook
+dateAdded: 2025-03-01
+recipeCategory: [dinner]
+recipeCuisine: [american, indian]
+keywords: [vegan, curry]
+recipeYield: "2"
+prepTime: PT5M
+cookTime: PT20M
+totalTime: PT25M
+nutrition:
+  calories: 271 kcal
+  proteinContent: 8 g
+aggregateRating:
+  ratingValue: 4.8
+  ratingCount: 120
+---
+
+# Butter Chickpeas
+
+![Butter Chickpeas](https://thealmondeater.com/butter-chickpeas.jpg)
+
+A short description.
+
+## Ingredients
+
+- 2 tbsp butter
+- 1 small onion (diced)
+
+## Instructions
+
+1. Melt the butter.
+2. Add the onion.
+
+## Notes
+
+Anything else.
+```
+
+Every field and section is optional. Times can be ISO 8601 (`PT1H30M`) or
+plain (`1h 30m`). `### Headings` inside Instructions split the steps into
+sections.
+"""
+
+aiInstructions = """
+Suggest recipes from the library first (`bin/recipes search`, `bin/recipes list --category`),
+and say so when a suggestion is not in it. Nutrition is per serving.
+"""
+
+[commands]
+read = "./read.js"
+
+[settings]
+recipes_directory = { type = "string", default = "vault/recipes", description = "Directory of recipe markdown files" }

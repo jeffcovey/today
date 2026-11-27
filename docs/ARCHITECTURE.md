@@ -221,6 +221,7 @@ All plugin-backed tables include a `source` column so multiple configured source
 | Health | `health_metrics` | `date`, `metric_name`, `value`, `units`, `metadata` |
 | Finance | `financial_transactions` | `date`, `account`, `payee`, `category`, `amount` |
 | Contacts | `contacts` | `full_name`, `organization`, `primary_email`, `birthday` |
+| Recipes | `recipes` | `title`, `categories`, `total_time_minutes`, `ingredients`, `calories` |
 
 ### System tables
 
