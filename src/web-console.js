@@ -13,6 +13,7 @@
  * anyone holding a valid session.
  */
 
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -121,7 +122,30 @@ function rejectUpgrade(socket, status, reason) {
   socket.destroy();
 }
 
-function originMatchesHost(req) {
+// One-time launches: a server-built command behind an opaque token, so a
+// navigation URL can never carry a command of its own. Used once, then gone.
+const LAUNCH_TTL_MS = 2 * 60_000;
+const launches = new Map();
+
+export function createConsoleLaunch(command) {
+  const now = Date.now();
+  for (const [token, launch] of launches) {
+    if (launch.expires < now) launches.delete(token);
+  }
+  const token = crypto.randomBytes(24).toString('hex');
+  launches.set(token, { command: command.replace(/[\r\n]+/g, ' ').trim(), expires: now + LAUNCH_TTL_MS });
+  return token;
+}
+
+export function consumeConsoleLaunch(token) {
+  if (typeof token !== 'string') return null;
+  const launch = launches.get(token);
+  if (!launch) return null;
+  launches.delete(token);
+  return launch.expires >= Date.now() ? launch.command : null;
+}
+
+export function originMatchesHost(req) {
   const origin = req.headers.origin;
   if (typeof origin !== 'string') return false;
   const host = req.headers.host;
@@ -204,14 +228,6 @@ export function attachConsole(server, {
         return;
       }
 
-      // A ?command= query param on the WebSocket URL overrides the configured
-      // startup command for this connection only (e.g. from the Focus tab).
-      const upgradeParams = new URL(req.url, 'http://localhost').searchParams;
-      const commandOverride = upgradeParams.get('command');
-      if (commandOverride) {
-        config = { ...config, command: commandOverride.replace(/[\r\n]+/g, ' ').trim() };
-      }
-
       let authenticated = false;
       try {
         authenticated = await authenticate(req, { bearerOnly: !hasOrigin });
@@ -221,6 +237,12 @@ export function attachConsole(server, {
       if (!authenticated) {
         rejectUpgrade(socket, 401, 'Unauthorized');
         return;
+      }
+
+      const launchToken = new URL(req.url, 'http://localhost').searchParams.get('launch');
+      if (launchToken) {
+        const launchCommand = consumeConsoleLaunch(launchToken);
+        if (launchCommand) config = { ...config, command: launchCommand };
       }
 
       wss.handleUpgrade(req, socket, head, (ws) => {

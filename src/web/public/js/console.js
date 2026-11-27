@@ -7,9 +7,11 @@
   if (!container || !statusEl || !reconnectBtn || typeof Terminal === 'undefined') return;
 
   const socketPath = (document.currentScript && document.currentScript.dataset.socketPath) || '/_console/socket';
-  const socketCommand = document.currentScript && document.currentScript.dataset.command;
-  const socketUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + socketPath +
-    (socketCommand ? '?command=' + encodeURIComponent(socketCommand) : '');
+  const socketUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + socketPath;
+  // A Focus launch is used by the first connection only: reconnecting or
+  // reloading gets the plain configured shell, which reattaches to tmux.
+  let launchToken = document.currentScript && document.currentScript.dataset.launch;
+  if (launchToken) history.replaceState(null, '', location.pathname);
 
   // xterm.js has one set of these for both modes, and it can't read well on both.
   // minimumContrastRatio would be simpler, but it greys out reverse-video text.
@@ -93,7 +95,8 @@
   const connect = () => {
     exited = false;
     setStatus('Connecting…', false);
-    socket = new WebSocket(socketUrl);
+    socket = new WebSocket(launchToken ? socketUrl + '?launch=' + encodeURIComponent(launchToken) : socketUrl);
+    launchToken = null;
     socket.addEventListener('open', () => {
       setStatus('Connected', false);
       refit();

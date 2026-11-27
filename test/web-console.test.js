@@ -13,7 +13,8 @@ import path from 'node:path';
 import WebSocket from 'ws';
 import { startServer, PASSWORD, PROJECT_ROOT } from './helpers/a11y-harness.js';
 import {
-  attachConsole, getConsoleConfig, shellEnvironment, DEFAULT_IDLE_MINUTES, CLOSE_IDLE, CLOSE_SHELL_EXITED
+  attachConsole, consumeConsoleLaunch, createConsoleLaunch, getConsoleConfig, shellEnvironment,
+  DEFAULT_IDLE_MINUTES, CLOSE_IDLE, CLOSE_SHELL_EXITED
 } from '../src/web-console.js';
 
 jest.setTimeout(180_000);
@@ -193,6 +194,46 @@ describe('PTY startup', () => {
     }
   });
 
+  test('a launch token runs its command once; reconnecting gets the configured command', async () => {
+    const httpServer = createServer();
+    const writes = [];
+    const term = () => ({
+      pid: 123,
+      onData: () => {},
+      onExit: () => {},
+      write: (data) => writes.push(data),
+      resize: () => {},
+      kill: () => {}
+    });
+    const attached = attachConsole(httpServer, {
+      authenticate: async () => true,
+      getConfigFn: () => ({ enabled: true, idleMinutes: 0, shell: '/bin/sh', command: 'tmux attach' }),
+      appRoot: PROJECT_ROOT,
+      log: () => {},
+      loadPtyFn: async () => ({ spawn: term })
+    });
+    const sockets = [];
+    try {
+      await new Promise((resolve) => httpServer.listen(0, '127.0.0.1', resolve));
+      const base = `ws://127.0.0.1:${httpServer.address().port}/_console/socket`;
+      const headers = { Origin: `http://127.0.0.1:${httpServer.address().port}` };
+      const token = createConsoleLaunch('echo launched');
+
+      sockets.push(await openSocket(`${base}?launch=${token}`, headers));
+      await waitFor(() => writes.length === 1, 'the launch command');
+      expect(writes[0]).toBe('echo launched\n');
+
+      sockets.push(await openSocket(`${base}?launch=${token}`, headers));
+      await waitFor(() => writes.length === 2, 'the configured command');
+      expect(writes[1]).toBe('tmux attach\n');
+      expect(consumeConsoleLaunch(token)).toBeNull();
+    } finally {
+      sockets.forEach((ws) => ws.close());
+      attached.close();
+      await new Promise((resolve) => httpServer.close(resolve));
+    }
+  });
+
   test('does not spawn a shell if the socket closes while the PTY module loads', async () => {
     const httpServer = createServer();
     const spawn = jest.fn();
@@ -308,6 +349,36 @@ describe('with [console] enabled', () => {
     const res = await fetch(`${server.baseUrl}/_git`, { headers: authHeaders });
     expect(res.status).toBe(200);
     expect(await res.text()).toContain('href="/_console"');
+  });
+
+  const launch = (body, headers = {}) => fetch(`${server.baseUrl}/_console/launch`, {
+    method: 'POST',
+    headers: { ...authHeaders, 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify(body)
+  });
+
+  test('a launch needs this site as its Origin', async () => {
+    expect((await launch({ request: '' })).status).toBe(403);
+    expect((await launch({ request: '' }, { Origin: 'https://attacker.example' })).status).toBe(403);
+  });
+
+  test('a launch refuses a preset that is not configured', async () => {
+    expect((await launch({ preset: 'nope; rm -rf ~' }, { Origin: server.baseUrl })).status).toBe(400);
+  });
+
+  test('a launch returns a one-time console URL that the page hands to its script', async () => {
+    const res = await launch({ request: "it's late" }, { Origin: server.baseUrl });
+    expect(res.status).toBe(200);
+    const { url } = await res.json();
+    expect(url).toMatch(/^\/_console\?launch=[0-9a-f]{48}$/);
+    const page = await (await fetch(`${server.baseUrl}${url}`, { headers: authHeaders })).text();
+    expect(page).toContain(`data-launch="${url.split('=')[1]}"`);
+  });
+
+  test('the console page ignores a command in its URL', async () => {
+    const page = await (await fetch(`${server.baseUrl}/_console?command=touch%20pwned`, { headers: authHeaders })).text();
+    expect(page).not.toContain('pwned');
+    expect(page).not.toContain('data-launch');
   });
 
   test('xterm is served from node_modules', async () => {

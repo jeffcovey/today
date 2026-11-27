@@ -73,7 +73,7 @@ import {
   buildMessages,
 } from './ai-chat/index.js';
 import { getNavbar, getThemeBootstrapScript, getDisplayMenuHtml, getToolLinksHtml, getSearchToggleHtml, getSearchFormHtml, getSearchRowHtml, THEME_COOKIE_NAME } from './web/navbar.js';
-import { attachConsole, getConsoleConfig, CONSOLE_PATH, CONSOLE_SOCKET_PATH } from './web-console.js';
+import { attachConsole, createConsoleLaunch, getConsoleConfig, originMatchesHost, CONSOLE_PATH, CONSOLE_SOCKET_PATH } from './web-console.js';
 import { attachMcp, getMcpConfig, getOrCreateMcpToken, MCP_PATH, MCP_TOKEN_ENV } from './web-mcp.js';
 import { getStoredThemeMode, setStoredThemeMode, isThemeMode, THEME_MODES,
   getStoredThemeName, setStoredThemeName, isThemeName, readWebPreferences } from './web-preferences.js';
@@ -6279,14 +6279,41 @@ app.use(`${CONSOLE_PATH}/vendor`, (req, res, next) => (getConsoleConfig().enable
 // a connector holds a secret that can be revoked without changing the password.
 attachMcp(app, { token: () => process.env[MCP_TOKEN_ENV] });
 
+const shellQuote = (value) => `'${String(value).replace(/'/g, `'"'"'`)}'`;
+
+// The Focus tab's launch: the command is built here from a configured preset
+// or the typed request, never taken from the browser. A POST with a matching
+// Origin, so another site can't start one with the user's session.
+app.post(`${CONSOLE_PATH}/launch`, authMiddleware, express.json(), (req, res) => {
+  if (!getConsoleConfig().enabled) return res.status(404).json({ error: 'The console is switched off.' });
+  if (!originMatchesHost(req)) return res.status(403).json({ error: 'Forbidden' });
+
+  const { preset, request } = req.body || {};
+  let todayCommand;
+  let windowName;
+  if (preset !== undefined) {
+    if (typeof preset !== 'string' || !Object.hasOwn(getFocusPresets(), preset)) {
+      return res.status(400).json({ error: 'Unknown focus preset.' });
+    }
+    todayCommand = `bin/today --focus ${shellQuote(preset)} --no-sync`;
+    windowName = preset;
+  } else {
+    const text = typeof request === 'string' ? request.replace(/[\r\n]+/g, ' ').trim() : '';
+    todayCommand = text ? `bin/today --no-sync ${shellQuote(text)}` : 'bin/today --no-sync';
+    windowName = 'today';
+  }
+  const command = `tmux has-session 2>/dev/null && tmux new-window -n ${shellQuote(windowName)} ${shellQuote(todayCommand)} && tmux attach || ${todayCommand}`;
+  res.json({ url: `${CONSOLE_PATH}?launch=${createConsoleLaunch(command)}` });
+});
+
 app.get(CONSOLE_PATH, authMiddleware, async (req, res) => {
   if (!getConsoleConfig().enabled) {
     res.status(404).send(await renderError(404,
       'The console is switched off. Add a [console] section with enabled = true to config.toml to turn it on.'));
     return;
   }
-  const consoleCommand = typeof req.query.command === 'string' ? req.query.command.replace(/[\r\n]+/g, ' ').trim() : '';
-  const commandAttr = consoleCommand ? ` data-command="${escapeHtmlEntities(consoleCommand)}"` : '';
+  const launchToken = typeof req.query.launch === 'string' && /^[0-9a-f]{48}$/.test(req.query.launch) ? req.query.launch : '';
+  const commandAttr = launchToken ? ` data-launch="${launchToken}"` : '';
   res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>

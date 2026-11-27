@@ -982,20 +982,22 @@ function moveHomeTab(event) {
   tabs[next].focus();
 }
 
-function openFocusConsole(presetName) {
-  const extra = presetName ? '' : (document.getElementById('focusCustomCommand')?.value.trim() || '');
-  let cmd;
-  if (presetName) {
-    cmd = 'bin/today --focus ' + presetName + ' --no-sync';
-  } else {
-    cmd = extra ? 'bin/today --no-sync ' + extra : 'bin/today --no-sync';
+async function openFocusConsole(presetName) {
+  const body = presetName
+    ? { preset: presetName }
+    : { request: document.getElementById('focusCustomCommand')?.value || '' };
+  try {
+    const response = await fetch('/_console/launch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || response.statusText);
+    window.location.href = result.url;
+  } catch (error) {
+    alert('Could not start the session: ' + error.message);
   }
-  const name = presetName || 'today';
-  // Use single-quote shell quoting: replace each ' with '"'"'
-  const shellQuote = (s) => "'" + s.replace(/'/g, "'\"'\"'") + "'";
-  const shellCmd = 'tmux has-session 2>/dev/null && tmux new-window -n ' + shellQuote(name) +
-    ' ' + shellQuote(cmd) + ' && tmux attach || ' + cmd;
-  window.location.href = '/_console?command=' + encodeURIComponent(shellCmd);
 }
 
 function toggleCollapse(sectionId) {
